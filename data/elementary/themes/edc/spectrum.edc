@@ -1,71 +1,107 @@
+// This group defines the spectrum widget, used for selecting a color from a 2D map (like saturation/value).
+// It's composed of a background, a content area for the color map, and a draggable cursor.
 group { name: "e/widgets/spectrum";
+   // Pre-loads the "diagonal_stripes.png" image and compresses it to save memory.
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // Defines the main background rectangle for the widget.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets create a small border around the widget.
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // Uses a theme-defined color for the dark background.
             color_class: "/bg-dark/normal/color";
+            // offscale prevents this part from being scaled by the global Edje scale factor, maintaining a consistent look.
             offscale;
          }
       }
+      // This part displays a tiled pattern, often used to indicate transparency or as a decorative background.
       part { name: "pat";
          scale: 1;
          description { state: "default" 0.0;
+            // Positions this part inside "bg" with a small margin.
             rel.to: "bg";
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
             image.normal: "diagonal_stripes.png";
+            // Uses an alternative dark background color from the theme.
             color_class: "/bg-dark-alt/normal/color";
+            // This macro sets up the image to be tiled with a size of 240x240 pixels.
             TILED_PATTERN(240, 240)
             offscale;
          }
       }
+      // A clipper is an invisible rectangle that masks other parts. Content drawn outside its area will not be visible.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
+            // It is sized and positioned to match the "e.swallow.content" part.
             rel.to: "e.swallow.content";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // When disabled, this part becomes visible as a semi-transparent white overlay (#FFFFFF40).
+            // This visually indicates the widget is inactive, and it's defined directly without a color_class
+            // to ensure it looks the same across different themes.
             color: 255 255 255 64; // no cc
          }
       }
+      // This is a SWALLOW part, which acts as a container for external Evas objects.
+      // The actual color spectrum (generated in C code) will be "swallowed" into this part.
       part { name: "e.swallow.content"; type: SWALLOW;
+         // The content of this part is clipped by the "clipper" part.
          clip_to: "clipper";
          description { state: "default" 0.0;
+            // It fills the area of the "pat" part.
             rel.to: "pat";
          }
       }
+      // An invisible, draggable rectangle that represents the user's selection point.
       part { name: "e.dragable.cursor"; type: RECT;
+         // The cursor's movement is confined to the "e.swallow.content" area.
          dragable.confine: "e.swallow.content";
+         // Enables dragging along both X and Y axes.
          dragable.x: 1 1 0;
          dragable.y: 1 1 0;
          description { state: "default" 0.0;
+            // Defines a 1x1 pixel cursor.
             min: 1 1;
             max: 1 1;
             fixed: 1 1;
+            // The cursor itself is not visible; it only serves as a handle for dragging.
             visible: 0;
+            // It's positioned relative to the content area, initially centered.
             rel.to: "e.swallow.content";
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
          }
       }
+      // This part is the visible vertical line of the crosshair cursor.
       part { name: "cursor_x"; type: RECT;
          description { state: "default" 0.0;
+            // The line's horizontal position is bound to the "e.dragable.cursor",
+            // while its vertical position spans the full height of "e.swallow.content",
+            // effectively creating a vertical line that follows the cursor's x-position.
             rel1.to_x: "e.dragable.cursor";
             rel1.to_y: "e.swallow.content";
             rel2.to_x: "e.dragable.cursor";
             rel2.to_y: "e.swallow.content";
+            // Uses a theme-defined color for the cursor.
             color_class: "/fg/normal/color/cursor";
          }
       }
+      // This part is the visible horizontal line of the crosshair cursor.
       part { name: "cursor_y"; type: RECT;
          description { state: "default" 0.0;
+            // The line's vertical position is bound to the "e.dragable.cursor",
+            // while its horizontal position spans the full width of "e.swallow.content",
+            // creating a horizontal line that follows the cursor's y-position.
             rel1.to_x: "e.swallow.content";
             rel1.to_y: "e.dragable.cursor";
             rel2.to_x: "e.swallow.content";
             rel2.to_y: "e.dragable.cursor";
+            // Uses a theme-defined color for the cursor.
             color_class: "/fg/normal/color/cursor";
          }
       }

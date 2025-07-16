@@ -1,17 +1,35 @@
+// This group defines the default style for a radio widget, which includes a
+// circular checkmark and an optional label and icon. It's the standard
+// representation of a radio button.
 group { name: "elm/radio/base/default";
+// A bitmask flag to indicate the selected state. This is used in scripts
+// to manage the radio button's state.
 #define SELECTED 8
+   // The script block contains Embryo script code for dynamic behavior.
    script {
+      // Inherits common button state logic, like handling different modes (icon,
+      // label, both) and states (pressed, disabled).
       BUTTONMODE_SCRIPT
+      // A public variable to store the selection state. It's manipulated by
+      // programs to reflect the radio's on/off status.
       public sel;
+      // This function evaluates the state and updates the checkmark's visibility.
+      // 'm' is a bitmask of the current state.
       public eval_sel(m) {
+         // If 'm' is non-zero, the radio is considered selected.
          if (m) {
+            // Shows the checkmark by setting its state to "selected".
             set_state(PART:"ck_check", "selected", 0.0);
          } else {
+            // Hides the checkmark by setting its state to "default".
             set_state(PART:"ck_check", "default", 0.0);
          }
       }
    }
    parts {
+      // The "shadow" part is a spacer, typically used to create a drop-shadow
+      // effect for the widget, giving it depth. It does not react to mouse
+      // events.
       part { name: "shadow"; type: SPACER;
          description { state: "default";
          }
@@ -20,6 +38,9 @@ group { name: "elm/radio/base/default";
          desc { "disabled"; inherit;
          }
       }
+      // This part is a container for a custom background. 'nomouse' ensures it
+      // doesn't interfere with mouse events. It's hidden by default and becomes
+      // visible when the "elm,state,background,visible" signal is received.
       swallow { "elm.swallow.background"; nomouse;
          desc { "default";
             visible: 0;
@@ -28,17 +49,25 @@ group { name: "elm/radio/base/default";
             visible: 1;
          }
       }
+      // A clipping rectangle for the icon. This ensures that the icon, when
+      // displayed, does not draw outside its designated area.
       rect { "icon_clip";
          desc { "default";
+            // Fully opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
          desc { "pressed"; inherit;
+            // Fully opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
          desc { "disabled"; inherit;
+            // Semi-transparent white (#FFFFFF40) for the disabled state.
             color: 255 255 255 64; // no cc
          }
       }
+      // This swallow part is for the main content, typically an icon.
+      // 'nomouse' prevents it from capturing mouse events, which are handled by
+      // the "event" rectangle. It's clipped by "icon_clip".
       swallow { "elm.swallow.content"; nomouse;
          clip_to: "icon_clip";
          scale: 1;
@@ -70,6 +99,9 @@ group { name: "elm/radio/base/default";
             min: ICMIN ICMIN;
          }
       }
+      // "base" is a reference rectangle that defines the core geometry for the
+      // radio checkmark area. Other parts like the background and checkmark
+      // are positioned relative to it. It's not visible itself.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default";
@@ -90,6 +122,8 @@ group { name: "elm/radio/base/default";
          desc { "disabled"; inherit;
          }
       }
+      // The background of the checkmark area. It's an image part positioned
+      // relative to the "base" part.
       part { name: "ck_bg";
          scale: 1;
          description { state: "default" 0.0;
@@ -98,14 +132,19 @@ group { name: "elm/radio/base/default";
             image.normal: "i-radio";
             min: 15 15;
             max: 15 15;
+            // Themed color for the normal background.
             color_class: "/bg/normal/radio/base";
          }
          desc { "disabled"; inherit;
+            // Themed color for the disabled state.
             color_class: "/bg/disabled/radio/base";
          }
       }
+      // The checkmark itself. It's an image part that is only visible when the
+      // radio button is in the "selected" state.
       part { name: "ck_check";
          scale: 1;
+         // By default, the checkmark is invisible.
          description { state: "default" 0.0;
             color_class: "/fg/selected/radio/radio";
             rel.to: "base";
@@ -115,14 +154,18 @@ group { name: "elm/radio/base/default";
             fixed: 1 1;
             visible: 0;
          }
+         // In the "selected" state, it becomes visible.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
+         // In disabled state, it is not visible.
          desc { "disabled"; inherit;
             visible: 0;
          }
       }
+      // This part provides visual feedback when the radio button is pressed. It's
+      // an overlay that becomes visible only during a "pressed" state.
       part { name: "ck_press";
          scale: 1;
          description { state: "default" 0.0;
@@ -139,6 +182,8 @@ group { name: "elm/radio/base/default";
             visible: 1;
          }
       }
+      // The text label for the radio button. 'nomouse' prevents it from
+      // capturing mouse events. It is positioned to the right of the icon/check area.
       text { "elm.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -200,9 +245,13 @@ group { name: "elm/radio/base/default";
             visible: 1;
          }
       }
+      // An invisible rectangle that covers the entire widget area to capture
+      // mouse events. This is a common technique to provide a single, reliable
+      // event source for the widget.
       rect { "event";
          ignore_flags: ON_HOLD;
          desc { "default";
+            // Transparent color (#00000000).
             color: 0 0 0 0; // no cc
          }
          desc { "disabled"; inherit;
@@ -211,9 +260,12 @@ group { name: "elm/radio/base/default";
       }
    }
    programs {
+      // When the event rectangle is clicked, it emits a signal to toggle the radio's state.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,radio,toggle" "elm";
       }
+      // Handles the "on" state signal. It updates the 'sel' variable by setting
+      // the SELECTED flag, then calls eval_sel to update the visual state.
       program { signal: "elm,state,radio,on"; source: "elm";
          script {
             new m = get_int(sel) | SELECTED;
@@ -221,6 +273,8 @@ group { name: "elm/radio/base/default";
             eval_sel(m);
          }
       }
+      // Handles the "off" state signal, clearing the SELECTED flag in 'sel' and
+      // updating the visuals.
       program { signal: "elm,state,radio,off"; source: "elm";
          script {
             new m = get_int(sel) & ~SELECTED;
@@ -228,29 +282,37 @@ group { name: "elm/radio/base/default";
             eval_sel(m);
          }
       }
+      // On mouse down, emit a "press" signal and trigger the click animation.
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
       }
+      // Sets the PRESSED flag, used for state-based visual changes.
       program { name: "button_click_anim";
          script { flag_set(PRESSED); }
       }
+      // On mouse down, temporarily show the "selected" state for immediate feedback.
       program { signal: "mouse,down,1"; source: "event";
          script { eval_sel(get_int(sel) | SELECTED); }
       }
+      // On mouse up, emit an "unpress" signal and trigger the unclick animation.
       program { signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
          after: "button_unclick_anim";
       }
+      // Unsets the PRESSED flag.
       program { name: "button_unclick_anim";
          script { flag_unset(PRESSED); }
       }
+      // On mouse up, revert the visual state to the actual selection state stored in 'sel'.
       program { signal: "mouse,up,1"; source: "event";
          script { eval_sel(get_int(sel)); }
       }
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // These programs manage state flags based on signals for text and icon visibility.
+      // This allows different parts of the UI to react to whether a label or icon is present.
       program { signal: "elm,state,text,visible"; source: "elm";
          script { flag_set(LABEL); }
       }
@@ -269,12 +331,14 @@ group { name: "elm/radio/base/default";
       program { signal: "elm,state,background,hidden"; source: "elm";
          script { flag_unset(BACKGROUND); }
       }
+      // These programs manage the disabled state of the widget.
       program { signal: "elm,state,disabled"; source: "elm";
          script { flag_set(DISABLE); }
       }
       program { signal: "elm,state,enabled"; source: "elm";
          script { flag_unset(DISABLE); }
       }
+      // Directly sets the visual state of checkmark parts when disabled or enabled.
       program { signal: "elm,state,disabled"; source: "elm";
          action:  STATE_SET "disabled" 0.0;
          target: "ck_check";
@@ -285,6 +349,7 @@ group { name: "elm/radio/base/default";
          target: "ck_check";
          target: "ck_bg";
       }
+      // Manages the visual feedback for the pressed state on the "ck_press" part.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "pressed" 0.0;
          target: "ck_press";
@@ -296,20 +361,31 @@ group { name: "elm/radio/base/default";
    }
 }
 
+// This group defines a "plain" style for radio and check buttons, often used
+// in toolbars or other compact UI elements. It lacks the distinct circular
+// radio graphic of the default style, appearing more like a toggle button.
 group { name: "elm/radio/base/plain";
    alias: "elm/check/base/plain";
+   // The script handles the complex state logic for this versatile button.
    script {
+      // 'btmode' stores the combined state (selected, disabled, icon/label visibility).
       public btmode;
+      // 'eval_mode' is the core state evaluation function. It takes the state
+      // bitmask 'm' and updates all relevant parts of the widget accordingly.
       public eval_mode(m) {
-         new m1 = m & MASK;
-         new d = m & DISABLE;
-         new s = m & SELECTED;
+         // Deconstruct the state bitmask into individual flags for easier use.
+         new m1 = m & MASK; // Visibility mask (icon, label)
+         new d = m & DISABLE; // Disabled flag
+         new s = m & SELECTED; // Selected flag
+         // Handle the selected/deselected states for enabled/disabled modes.
          if (s) {
             if (!d) {
+               // Selected and enabled.
                set_state(PART:"shadow", "selected", 0.0);
                set_state(PART:"base", "selected", 0.0);
                set_state(PART:"bar", "selected", 0.0);
             } else {
+               // Selected but disabled.
                set_state(PART:"shadow", "selected", 0.0);
                set_state(PART:"base", "disabled", 0.0);
                set_state(PART:"bar", "default", 0.0);
@@ -325,7 +401,10 @@ group { name: "elm/radio/base/plain";
                set_state(PART:"bar", "default", 0.0);
             }
          }
+         // This large block handles the layout and state of text and icon
+         // based on their visibility flags.
          if (m1 == (ICON | LABEL)) {
+            // Case: Both icon and label are visible.
             if (!d) {
                set_state(PART:"elm.swallow.content", "visible", 0.0);
                if (s) set_state(PART:"elm.text", "selected", 0.0);
@@ -339,6 +418,7 @@ group { name: "elm/radio/base/plain";
                set_state(PART:"event", "disabled", 0.0);
             }
          } else if (m1 == (ICON)) {
+            // Case: Only icon is visible.
             if (!d) {
                set_state(PART:"elm.swallow.content", "icononly", 0.0);
                set_state(PART:"elm.text", "default", 0.0);
@@ -351,6 +431,7 @@ group { name: "elm/radio/base/plain";
                set_state(PART:"event", "disabled", 0.0);
             }
          } else if (m1 == (LABEL)) {
+            // Case: Only label is visible.
             if (!d) {
                set_state(PART:"elm.swallow.content", "default", 0.0);
                if (s) set_state(PART:"elm.text", "selected", 0.0);
@@ -379,10 +460,13 @@ group { name: "elm/radio/base/plain";
       }
    }
    parts {
+      // The shadow provides a subtle 3D effect. Its appearance changes when
+      // the button is selected to give a "pressed" look.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // A macro for a standard small window shadow.
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal/button";
          }
@@ -393,6 +477,7 @@ group { name: "elm/radio/base/plain";
             color_class: "/shadow/pressed/button";
          }
       }
+      // The main background rectangle of the button.
       rect { name: "base"; nomouse;
          scale: 1;
          desc { "default";
@@ -411,14 +496,18 @@ group { name: "elm/radio/base/plain";
             color_class: "/bg/disabled/button";
          }
       }
+      // Clipping rectangle for the content (icon).
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // Semi-transparent white (#FFFFFF40) for the disabled state overlay.
             color: 255 255 255 64; // no cc
          }
       }
+      // The main difference from the "plain" style is the layout of content
+      // and text. Here, the icon is centered horizontally and aligned to the top.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          clip_to: "clip";
@@ -495,10 +584,13 @@ group { name: "elm/radio/base/plain";
             text.ellipsis: -1;
          }
       }
+      // A decorative bar at the bottom, visible only when the button is
+      // selected, acting as an indicator.
       rect { "bar"; nomouse;
          scale: 1;
          desc { "default";
             color_class: "/fg/selected/button/bar";
+            // Transparent by default (#FFFFFF00).
             color: 255 255 255 0; // no cc
             fixed: 0 1;
             rel.to: "base";
@@ -509,6 +601,7 @@ group { name: "elm/radio/base/plain";
          }
          desc { "selected"; inherit;
            min: 0 5;
+           // Opaque white when selected (#FFFFFFFF).
            color: 255 255 255 255; // no cc
            visible: 1;
          }
@@ -524,18 +617,23 @@ group { name: "elm/radio/base/plain";
       }
    }
    programs {
+      // On mouse down, temporarily set the SELECTED flag and update the visuals
+      // to give immediate feedback of a press action.
       program { signal: "mouse,down,1"; source: "event";
          script {
             new m = get_int(btmode);
             eval_mode(m | SELECTED);
          }
       }
+      // On mouse up, revert to the actual state stored in 'btmode'.
       program { signal: "mouse,up,1"; source: "event";
          script {
             new m = get_int(btmode);
             eval_mode(m);
          }
       }
+      // On a full click, emit toggle signals for both radio and check. This is
+      // because this group is aliased for both widget types.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,radio,toggle" "elm";
          after: "check_toggle";
@@ -543,6 +641,8 @@ group { name: "elm/radio/base/plain";
       program { name: "check_toggle";
          action: SIGNAL_EMIT "elm,action,check,toggle" "elm";
       }
+      // When an "on" signal is received (for radio or check), set the SELECTED
+      // flag in 'btmode', save it, and update the visuals.
       program { signal: "elm,state,*,on"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -550,6 +650,7 @@ group { name: "elm/radio/base/plain";
             eval_mode(m);
          }
       }
+      // Handles the "off" state signal.
       program { signal: "elm,state,*,off"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -557,6 +658,9 @@ group { name: "elm/radio/base/plain";
             eval_mode(m);
          }
       }
+      // The following programs handle state changes for text, icon visibility,
+      // and disabled status. They update the 'btmode' state variable with the
+      // appropriate flag and then call eval_mode() to refresh the UI.
       program { signal: "elm,state,text,visible"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -602,8 +706,12 @@ group { name: "elm/radio/base/plain";
    }
 }
 
+// This group defines an "icon" style for radio and check buttons, where the
+// icon is the primary element and the text is positioned below it. It is
+// structurally very similar to the "plain" style.
 group { name: "elm/radio/base/icon";
    alias: "elm/check/base/icon";
+   // The script is identical to the "plain" style, managing states in the same way.
    script {
       public btmode;
       public eval_mode(m) {
@@ -760,6 +868,7 @@ group { name: "elm/radio/base/icon";
             fixed: 1 1;
          }
       }
+      // The text is positioned below the icon area.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -830,6 +939,7 @@ group { name: "elm/radio/base/icon";
          }
       }
    }
+   // The programs are identical to the "plain" style.
    programs {
       program { signal: "mouse,down,1"; source: "event";
          script {
@@ -909,7 +1019,11 @@ group { name: "elm/radio/base/icon";
    }
 }
 
+// This group defines a radio button style specifically for list headers, used
+// for indicating sort order. It uses an arrow icon instead of a standard radio
+// circle. The logic is very similar to the "default" radio style.
 group { name: "elm/radio/base/sort_header";
+   // The script is identical to the "default" style's script.
    script {
       BUTTONMODE_SCRIPT
       public sel;
@@ -1000,6 +1114,7 @@ group { name: "elm/radio/base/sort_header";
          desc { "disabled"; inherit;
          }
       }
+      // The background of the indicator, using a down-arrow image.
       part { name: "ck_bg";
          scale: 1;
          description { state: "default" 0.0;
@@ -1014,6 +1129,7 @@ group { name: "elm/radio/base/sort_header";
             color_class: "/bg/disabled/radio/base";
          }
       }
+      // The selected state indicator, also an arrow. It's only visible when selected.
       part { name: "ck_check";
          scale: 1;
          description { state: "default" 0.0;
@@ -1049,6 +1165,7 @@ group { name: "elm/radio/base/sort_header";
             visible: 1;
          }
       }
+      // The text label for the header.
       text { "elm.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -1061,6 +1178,7 @@ group { name: "elm/radio/base/sort_header";
             text { font: FN; size: 10;
                align: 0.0 0.5;
                min: 0 0;
+               // Ellipsis is disabled to ensure the full header text is visible.
                ellipsis: 0;
             }
             visible: 0;
@@ -1121,6 +1239,8 @@ group { name: "elm/radio/base/sort_header";
          }
       }
    }
+   // The programs are identical to the "default" style, handling clicks,
+   // state changes, and visual feedback in the same manner.
    programs {
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,radio,toggle" "elm";

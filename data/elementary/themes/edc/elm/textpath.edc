@@ -1,21 +1,43 @@
+// Default theme for the Textpath widget, which is designed to render text along a path.
+// This group defines a single textblock part that holds the text content.
 group { name: "elm/textpath/base/default";
    styles {
+      // Defines a style for text displayed within the widget.
       style { name: "textpath_style";
+         // 'base' specifies the default text properties.
+         // FN is a macro for the default font name.
+         // 'color' uses a color class, allowing the actual color to be defined
+         // globally for theme consistency. For example, /fg/normal/text might
+         // resolve to a dark grey like #333333.
          base: "font="FN" font_size=16 text_class=tb_plain wrap=none align=left color=cc:/fg/normal/text";
+         // Maps HTML-like tags to styling changes.
+         // <br> creates a line break.
          tag: "br" "\n";
+         // <b> makes text bold. The '+' means it inherits from the base style.
          tag: "b" "+ font="FNBD" text_class=tb_light";
+         // Includes a standard set of text formatting tags (e.g., <i>, <u>)
+         // defined by this macro, ensuring consistent styling capabilities across different widgets.
          ENABLED_TEXTBLOCK_TAGS
       }
    }
    parts {
+      // The 'elm.text' part is the primary component for displaying text. Its name
+      // is a convention that allows the widget's C code to access it.
       part { name: "elm.text";
          type: TEXTBLOCK;
+         // 'scale: 1' enables dynamic scaling of the text size based on the
+         // system's scaling factor, ensuring readability on high-DPI displays.
          scale: 1;
          description { state: "default" 0.0;
+            // Aligns the part to the top-left of the group's area.
             align: 0.0 0.0;
             text {
                style: "textpath_style";
+               // min: 0 1; prevents the text from becoming invisible by ensuring a
+               // minimum height of 1 pixel, while allowing it to shrink horizontally.
                min: 0 1;
+               // align: 0.0 0.5; horizontally aligns text to the left and vertically centers it
+               // within the part area.
                align: 0.0 0.5;
             }
          }

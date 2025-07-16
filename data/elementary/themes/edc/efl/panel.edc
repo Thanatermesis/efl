@@ -1,7 +1,11 @@
+// This group defines a basic panel layout. It serves as a container
+// for content, which is managed by the application.
 group { name: "efl/panel";
    data.item: "version" "123";
    data.item: "handler_size" "30";
    parts {
+      // The "efl.content" part is a SWALLOW type, which acts as a placeholder
+      // where the application can place its own content (e.g., widgets).
       part { name: "efl.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
@@ -9,9 +13,13 @@ group { name: "efl/panel";
    }
 }
 
+// This group defines a panel for the left side of a scroller.
+// It manages the visibility of the panel content and its background.
 group { name: "efl/scroller/panel/left";
    data.item: "version" "123";
    parts {
+      // "efl.panel_area" is a SWALLOW part that defines the area where the panel
+      // content will be displayed. It is initially not visible.
       part { name: "efl.panel_area"; type: SWALLOW;
          description { state: "default" 0.0;
             rel2.relative: 0.0 1.0;
@@ -24,6 +32,8 @@ group { name: "efl/scroller/panel/left";
             visible: 1;
          }
       }
+      // "efl.event_area" is a SWALLOW part, likely used for handling events
+      // to toggle the panel's visibility. It's positioned to the right of the panel area.
       part { name: "efl.event_area"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "efl.panel_area";
@@ -38,13 +48,17 @@ group { name: "efl/scroller/panel/left";
             visible: 1;
          }
       }
+      // "access.outline" is a transparent rectangle for accessibility purposes,
+      // outlining the panel area.
       part { name: "access.outline"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
             rel.to: "efl.panel_area";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
+      // "bg" is the background rectangle for the panel.
+      // It uses a color class, allowing for theme-based styling.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.panel_area";
@@ -56,6 +70,7 @@ group { name: "efl/scroller/panel/left";
             visible: 1;
          }
       }
+      // "efl.content" is where the actual content of the panel is swallowed.
       part { name: "efl.content"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "efl.panel_area";
@@ -67,7 +82,10 @@ group { name: "efl/scroller/panel/left";
          }
       }
    }
+   // Programs define the behavior of the group in response to signals.
    programs {
+      // When "efl,state,content,visible" is received, all parts are made visible
+      // by changing their state to "visible".
       program { signal: "efl,state,content,visible"; source: "efl";
          action: STATE_SET "visible" 0.0;
          target: "efl.panel_area";
@@ -75,6 +93,8 @@ group { name: "efl/scroller/panel/left";
          target: "bg";
          target: "efl.content";
       }
+      // When "efl,state,content,hidden" is received, all parts are hidden
+      // by reverting their state to "default".
       program { signal: "efl,state,content,hidden"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "efl.panel_area";
@@ -85,6 +105,8 @@ group { name: "efl/scroller/panel/left";
    }
 }
 
+// This group defines a panel for the right side of a scroller,
+// with a layout mirrored from the left panel.
 group { name: "efl/scroller/panel/right";
    data.item: "version" "123";
    parts {
@@ -169,6 +191,8 @@ group { name: "efl/scroller/panel/right";
    }
 }
 
+// This group defines a panel for the top of a scroller.
+// The layout is adjusted for a horizontal panel at the top.
 group { name: "efl/scroller/panel/top";
    data.item: "version" "123";
    parts {
@@ -253,6 +277,8 @@ group { name: "efl/scroller/panel/top";
    }
 }
 
+// This group defines a panel for the bottom of a scroller,
+// with a layout mirrored from the top panel.
 group { name: "efl/scroller/panel/bottom";
    data.item: "version" "123";
    parts {
@@ -328,20 +354,29 @@ group { name: "efl/scroller/panel/bottom";
    }
 }
 
+// This group defines a left-side panel that can be toggled.
+// It includes features like animations, focus highlighting, and RTL support.
 group { name: "efl/panel/left";
    data.item: "version" "123";
-   data.item: "focus_highlight" "on";
+   data.item: "focus_highlight" "on"; // Enables focus highlight feature
+   // Script block to define Embryo script variables and functions.
+   // 'is_rtl' is used to track Right-To-Left language mode.
    script {
       public is_rtl = 0;
    }
    parts {
+      // "shadow" part adds a drop shadow effect to the panel.
+      // It follows the "base" part's geometry.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // WIN_SHADOW_SMALL is a macro that defines shadow properties.
             WIN_SHADOW_SMALL;
          }
       }
+      // "glow" part is for the focus highlight effect. It's a rectangle
+      // that becomes visible when the panel is focused.
       part { name: "glow"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -357,10 +392,13 @@ group { name: "efl/panel/left";
             visible: 1;
          }
       }
+      // "all" is a spacer that occupies the entire group area, used as a
+      // reference for other parts.
       part { name: "all"; type: SPACER;
          description { state: "default" 0.0;
          }
       }
+      // "base" is the main background rectangle of the panel.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_x: "all";
@@ -369,6 +407,8 @@ group { name: "efl/panel/left";
             color_class: "/bg/normal/panel";
          }
       }
+      // "efl.content" is the SWALLOW part for the application content.
+      // It's placed inside the "base" part with some padding.
       part { name: "efl.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -378,6 +418,8 @@ group { name: "efl/panel/left";
             offscale;
          }
       }
+      // "efl.swallow.event" is a SWALLOW part that acts as the handle or
+      // toggle button area for the panel.
       part { name: "efl.swallow.event"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -386,8 +428,9 @@ group { name: "efl/panel/left";
             align: 1.0 0.5;
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
+         // When hidden, the event area moves to the left edge to hide the panel.
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
             align: 0.0 0.5;
@@ -395,15 +438,19 @@ group { name: "efl/panel/left";
             rel2.relative: 0.0 1.0;
          }
       }
+      // "btn" is a transparent rectangle on top of the event area to capture
+      // mouse clicks for toggling the panel.
       part { name: "btn"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.swallow.event";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
          description { state: "hidden" 0.0;
             rel.to: "efl.swallow.event";
          }
       }
+      // "icn" is the icon part, displaying an arrow to indicate
+      // the panel's toggle action. It's not interactive (mouse_events: 0).
       part { name: "icn"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -412,6 +459,7 @@ group { name: "efl/panel/left";
             rel.to: "btn";
             image.normal: "i-arrow-l";
          }
+         // The icon changes to a right arrow when the panel is hidden.
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
             image.normal: "i-arrow-r";
@@ -419,15 +467,18 @@ group { name: "efl/panel/left";
       }
    }
    programs {
+      // Clicking the "btn" part emits a signal to toggle the panel.
       program { signal: "mouse,clicked,1"; source: "btn";
          action: SIGNAL_EMIT "efl,action,panel,toggle" "efl";
       }
+      // On "efl,action,show", animate the event area and base to their "default" state.
       program { signal: "efl,action,show"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
          target: "efl.swallow.event";
          target: "base";
       }
+      // This script runs when showing the panel to set the correct icon based on RTL mode.
       program { signal: "efl,action,show"; source: "efl";
          script {
             if (get_int(is_rtl) == 0)
@@ -436,6 +487,7 @@ group { name: "efl/panel/left";
               set_state(PART:"icn", "hidden", 0.0);
          }
       }
+      // When the UI switches to RTL mode, this script updates the icon and sets 'is_rtl'.
       program { signal: "edje,state,rtl"; source: "edje";
          script {
             new st[31];
@@ -448,6 +500,7 @@ group { name: "efl/panel/left";
             set_int(is_rtl, 1);
          }
       }
+      // When the UI switches to LTR mode, this script updates the icon and unsets 'is_rtl'.
       program { signal: "edje,state,ltr"; source: "edje";
          script {
             new st[31];
@@ -460,11 +513,13 @@ group { name: "efl/panel/left";
             set_int(is_rtl, 0);
          }
       }
+      // On "efl,action,hide", animate the event area to its "hidden" state.
       program { signal: "efl,action,hide"; source: "efl";
          action: STATE_SET "hidden" 0.0;
          transition: ACCELERATE 0.2;
          target: "efl.swallow.event";
       }
+      // This script runs when hiding the panel to set the correct icon based on RTL mode.
       program { signal: "efl,action,hide"; source: "efl";
          script {
             if (get_int(is_rtl) == 0)
@@ -473,8 +528,12 @@ group { name: "efl/panel/left";
               set_state(PART:"icn", "default", 0.0);
          }
       }
+      // The "hide1" and "hide2" programs work together to create a custom
+      // slide-out animation for the panel.
       program { name: "hide1";
          signal: "efl,action,hide"; source: "efl";
+         // This script calculates the position for the "base" part to slide off-screen.
+         // It creates a custom state for the animation.
          script {
             new x, y, w, h;
             if (get_int(is_rtl) == 0) {
@@ -492,16 +551,20 @@ group { name: "efl/panel/left";
          }
          after: "hide2";
       }
+      // "hide2" applies the custom state created by "hide1" with a transition,
+      // executing the animation.
       program { name: "hide2";
          action: STATE_SET "custom" 0.0;
          transition: ACCELERATE 0.3;
          target: "base";
       }
+      // Shows the focus highlight effect.
       program { signal: "efl,action,focus_highlight,show"; source: "efl";
          action: STATE_SET "focused" 0.0;
          transition: ACCELERATE 0.2;
          target: "glow";
       }
+      // Hides the focus highlight effect.
       program { signal: "efl,action,focus_highlight,hide"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -510,10 +573,13 @@ group { name: "efl/panel/left";
    }
 }
 
+// This group defines a right-side panel, inheriting its base functionality
+// from "efl/panel/left" and overriding parts for a right-aligned layout.
 group { name: "efl/panel/right";
    data.item: "version" "123";
    inherit: "efl/panel/left";
    parts {
+      // Overriding "base" to position it on the right side of the event area.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 1.0 0.0;
@@ -524,6 +590,7 @@ group { name: "efl/panel/right";
             rel2.offset: -1 -1;
          }
       }
+      // Overriding "efl.swallow.event" to place it on the left edge.
       part { name: "efl.swallow.event";
          description { state: "default" 0.0;
             align: 0.0 0.5;
@@ -536,6 +603,7 @@ group { name: "efl/panel/right";
             rel2.relative: 1.0 1.0;
          }
       }
+      // Overriding icon images for a right-side panel.
       part { name: "icn";
          description { state: "default" 0.0;
             image.normal: "i-arrow-r";
@@ -546,6 +614,7 @@ group { name: "efl/panel/right";
       }
    }
    programs {
+      // Overriding "hide1" program for a right-side slide-out animation.
       program { name: "hide1";
          script {
             new x, y, w, h;
@@ -560,10 +629,13 @@ group { name: "efl/panel/right";
    }
 }
 
+// This group defines a top panel, inheriting from "efl/panel/left" and
+// adapting the layout for a horizontal, top-aligned panel.
 group { name: "efl/panel/top";
    data.item: "version" "123";
    inherit: "efl/panel/left";
    parts {
+      // Overriding "base" for a top-aligned layout.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -574,6 +646,8 @@ group { name: "efl/panel/top";
             rel2.to_y: "efl.swallow.event";
          }
       }
+      // Overriding "efl.swallow.event" for a horizontal handle at the bottom
+      // of the panel area.
       part { name: "efl.swallow.event";
          description { state: "default" 0.0;
             min: 30 30; max: 999999 30;
@@ -587,6 +661,7 @@ group { name: "efl/panel/top";
             rel2.relative: 1.0 0.0;
          }
       }
+      // Overriding icon images for a top panel (up/down arrows).
       part { name: "icn";
          description { state: "default" 0.0;
             image.normal: "i-arrow-u";
@@ -597,6 +672,7 @@ group { name: "efl/panel/top";
       }
    }
    programs {
+      // Overriding "hide1" for a slide-up animation.
       program { name: "hide1";
          script {
             new x, y, w, h;
@@ -607,10 +683,13 @@ group { name: "efl/panel/top";
             set_state_val(PART:"base", STATE_REL1_OFFSET, 0, h);
          }
       }
+      // For top/bottom panels, the icon direction is independent of LTR/RTL mode.
+      // This overrides the program from "efl/panel/left" to just set the icon state.
       program { signal: "efl,action,show"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "icn";
       }
+      // The RTL/LTR handling for icon state is simplified since direction doesn't change.
       program { signal: "edje,state,rtl"; source: "edje";
          script {
             new st[31];
@@ -633,6 +712,7 @@ group { name: "efl/panel/top";
               set_state(PART:"icn", "hidden", 0.0);
          }
       }
+      // Overriding to set the icon state to hidden when the panel hides.
       program { signal: "efl,action,hide"; source: "efl";
          action: STATE_SET "hidden" 0.0;
          target: "icn";
@@ -640,10 +720,13 @@ group { name: "efl/panel/top";
    }
 }
 
+// This group defines a bottom panel, inheriting from "efl/panel/top"
+// and adjusting the layout for a bottom-aligned panel.
 group { name: "efl/panel/bottom";
    data.item: "version" "123";
    inherit: "efl/panel/top";
    parts {
+      // Overriding "base" for a bottom-aligned layout.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 0.0 1.0;
@@ -654,6 +737,7 @@ group { name: "efl/panel/bottom";
             rel2.to_y: "all";
          }
       }
+      // Overriding "efl.swallow.event" for a handle at the top of the panel area.
       part { name: "efl.swallow.event";
          description { state: "default" 0.0;
             align: 0.5 0.0;
@@ -666,6 +750,7 @@ group { name: "efl/panel/bottom";
             rel2.relative: 1.0 1.0;
          }
       }
+      // Overriding icon images for a bottom panel.
       part { name: "icn";
          description { state: "default" 0.0;
             image.normal: "i-arrow-d";
@@ -676,6 +761,7 @@ group { name: "efl/panel/bottom";
       }
    }
    programs {
+      // Overriding "hide1" for a slide-down animation.
       program { name: "hide1";
          script {
             new x, y, w, h;

@@ -1,9 +1,16 @@
+// This group defines the visual layout for an edge binding selection widget.
+// It's used in the configuration to let users choose a screen edge and assign an action.
 group { name: "e/modules/conf_edgebindings/selection";
+   // Pre-load images to be used in parts. Using COMP (compressed) saves memory.
    images.image: "mini_blue_glow_arrow_0.png" COMP;
    images.image: "mini_blue_glow_arrow_1.png" COMP;
    images.image: "mini_blue_glow_arrow_2.png" COMP;
    images.image: "mini_blue_glow_arrow_3.png" COMP;
+   // Define styles for text elements to ensure consistency.
    styles {
+      // 'edge_binding_style' is a custom style for text.
+      // It sets a default font, size, and color class.
+      // It also defines tags for basic formatting like line breaks ('br') and highlighting ('hilight').
       style { name: "edge_binding_style";
          base: "font="FN" font_size=10 text_class=tb_plain align=center color=cc:/fg/normal/text wrap=word";
          tag: "br" "\n";
@@ -11,48 +18,60 @@ group { name: "e/modules/conf_edgebindings/selection";
       }
    }
    parts {
+      // 'bg' is a simple rectangle serving as the main background of the widget.
+      // It is placed relative to 'e.swallow.background', likely to provide a border or backdrop effect.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.background";
+            // Color is defined by a color class, which allows for theme-based coloring.
+            // '/bg-dark/normal/edgebindings' will be mapped to a specific color by the theme.
             color_class: "/bg-dark/normal/edgebindings";
          }
       }
+      // 'e.swallow.background' is a container for external content.
+      // It's likely used to hold a preview of the desktop or a representative image.
+      // The 'scale: 1' property allows this part to be controlled by programs.
       part { name: "e.swallow.background"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            min: 320 180;
-            align: 0 0.5;
+            min: 320 180; // Sets a minimum size for the preview area.
+            align: 0 0.5; // Aligns to the left and vertical center.
             rel1.offset: 2 2;
-            rel2.relative: 0.5 1.0;
+            rel2.relative: 0.5 1.0; // Occupies the left half of the parent area.
             rel2.offset: -3 -3;
-            offscale;
+            offscale; // Initially invisible. Made visible by a program.
          }
       }
+      // 'e.text.selection' displays text over the background,
+      // likely showing what is currently selected.
       part { name: "e.text.selection"; type: TEXT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.swallow.background";
-            rel1.relative: 0.5 0.5;
+            rel1.relative: 0.5 0.5; // Centered within 'e.swallow.background'.
             rel2.relative: 0.5 0.5;
-            fixed: 1 1;
+            fixed: 1 1; // Text size won't scale with the part.
             text { font: FNBD; size: 10;
                text_class: "label";
                min: 1 1;
-               ellipsis: -1;
+               ellipsis: -1; // Ellipsis enabled if text overflows.
             }
             color_class: "/fg/normal/text-hilight";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
+      // The following four parts ('e.edge.left', 'right', 'top', 'bottom') are rectangular
+      // indicators that highlight the selected screen edge. They are positioned
+      // around the 'e.swallow.background' part.
       part { name: "e.edge.left"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "e.swallow.background";
             rel1.offset: 0 10;
             rel2.offset: -1 -11;
-            align: 0.0 0.5;
-            max: 5 99999;
+            align: 0.0 0.5; // Aligns to the left edge.
+            max: 5 99999; // Constrains the width to 5 pixels.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.right"; type: RECT;
@@ -61,10 +80,10 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             rel1.offset: 0 10;
             rel2.offset: -1 -11;
-            align: 1.0 0.5;
-            max: 5 99999;
+            align: 1.0 0.5; // Aligns to the right edge.
+            max: 5 99999; // Constrains the width to 5 pixels.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.top"; type: RECT;
@@ -73,10 +92,10 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             rel1.offset: 10 0;
             rel2.offset: -11 -1;
-            align: 0.5 0.0;
-            max: 99999 5;
+            align: 0.5 0.0; // Aligns to the top edge.
+            max: 99999 5; // Constrains the height to 5 pixels.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.bottom"; type: RECT;
@@ -85,22 +104,25 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             rel1.offset: 10 0;
             rel2.offset: -11 -1;
-            align: 0.5 1.0;
-            max: 99999 5;
+            align: 0.5 1.0; // Aligns to the bottom edge.
+            max: 99999 5; // Constrains the height to 5 pixels.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
 
+      // The following four parts ('e.edge.top_left', 'top_right', 'bottom_right', 'bottom_left')
+      // are image parts used to highlight the corners of the screen.
+      // They use pre-loaded arrow images to indicate the selected corner.
       part { name: "e.edge.top_left";
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "e.swallow.background";
-            max: 10 10;
+            max: 10 10; // Fixed size for the corner indicator.
             image.normal: "mini_blue_glow_arrow_2.png";
-            align: 0.0 0.0;
+            align: 0.0 0.0; // Aligns to the top-left corner.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.top_right";
@@ -109,9 +131,9 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             max: 10 10;
             image.normal: "mini_blue_glow_arrow_3.png";
-            align: 1.0 0.0;
+            align: 1.0 0.0; // Aligns to the top-right corner.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.bottom_right";
@@ -120,9 +142,9 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             max: 10 10;
             image.normal: "mini_blue_glow_arrow_0.png";
-            align: 1.0 1.0;
+            align: 1.0 1.0; // Aligns to the bottom-right corner.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
       part { name: "e.edge.bottom_left";
@@ -131,15 +153,20 @@ group { name: "e/modules/conf_edgebindings/selection";
             rel.to: "e.swallow.background";
             max: 10 10;
             image.normal: "mini_blue_glow_arrow_1.png";
-            align: 0.0 1.0;
+            align: 0.0 1.0; // Aligns to the bottom-left corner.
             color_class: "/fg/selected/edgebindings/edge";
-            offscale;
+            offscale; // Initially invisible.
          }
       }
 
+      // 'e.box' is a container that organizes other parts.
+      // Its complex relative positioning suggests it's for laying out controls
+      // in a specific region of the UI.
       part { name: "e.box"; type: BOX;
          scale: 1;
          description { state: "default" 0.0;
+            // The box's position is intricately defined relative to other parts,
+            // anchoring it between 'e.edge.bottom_right' and 'e.text.description'.
             rel1 {
                relative: 1 1;
                offset: 50 4;
@@ -155,13 +182,17 @@ group { name: "e/modules/conf_edgebindings/selection";
                align: 0.5 0.5;
                min: 1 1;
             }
-            offscale;
+            offscale; // Initially invisible.
          }
       }
+      // 'e.swallow.slider' is a placeholder for a slider widget.
+      // This allows for dynamic control, such as adjusting binding sensitivity or delay.
       part { name: "e.swallow.slider"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
             align: 0 0.0;
+            // Positioned relative to 'e.edge.bottom_right' and 'e.box',
+            // placing it inside the layout defined by the 'e.box' part.
             rel1 {
                relative: 1 1;
                offset: 5 1;
@@ -169,12 +200,15 @@ group { name: "e/modules/conf_edgebindings/selection";
                to_y: "e.box";
             }
             rel2.offset: -5 -1;
-            offscale;
+            offscale; // Initially invisible.
          }
       }
+      // 'e.text.description' is a text block for displaying detailed information
+      // about the selected edge binding. It uses the 'edge_binding_style'.
       part { name: "e.text.description"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned to the right of the main preview area.
             rel1 {
                relative: 1 0;
                offset: 80 4;
@@ -186,7 +220,7 @@ group { name: "e/modules/conf_edgebindings/selection";
                min: 1 1;
                ellipsis: -1;
             }
-            offscale;
+            offscale; // Initially invisible.
          }
       }
    }

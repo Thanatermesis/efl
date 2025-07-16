@@ -1,16 +1,26 @@
+// This group provides a preview widget for a solid color. It layers a
+// background, a pattern, and the color itself to give a clear representation,
+// especially for colors with alpha transparency.
 group { name: "e/modules/conf_colors/preview/solid";
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // "bg" is the outer rectangle, providing a dark border and background.
+      // The offsets create a small padding within the group's area.
+      // The "bg" and "pat" parts create a background with a pattern, similar
+      // to the "e/modules/conf_colors/preview/solid" group.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // Uses a standard dark background color from the theme.
             color_class: "/bg-dark/normal/color";
             min: 18 18;
             offscale;
          }
       }
+      // "pat" displays a pattern (diagonal stripes) to help visualize alpha
+      // transparency in the color preview. It sits on top of "bg".
       part { name: "pat";
          scale: 1;
          description { state: "default" 0.0;
@@ -19,10 +29,14 @@ group { name: "e/modules/conf_colors/preview/solid";
             rel2.offset: -3 -3;
             image.normal: "diagonal_stripes.png";
             color_class: "/bg-dark-alt/normal/color";
+            // This macro tiles the source image to fill the part area.
             TILED_PATTERN(240, 240)
             offscale;
          }
       }
+      // "e.rect" is the actual color preview area. Its color is set externally
+      // by the application logic via the "color_preview" color class.
+      // It is placed directly over the "pat" part.
       part { name: "e.rect"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "color_preview";
@@ -32,12 +46,18 @@ group { name: "e/modules/conf_colors/preview/solid";
    }
 }
 
+// This group provides a preview for text colors. It displays a sample
+// text string which will adopt the color set on the "color_preview" class.
 group { name: "e/modules/conf_colors/preview/text";
    parts {
+      // "e.text" is a text part to show the color preview on a string.
       part { name: "e.text"; type: TEXT; mouse_events: 0;
          description { state: "default" 0.0;
+            // The color of the text is set externally via this color class.
             color_class: "color_preview";
             text { font: FNBD; size: 16;
+               // "Ab" is used as sample text as it contains both curves and
+               // straight lines, giving a good representation of the font rendering.
                text: "Ab";
                min: 1 1;
                ellipsis: -1;
@@ -47,6 +67,9 @@ group { name: "e/modules/conf_colors/preview/text";
    }
 }
 
+// This group is used for previewing colors with multiple components, or
+// perhaps when the color type is unknown. It is designed to show three
+// separate color values side-by-side.
 group { name: "e/modules/conf_colors/preview/unknown";
    images.image: "diagonal_stripes.png" COMP;
    parts {
@@ -72,8 +95,12 @@ group { name: "e/modules/conf_colors/preview/unknown";
             offscale;
          }
       }
+      // The next three parts ("c1", "c2", "c3") create three vertical bars
+      // side-by-side, filling the "pat" area. Each represents a color component
+      // and can be individually colored via its color_class.
       part { name: "c1"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Left third. Default color is semi-transparent red (#FF000080).
             color: 255 0 0 128; // no cc
             color_class: "color_preview_c1";
             rel.to: "pat";
@@ -82,6 +109,7 @@ group { name: "e/modules/conf_colors/preview/unknown";
       }
       part { name: "c2"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Middle third. Default color is semi-transparent green (#00FF0080).
             color: 0 255 0 128; // no cc
             color_class: "color_preview_c2";
             rel1.to: "c1";
@@ -92,6 +120,7 @@ group { name: "e/modules/conf_colors/preview/unknown";
       }
       part { name: "c3"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Right third. Default color is semi-transparent blue (#0000FF80).
             color: 0 0 255 128; // no cc
             color_class: "color_preview_c3";
             rel1.to: "c2";

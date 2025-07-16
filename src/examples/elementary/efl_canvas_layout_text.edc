@@ -1,19 +1,34 @@
+// Specifies the minimum EFL version required to compile this EDC file.
 efl_version: 1 21;
+// 'collections' is the root block that contains all EDC definitions like groups, styles, etc.
 collections {
+   // Defines reusable text styles that can be applied to text-based parts.
    styles {
+      // Defines a style named 'tbstyle'. 'base: ""' means it doesn't inherit from any other style.
+      // This is useful for creating a clean slate for text properties.
       style { name: "tbstyle";
          base: "";
       }
    }
+    // This group defines a simple layout named "test".
+    // It contains a single textblock that spans the entire area of the object.
     group { name: "test";
         parts {
+            // A TEXTBLOCK part named "text" to display rich text.
+            // 'nomouse' makes this part transparent to mouse events, optimizing performance
+            // as it won't be considered for input handling.
             textblock { "text"; nomouse;
                 desc { "default";
+                    // These two lines make the textblock fill its parent container completely.
+                    // rel1 sets the top-left corner, rel2 sets the bottom-right.
                     rel1.relative: 0.0 0.0;
                     rel2.relative: 1.0 1.0;
-                    text { 
+                    text {
+                        // Applies the 'tbstyle' defined earlier.
                         style: "tbstyle";
+                        // Sets the font and size. FN is a macro often used for a default font.
                         font: FN; size: 10;
+                        // Centers the text both horizontally (0.5) and vertically (0.5).
                         align: 0.5 0.5;
                     }
                     visible: 1;
@@ -21,21 +36,32 @@ collections {
             }
         }
     }
+    // This group, "test2", demonstrates a layout with two parts side-by-side.
+    // The left half is a colored rectangle, and the right half is a textblock.
     group { name: "test2";
         parts {
+            // A RECT part for drawing a solid color rectangle. 'nomouse' is used for performance.
+            // 'repeat' and 'precise' are image-related properties that have little effect here.
             rect { "rect"; nomouse; repeat; precise;
                desc { "default";
+                  // Sets the rectangle color to opaque red (RGBA: 255, 0, 0, 255 -> #FF0000FF).
                   color: 255 0 0 255;
+                  // Positions the rectangle to fill the left half of the container.
+                  // It spans from 0% to 50% horizontally, and 0% to 100% vertically.
                   rel1.relative: 0.0 0.0;
                   rel2.relative: 0.5 1;
                }
             }
+            // This textblock part is positioned to the right of the "rect" part.
             textblock { "text"; nomouse;
                 desc { "default";
+                   // Positions the textblock to fill the right half of the container.
+                   // It starts where the "rect" part ends (50% horizontally) and extends to the far edge.
                    rel1.relative: 0.5 0.0;
                    rel2.relative: 1.0 1.0;
                    //fixed: 1 1;
                    text {
+                      // Text properties are configured identically to the "test" group's textblock.
                       style: "tbstyle";
                       font: FN; size: 10;
                       align: 0.5 0.5;

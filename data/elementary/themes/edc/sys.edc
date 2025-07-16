@@ -1,13 +1,29 @@
+// This group defines the UI for system dialogs like logout, halt, and reboot.
+// These dialogs are borderless, meaning they don't have standard window
+// decorations, which is typical for system-level notifications or prompts.
 group { name: "e/sys/logout";
+   // The aliases allow this same group to be used for multiple system actions,
+   // reducing code duplication. The specific action (e.g., reboot, suspend) is
+   // determined by which name is requested when the UI is created.
    alias: "e/sys/halt";
    alias: "e/sys/reboot";
    alias: "e/sys/suspend";
    alias: "e/sys/hibernate";
+   // This data item tells the window manager that this window should be
+   // borderless.
    data.item: "borderless" "1";
 
    styles {
+      // Defines a style for text display, which can be reused by multiple text
+      // parts. This style sets the default font, size, color, and alignment.
       style { name: "sys_style";
+         // The base properties for the style. It uses color classes (cc:) to
+         // allow theming. For example, 'cc:/fg/normal/sys/text' gets the
+         // standard text color for system UIs from the current theme.
          base: "font="FN" font_size=10 text_class=tb_plain align=left color=cc:/fg/normal/sys/text wrap=word";
+         // These tags define formatting changes that can be applied within a
+         // textblock. For example, using '<b>text</b>' in the textblock's
+         // content would apply the "FNBD" (bold) font.
          tag: "br"      "\n";
          tag: "b"       "+ font="FNBD"";
          tag: "hilight" "+ font="FNBD" text_class=tb_light";
@@ -16,36 +32,65 @@ group { name: "e/sys/logout";
       }
    }
    parts {
+      // A simple rectangle part that serves as the background of the dialog.
+      // It does not react to mouse events, making it a passive visual element.
       part { name: "bg"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // The color is determined by the color class, ensuring it matches
+            // the current theme's system background color.
             color_class: "/bg/normal/sys";
          }
       }
+      // This textblock part is intended to display the main message of the
+      // dialog. Its name "e.textblock.message" is a convention that allows
+      // the application code to easily find and set the text of this part.
       part { name: "e.textblock.message"; type: TEXTBLOCK;
+         // Enables text scaling if the container is resized.
          scale: 1;
          description { state: "default" 0.0;
+            // This part's top-left corner is positioned relative to a part named
+            // "knob". The use of "knob" here is unusual as it is not defined
+            // within this group. It may be inherited or defined externally,
+            // or this might be a remnant from copied code.
             rel1.relative: 1.0 0.0;
             rel1.to_x: "knob";
             rel1.offset: 8 8;
+            // The bottom-right corner is relative to the parent, with an inset.
             rel2.offset: -9 -9;
+            // Sets a minimum size for the textblock.
             min: 20 80;
+            // This property prevents the part's geometry from being scaled,
+            // even though text scaling is enabled on the part itself. This can
+            // be useful for maintaining a consistent layout while allowing text
+            // to grow or shrink.
             offscale;
+            // Applies the 'sys_style' and configures text properties.
             text { style: "sys_style";
                min: 1 1;
+               // Ellipsis is used to truncate text that doesn't fit, showing
+               // "..." at the end.
                ellipsis: -1;
             }
          }
       }
+      // A spacer part that defines an area for a busy animation (like a
+      // spinner). It's an invisible container for layout purposes.
       part { name: "busy_area"; type: SPACER;
          description { state: "default" 0.0;
+            // Positions the spacer on the left side of the dialog.
             rel1.relative: 0.0 0.0;
             rel1.offset: 8 8;
             rel2.relative: 0.0 1.0;
             rel2.offset: 8 -9;
             align: 0.0 0.5;
+            // This macro sets a fixed size for the spacer.
             FIXED_SIZE(40, 40)
          }
       }
+      // This macro places a busy indicator (e.g., a spinner) inside the
+      // 'busy_area' part. It's a convenient way to add loading animations.
+      // The program will start the animation when it receives the "show" signal
+      // and stop it on the "hide" signal.
       BUSY("busy_area", "show", "", "hide", "")
    }
 }

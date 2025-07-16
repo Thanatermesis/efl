@@ -1,27 +1,43 @@
+// This group defines the main background for the desklock screen. It handles
+// the visibility and transitions of the background, ensuring a smooth
+// appearance and disappearance. The `hide_signal` data item is a hint for
+// external code that this group can be hidden via a signal.
 group { name: "e/desklock/background";
    data.item: "hide_signal" "1";
    parts {
+      // A clipping rectangle used to fade the background in and out. It starts
+      // as transparent and invisible, then animates to opaque to reveal the
+      // background.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
+            // Transparent white (#FFFFFF00) used when the background is hidden.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
+            // Opaque white (#FFFFFFFF) used when the background is visible.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The actual background part, which is clipped by the "clip" part.
+      // Its appearance is defined by a color class, allowing for theming.
       part { name: "bg"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
             color_class: "/bg/normal/desklock/background";
          }
       }
+      // This program is triggered by the "show" signal to make the background
+      // visible with a sinusoidal transition over 0.5 seconds.
       program { name: "shower"; signal: "show"; source: "";
          action: STATE_SET "visible" 0.0;
          transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
          target: "clip";
       }
+      // Triggered by the "e,action,hide" signal from "e" (Ecore). This hides
+      // the background and, upon completion, emits "e,action,hide,done" to
+      // notify that the hide animation is finished.
       program { signal: "e,action,hide"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
@@ -30,6 +46,10 @@ group { name: "e/desklock/background";
             action: SIGNAL_EMIT "e,action,hide,done" "e";
          }
       }
+      // Triggered by "e,action,show,immediate". This program stops any
+      // ongoing "shower" animation and immediately sets the background to
+      // its visible state without a transition. Useful for scenarios where an
+      // instant appearance is needed.
       program { signal: "e,action,show,immediate"; source: "e";
          action: ACTION_STOP;
          target: "shower";
@@ -38,6 +58,9 @@ group { name: "e/desklock/background";
             target: "clip";
          }
       }
+      // This part is a container ("swallow") for the login box. The actual
+      // login box UI (defined in another group) will be placed here. It is
+      // clipped by "clip" so it fades with the background.
       part { name: "e.swallow.login_box"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -46,7 +69,12 @@ group { name: "e/desklock/background";
    }
 }
 
+// This group defines the main login box, including the logo, password entry
+// field, and various status indicators. It's designed to be embedded within
+// the "e/desklock/background" group.
 group { name: "e/desklock/login_box";
+   // A set of logos for different display resolutions. Edje will select the
+   // most appropriate image based on the part's size, ensuring crisp visuals.
    set { name: "logo_mono";
       image { image: "logo.png" COMP;  size: 601 601 99999 99999; }
       image { image: "logo2.png" COMP; size: 301 301   600   600; }
@@ -54,10 +82,14 @@ group { name: "e/desklock/login_box";
       image { image: "logo4.png" COMP; size:  76  76   150   150; }
       image { image: "logo5.png" COMP; size:  0    0    75    75; }
    }
+   // These macros likely define animated rings for visual feedback during
+   // authentication, adding a dynamic feel to the UI.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
    parts {
+      // A clipping rectangle for the logo, allowing it to be hidden or shown
+      // programmatically, for instance, when the on-screen keyboard appears.
       part { name: "logo_clip"; type: RECT;
          description { state: "default";
             min: 9999 9999;
@@ -67,6 +99,8 @@ group { name: "e/desklock/login_box";
             visible: 0;
          }
       }
+      // A clipping rectangle for the password input area. This ensures that
+      // the text and cursor do not overflow their designated space.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_x: "logo";
@@ -79,6 +113,8 @@ group { name: "e/desklock/login_box";
             rel2.offset: 99 196;
          }
       }
+      // The main logo image. It is clipped by "logo_clip" and uses a color
+      // class for theming. Its size is fixed to maintain a consistent look.
       part { name: "logo"; clip_to: "logo_clip";
          scale: 1;
          description { state: "default" 0.0;
@@ -89,6 +125,8 @@ group { name: "e/desklock/login_box";
             color_class: "/fg/normal/desklock/logo";
          }
       }
+      // A text part for the main title above the password entry. It is
+      // positioned relative to the logo.
       part { name: "e.text.title"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -109,6 +147,8 @@ group { name: "e/desklock/login_box";
             fixed: 0 1;
          }
       }
+      // A text part for displaying hints, such as "Caps Lock is on".
+      // Positioned below the password entry area.
       part { name: "e.text.hint"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -129,6 +169,8 @@ group { name: "e/desklock/login_box";
             fixed: 0 1;
          }
       }
+      // A rectangle that highlights the password entry area when it is
+      // selected, providing clear visual feedback to the user.
       part { name: "selection"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.text.password";
@@ -140,6 +182,8 @@ group { name: "e/desklock/login_box";
             visible: 1;
          }
       }
+      // The text part where the user enters their password. It is clipped by
+      // the "clipper" part. The text itself is styled using a text class.
       part { name: "e.text.password"; type: TEXT;
          scale: 1;
          clip_to: "clipper";
@@ -163,6 +207,9 @@ group { name: "e/desklock/login_box";
             fixed: 1 1;
          }
       }
+      // The blinking cursor for the password entry field. It's a simple
+      // rectangle whose visibility is toggled by programs to create the blink
+      // effect.
       part { name: "cursor"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clipper";
@@ -182,6 +229,9 @@ group { name: "e/desklock/login_box";
             visible: 1;
          }
       }
+      // An icon for fingerprint authentication. It has multiple states to provide
+      // visual feedback for success, failure, or active scanning. Colors are
+      // animated and controlled via color classes for theming.
       part { name: "fprint";
          scale: 1;
          description { state: "default" 0.0;
@@ -192,18 +242,22 @@ group { name: "e/desklock/login_box";
             rel.to_y: "e.text.password";
             rel1.relative: 0.0 1.0;
             align: 0.5 0.0;
+            // Start transparent (#FFFFFF00), will be faded in.
             color: 255 255 255 0; // no cc
             color_class: "/fg/normal/desklock/fprint/normal";
             visible: 0;
          }
          description { state: "active" 0.0;
             inherit: "default" 0.0;
+            // Becomes opaque (#FFFFFFFF) when active.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
          description { state: "auth-success" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/desklock/fprint/success";
+            // In feedback states (success/fail), the icon is made opaque white
+            // (#FFFFFFFF) to ensure it is fully visible.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
@@ -214,6 +268,8 @@ group { name: "e/desklock/login_box";
             visible: 1;
          }
       }
+      // A spacer part that defines the area for the busy/spinner animation,
+      // shown during authentication checks.
       part { name: "busy_area"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -224,12 +280,21 @@ group { name: "e/desklock/login_box";
             align: 0.5 0.0;
          }
       }
+      // When the login box is hidden, this program emits a signal to indicate
+      // that the current state is invalid (e.g., to stop animations).
       program { signal: "e,action,hide"; source: "e";
          action: SIGNAL_EMIT "e,state,invalid" "e";
       }
+      // This macro encapsulates the logic for a busy animation. It listens for
+      // "e,state,checking" to start and "e,state,invalid" to stop, providing
+      // visual feedback that a process is running.
       BUSY("busy_area", "e,state,checking", "e", "e,state,invalid", "e")
    }
    programs {
+      // This set of programs creates a blinking cursor effect. "cursor_show"
+      // makes the cursor visible, then starts a timer. After the timer,
+      // "cursor_hide" hides it and starts another timer to show it again,
+      // creating a continuous loop.
       program { name: "cursor_show";
          signal: "show"; source: "";
          action: STATE_SET "visible" 0.0;
@@ -249,6 +314,9 @@ group { name: "e/desklock/login_box";
          in: 0.4 0.0;
          after: "cursor_show";
       }
+      // These programs control the visibility of the "selection" part,
+      // showing it when the password field is selected and hiding it when
+      // unselected.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "selection";
@@ -257,6 +325,9 @@ group { name: "e/desklock/login_box";
          action: STATE_SET "default" 0.0;
          target: "selection";
       }
+      // These programs toggle the visibility of the logo by changing the state
+      // of the "logo_clip" part. This can be used to hide the logo when, for
+      // example, a virtual keyboard is shown.
       program { signal: "e,state,logo,hidden"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "logo_clip";
@@ -266,6 +337,9 @@ group { name: "e/desklock/login_box";
          target: "logo_clip";
       }
 
+      // The following programs respond to various fingerprint events by
+      // setting the "fprint" part to its "active" state, indicating that
+      // the sensor is ready or in use.
       program { signal: "e,fprint,unknown"; source: "e";
          action: STATE_SET "active" 0.0;
          transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
@@ -282,11 +356,17 @@ group { name: "e/desklock/login_box";
          target: "fprint";
       }
 
+      // This program sets the fingerprint icon to a "success" state with a
+      // quick transition, providing positive feedback.
       program { signal: "e,fprint,auth,success"; source: "e";
          action: STATE_SET "auth-success" 0.0;
          transition: SINUSOIDAL 0.2 USE_DURATION_FACTOR 1;
          target: "fprint";
       }
+      // These programs handle various authentication failure scenarios. They
+      // all set the "fprint" part to the "auth-fail" state for immediate
+      // visual feedback and then schedule the "fprint-reset" program to run,
+      // returning the icon to its active state for another attempt.
       program { signal: "e,fprint,auth,fail"; source: "e";
          action: STATE_SET "auth-fail" 0.0;
          transition: SINUSOIDAL 0.2 USE_DURATION_FACTOR 1;
@@ -317,17 +397,23 @@ group { name: "e/desklock/login_box";
          target: "fprint";
          after: "fprint-reset";
       }
+      // Responds to the fingerprint scanner being disconnected by returning
+      // the icon to its initial, default (hidden) state.
       program { signal: "e,fprint,auth,disconnect"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.2 USE_DURATION_FACTOR 1;
          target: "fprint";
       }
+      // Handles a generic error, treating it as a failure.
       program { signal: "e,fprint,auth,error"; source: "e";
          action: STATE_SET "auth-fail" 0.0;
          transition: SINUSOIDAL 0.2 USE_DURATION_FACTOR 1;
          target: "fprint";
          after: "fprint-reset";
       }
+      // This program is triggered after a failed authentication attempt to
+      // reset the fingerprint icon back to its active state, ready for another
+      // try. The `in: 0.5 0.0;` line introduces a 0.5s delay before running.
       program { name: "fprint-reset";
          action: STATE_SET "active" 0.0;
          transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
@@ -337,8 +423,14 @@ group { name: "e/desklock/login_box";
    }
 }
 
+// This group defines the UI for PIN code entry. It's a simpler layout,
+// intended for devices or situations where a PIN is used instead of a
+// full password. It includes a title, the PIN entry field, and a swallow
+// area for a numeric keypad.
 group { name: "e/desklock/pin_box";
    parts {
+      // A title text part, statically set to "Please enter your PIN".
+      // Positioned above the button area.
       part { name: "e.text.title"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -357,6 +449,7 @@ group { name: "e/desklock/pin_box";
             fixed: 0 1;
          }
       }
+      // A rectangle to highlight the PIN entry area when it's focused.
       part { name: "selection"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.text.password";
@@ -368,6 +461,7 @@ group { name: "e/desklock/pin_box";
             visible: 1;
          }
       }
+      // The text part where the user's PIN is displayed as it's entered.
       part { name: "e.text.password"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -386,6 +480,7 @@ group { name: "e/desklock/pin_box";
             offscale;
          }
       }
+      // The blinking cursor for the PIN entry field.
       part { name: "cursor"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.text.password";
@@ -401,10 +496,13 @@ group { name: "e/desklock/pin_box";
             inherit: "default" 0.0;
          }
       }
+      // A clipping rectangle for the buttons container.
       part { name: "button_clip"; type: RECT;
          description { state: "default";
          }
       }
+      // A swallow part designed to hold a numeric keypad or other input buttons
+      // for entering the PIN.
       part { name: "e.swallow.buttons"; type: SWALLOW;
         clip_to: "button_clip";
         description { state: "default";
@@ -416,6 +514,8 @@ group { name: "e/desklock/pin_box";
       }
    }
    programs {
+      // This set of programs creates a blinking cursor effect for the PIN
+      // entry field, using timers to toggle visibility.
       program { name: "cursor_show";
          signal: "show"; source: "";
          action: STATE_SET "visible" 0.0;
@@ -436,6 +536,8 @@ group { name: "e/desklock/pin_box";
          in: 0.2 0.0;
          after: "cursor_show";
       }
+      // These programs show or hide the selection highlight based on whether
+      // the PIN entry field is focused.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "selection";

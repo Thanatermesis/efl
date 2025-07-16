@@ -14,11 +14,20 @@ Group: efl/slider/vertical (@since 1.23)
 	 Signal: efl,state,inverted,off
 	 Signal: efl,state,inverted,on
 */
+// This group defines a standard horizontal slider widget. It includes a background
+// bar, a draggable knob, and a glow effect to show the current value. The script
+// manages visual states for enabled, disabled, and inverted modes.
 group { name: "efl/slider/horizontal";
    data.item: "version" "123";
+// Define a bitmask for the inverted state. This allows combining
+// different states like 'inverted' and 'disabled' using bitwise operations.
 #define INVERT  16
    script {
+      // A public integer to store the slider's current state (mode).
+      // This is accessed by programs to modify and check the state.
       public slmode;
+      // This function updates the visual states of slider parts based on the mode 'm'.
+      // It handles combinations of disabled and inverted states.
       public eval_mode(m) {
          new d = m & DISABLE;
          new i = m & INVERT;
@@ -49,6 +58,9 @@ group { name: "efl/slider/horizontal";
       }
    }
    parts {
+      // A SWALLOW part that acts as a container for application-provided content.
+      // It also serves as the reference for positioning other parts.
+      // 'offscale' prevents content from being scaled down if it's larger than the part.
       part { name: "efl.bar"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -60,6 +72,8 @@ group { name: "efl/slider/horizontal";
             offscale;
          }
       }
+      // The background track of the slider. It's a RECT part that doesn't handle
+      // mouse events itself ('mouse_events: 0').
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -74,8 +88,11 @@ group { name: "efl/slider/horizontal";
             color_class: "/bg/disabled/slider/base";
          }
       }
+      // This part visualizes the slider's value. In the default state, it extends
+      // from the beginning of the slider to the knob's position.
       part { name: "glow"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // The color class used for the bar in its normal state.
             color_class: "/fg/normal/slider/bar";
             rel1.to: "base";
             rel2.relative: 0.5 1.0;
@@ -86,6 +103,8 @@ group { name: "efl/slider/horizontal";
             inherit: "default" 0.0;
             color_class: "/fg/disabled/slider/bar";
          }
+         // In the inverted state, the glow part extends from the knob's position to
+         // the end of the slider. This is achieved by changing the relative positioning.
          description { state: "inverted" 0.0;
             color_class: "/fg/normal/slider/bar";
             rel1.relative: 0.5 0.0;
@@ -98,12 +117,18 @@ group { name: "efl/slider/horizontal";
             color_class: "/fg/disabled/slider/bar";
          }
       }
+      // This is an invisible, draggable part that the user interacts with.
+      // It is confined to the 'efl.bar' area.
       part { name: "efl.draggable.slider"; type: RECT;
          scale: 1;
+         // Enables horizontal dragging. The parameters are:
+         // enable_x, step_x, alt_step_x
          dragable.x: 1 1 0;
          dragable.y: 0 0 0;
          dragable.confine: "efl.bar";
          description { state: "default" 0.0;
+            // The color is set to transparent (RGBA: 0, 0, 0, 0), making this part
+            // invisible. It exists only to capture drag events.
             color: 0 0 0 0; // no cc
             min: 16 16;
             max: 16 16;
@@ -114,6 +139,8 @@ group { name: "efl/slider/horizontal";
             rel2.to_x: "efl.bar";
          }
       }
+      // The visible handle of the slider. It follows the 'efl.draggable.slider' part.
+      // 'nomouse' ensures it doesn't interfere with the drag events of the draggable part.
       part { name: "knob"; nomouse;
          scale: 1;
          description { state: "default" 0.0;
@@ -133,6 +160,9 @@ group { name: "efl/slider/horizontal";
             color_class: "/fg/disabled/slider/knob";
          }
       }
+      // An invisible rectangle that becomes visible when the slider is disabled.
+      // This is a common technique to block mouse events from reaching parts
+      // underneath, effectively disabling interaction.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -145,14 +175,21 @@ group { name: "efl/slider/horizontal";
       }
    }
    programs {
+      // When the left mouse button is pressed on the draggable area, the knob's
+      // state changes to 'clicked' to provide visual feedback.
       program { signal: "mouse,down,1"; source: "efl.draggable.slider";
          action:  STATE_SET "clicked" 0.0;
          target: "knob";
       }
+      // When the mouse button is released, the knob returns to its 'default' state.
       program { signal: "mouse,up,1"; source: "efl.draggable.slider";
          action:  STATE_SET "default" 0.0;
          target: "knob";
       }
+      // These programs handle state changes sent from the C code. When a state
+      // signal like 'efl,state,inverted,on' is received, the script updates the 'slmode'
+      // variable by setting or clearing the appropriate bit (INVERT or DISABLE)
+      // and then calls 'eval_mode' to refresh the UI accordingly.
       program { signal: "efl,state,inverted,on"; source: "efl";
          script {
             new m = get_int(slmode);
@@ -185,6 +222,8 @@ group { name: "efl/slider/horizontal";
 #undef INVERT
 }
 
+// This group defines the vertical version of the slider. It shares the same structure
+// and logic as the horizontal slider, with adjustments for vertical orientation.
 group { name: "efl/slider/vertical";
    data.item: "version" "123";
 #define INVERT  16
@@ -272,6 +311,7 @@ group { name: "efl/slider/vertical";
       part { name: "efl.draggable.slider"; type: RECT;
          scale: 1;
          dragable.x: 0 0 0;
+         // Enables vertical dragging for this slider.
          dragable.y: 1 1 0;
          dragable.confine: "efl.bar";
          description { state: "default" 0.0;
@@ -357,10 +397,15 @@ group { name: "efl/slider/vertical";
 }
 
 //Range
+// This group defines a horizontal range slider, allowing the selection of an
+// interval with two draggable knobs. It extends the basic slider by adding a
+// second knob and logic to manage the range between them.
 group { name: "efl/slider_interval/horizontal";
    data.item: "version" "123";
    script {
       public slmode;
+      // This function updates the glow part based on the positions of the two knobs.
+      // It handles cases where the knobs are swapped (end knob is before start knob).
       public update_glow() {
          new Float:x1, Float:y1;
          new Float:x2, Float:y2;
@@ -371,6 +416,8 @@ group { name: "efl/slider_interval/horizontal";
          else
            set_state(PART:"glow", "default", 0.0);
       }
+      // Handles the disabled state for the range slider, ensuring the glow part
+      // is correctly displayed as disabled.
       public eval_mode(m) {
          new d = m & DISABLE;
          if (d) {
@@ -416,9 +463,11 @@ group { name: "efl/slider_interval/horizontal";
             color_class: "/bg/disabled/slider/base";
          }
       }
+      // The glow part for the range slider. It fills the area between the two knobs.
       part { name: "glow"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/fg/normal/slider/bar";
+            // The glow part is positioned between the center of 'knob' and 'knob2'.
             rel1.relative: 0.5 0.0;
             rel2.relative: 0.5 1.0;
             rel1.to_x: "knob";
@@ -430,6 +479,8 @@ group { name: "efl/slider_interval/horizontal";
             inherit: "default" 0.0;
             color_class: "/fg/disabled/slider/bar";
          }
+         // This state is used when the knobs are swapped (knob2 is to the left of knob1).
+         // It reverses the relative positioning to draw the glow correctly.
          description { state: "range_reverse" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/slider/bar";
@@ -476,6 +527,7 @@ group { name: "efl/slider_interval/horizontal";
             color_class: "/fg/disabled/slider/knob";
          }
       }
+      // The second draggable area for the range slider's second knob.
       part { name: "efl.draggable2.slider"; type: RECT;
          scale: 1;
          dragable.x: 1 1 0;
@@ -492,6 +544,7 @@ group { name: "efl/slider_interval/horizontal";
             rel2.to_x: "efl.bar";
          }
       }
+      // The second visible knob for the range slider.
       part { name: "knob2"; nomouse;
          scale: 1;
          description { state: "default" 0.0;
@@ -523,6 +576,8 @@ group { name: "efl/slider_interval/horizontal";
       }
    }
    programs {
+      // Whenever either of the draggable parts is moved, the 'update_glow'
+      // function is called to redraw the range.
       program { signal: "drag"; source: "efl.draggable*";
          script { update_glow(); }
       }
@@ -534,6 +589,7 @@ group { name: "efl/slider_interval/horizontal";
          action:  STATE_SET "default" 0.0;
          target: "knob";
       }
+      // Mouse events for the second knob, mirroring the behavior of the first.
       program { signal: "mouse,down,1"; source: "efl.draggable2.slider";
          action:  STATE_SET "clicked" 0.0;
          target: "knob2";
@@ -554,12 +610,16 @@ group { name: "efl/slider_interval/horizontal";
             new m = get_int(slmode);
             m &= ~DISABLE; set_int(slmode, m);
             eval_mode(m);
+            // After enabling, 'update_glow' is called to ensure the glow part is
+            // correctly rendered according to the knob positions.
             update_glow();
          }
       }
    }
    }
 
+// This group defines the vertical version of the range slider. It mirrors the
+// horizontal range slider's functionality with adjustments for vertical orientation.
 group { name: "efl/slider_interval/vertical";
    data.item: "version" "123";
    script {

@@ -1,14 +1,29 @@
 /* simple layout to pack our scrolling content into an elm_layout */
+// This group defines the theme for a basic layout. It is intended to be used with elm_layout
+// and provides a single content area where other widgets can be placed. The name
+// "elm/code/layout/default" suggests its use as a default layout for a code-related widget.
 group { name: "elm/code/layout/default";
+   // The alias provides an alternative name for this group, allowing it to be accessed
+   // via "efl/code/layout". This is useful for maintaining compatibility or providing
+   // a more abstract name.
    alias: "efl/code/layout";
+   // The data block stores key-value pairs that can be queried at runtime.
+   // Here, it defines default font properties for the content, which can be used
+   // by the widget to style its text.
    data {
       item: "font.name" "Mono";
       item: "font.size" "10";
    }
    parts {
+      // Defines a SWALLOW part named "elm.swallow.content", which acts as a container
+      // for external Evas objects. The name is a convention used by Elementary widgets
+      // to identify the main content area.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
+            // The content is horizontally centered (align: 0.5) and vertically aligned to the top (align: 0.0).
             align: 0.5 0.0;
+            // The width is scalable (fixed: 0), but the height is fixed (fixed: 1),
+            // meaning it will not stretch vertically and will be sized based on its content.
             fixed: 0 1;
          }
       }

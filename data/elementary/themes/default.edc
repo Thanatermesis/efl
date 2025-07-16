@@ -1,23 +1,40 @@
+// Specifies the EFL version this theme is designed for (1.25). This ensures
+// compatibility and prevents the theme from being used with an older,
+// incompatible version of EFL.
 efl_version: 1 25;
 
+// Includes a file containing EDJE macros. Macros are reusable blocks of code
+// that help reduce repetition and improve the maintainability of the theme.
 #include "macros.edc"
 
+// Declares an external dependency on 'elm' (Elementary), allowing the theme to
+// use standard widget APIs for theming.
 externals.external: "elm";
 
-// theme api version. from 1.10 on we will check version to avoid
-// compat issues
+// Defines custom data items for the theme.
+// "version" is a theme-specific version, used here to align with the EFL version (1.25).
 data.item: "version" "125";
+// "efl_theme_base" indicates the base color scheme. Applications can query this
+// to adapt their non-themed content, e.g., choosing light or dark text colors.
 data.item: "efl_theme_base" "dark";
 
+// The 'collections' block groups all the theme's UI definitions (called 'groups').
+// This theme is highly modular, including separate files for different components.
 collections {
 
+// Sound-related definitions for UI events.
 #include "snd.edc"
+// Generic icons used across the theme.
 #include "ic.edc"
 
+// Global font styles and color classes. These are fundamental to ensuring a
+// consistent look and feel across all themed components.
 #include "fonts.edc"
 #include "colorclasses.edc"
 
-// elm
+// Elementary (elm) widget theming.
+// The following includes provide the look and feel for the standard EFL widget
+// set provided by the Elementary toolkit.
 #include "edc/elm/bg.edc"
 #include "edc/elm/button.edc"
 #include "edc/elm/scroller.edc"
@@ -79,7 +96,9 @@ collections {
 #include "edc/elm/slider.edc"
 
 
-// widgets
+// Legacy widget theming.
+// These are for older Evas-based widgets that are not part of the standard
+// Elementary set. They are included for compatibility with older applications.
 #include "edc/menu.edc"
 #include "edc/button.edc"
 #include "edc/check.edc"
@@ -101,7 +120,9 @@ collections {
 #include "edc/spectrum.edc"
 #include "edc/graph.edc"
 
-// desktop in general
+// Theming for core Enlightenment desktop components.
+// This section defines the appearance of elements like the desktop background
+// (wallpaper), window borders, and various system dialogs.
 #include "edc/wallpaper.edc"
 #include "edc/comp.edc"
 #include "edc/comp_compat.edc"
@@ -123,7 +144,9 @@ collections {
 #include "edc/about-theme.edc"
 #include "edc/transitions.edc"
 
-// modules
+// Theming for Enlightenment's modules (also known as gadgets).
+// Each file corresponds to a specific module that can be placed on the desktop
+// or a shelf, such as the start menu, pager, or taskbar.
 #include "edc/start.edc"
 #include "edc/pager.edc"
 #include "edc/pager16.edc"
@@ -152,11 +175,13 @@ collections {
 #include "edc/tiling.edc"
 #include "edc/procstats.edc"
 
-// icons
+// Specific icon themes for different parts of the desktop.
 #include "edc/icons.edc"
 #include "edc/border-icons.edc"
 
-// New efl ui themes
+// Theme definitions for the newer "Efl.Ui" widgets.
+// These are part of a more modern, unified UI toolkit within EFL, and these
+// files ensure they are styled consistently with the rest of the theme.
 #include "edc/efl/macros.edc"
 #include "edc/efl/bg.edc"
 #include "edc/efl/button.edc"

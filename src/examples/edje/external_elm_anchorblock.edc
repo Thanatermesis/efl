@@ -1,4 +1,7 @@
 
+// Defines a long string of text (LOREM) to be used as content for the
+// anchorblock. This text includes item tags, which are small, inline graphical
+// elements, in this case, emoticons.
 #define LOREM "Vestibulum nunc mi, adipiscing dapibus turpis. Integer ornare \
 vestibulum. Quisque libero augue, non tristique tortor. Praesent urna augue, \
 blandit id sodales vel, varius at purus. Ut congue mollis elit, quis vehicula \
@@ -35,29 +38,39 @@ diam ac purus tempor suscipit eget sed metus. Nam erat nunc, eleifend vitae \
 vehicula vitae, venenatis faucibus est. Nam auctor mauris metus. Nam eget \
 vehicula nunc. Nulla ut nisi id sapien rhoncus vestibulum."
 
+// Collections are the top-level containers in an EDC file, grouping different
+// UI layouts. Each group defines a specific interface and its behavior.
 collections {
+   // The 'main' group defines the primary interface of this application.
    group { name: "main";
       /* set a min window size */
       min: 300 400;
 
-      /* tell edje that we are going to use elementary external parts */
+      // This block declares the use of external toolkits. Here, "elm" refers
+      // to the Elementary toolkit, allowing us to use its widgets within Edje.
       externals {
          external: "elm";
       }
 
+      // The 'parts' block defines all the graphical elements of the interface.
       parts {
+         // This part is a simple white rectangle that serves as the background.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // color: solid white (#FFFFFFFF)
                color: 255 255 255 255;
             }
          }
 
+         // A text part for the window title, with a soft shadow effect.
          part { name: "title";
             type: TEXT;
             effect: SOFT_SHADOW;
             description { state: "default" 0.0;
+               // text color: solid white (#FFFFFFFF)
                color: 255 255 255 255;
+               // shadow color: dark gray, semi-transparent (#46464646)
                color3: 70 70 70 70;
                text {
                   text: "Elementary Anchorblock";
@@ -68,22 +81,30 @@ collections {
             }
          }
 
-         /* EXTERNAL elementary anchorblock */
+         // An external part that embeds an Elementary 'anchorblock' widget.
+         // Anchorblocks are used to display text with clickable links.
          part { name: "anchorblock";
             type: EXTERNAL;
             source: "elm/anchorblock";
             description { state: "default" 0.0;
+               // color: semi-transparent yellow (#C8C800C8)
                color: 200 200 0 200;
                rel1.offset: 5 35;
                rel2.offset: -6 -45;
                align: 0.0 0.0;
+               // The 'map' property enables 3D-like transformations, allowing
+               // for rotations and perspective effects on the part.
                map {
                   on: 1;
                   perspective_on: 1;
                   smooth: 1;
                }
+               // Sets the 'text' property of the anchorblock widget to the LOREM macro.
                params.string: "text" LOREM;
             }
+            // These descriptions define different states for the 'anim' animation.
+            // Each state applies a different rotation to the anchorblock, creating
+            // a sequence of 3D-like movements.
             description { state: "anim" 0.0;
                inherit: "default" 0.0;
                map.rotation.z: 100;
@@ -102,8 +123,10 @@ collections {
                map.rotation.y: 100;
             }
          }
-   
-         /* EXTERNAL elementary button to trigger the animation */
+
+         // An external part for an Elementary 'button' widget. This button
+         // is positioned at the bottom of the window and is used to trigger
+         // the animation sequence on the anchorblock.
          part { name: "button";
             type: EXTERNAL;
             source: "elm/button";
@@ -115,6 +138,7 @@ collections {
                rel2 {
                   offset: -6 -2;
                }
+               // Sets the 'label' property of the button widget.
                params {
                   string: "label" "Animate";
                }
@@ -122,8 +146,14 @@ collections {
          }
       }
 
+      // The 'programs' block defines the interactive behavior of the interface.
+      // It connects signals from parts (like a button click) to actions
+      // (like changing the state of another part).
       programs {
-         /* button clicked, start the animation cycle */
+         // When the "button" part emits the "clicked" signal, this program
+         // starts. It sets the "anchorblock" part to the "anim" state with a
+         // value of 0.0 over a 1-second linear transition. After it finishes,
+         // it triggers the "anim2" program, creating a chain of animations.
          program { name: "button_click";
             signal: "clicked";
             source: "button";
@@ -132,6 +162,9 @@ collections {
             target: "anchorblock";
             after: "anim2";
          }
+         // The following programs form a chain of animations. Each one is
+         // triggered by the 'after' property of the previous program. They
+         // sequentially apply the different 'anim' states to the 'anchorblock'.
          program { name: "anim2";
             action: STATE_SET "anim" 0.1;
             transition: LINEAR 1.0;
@@ -150,6 +183,8 @@ collections {
             target: "anchorblock";
             after: "anim5";
          }
+         // The final program in the animation chain. It resets the
+         // 'anchorblock' to its 'default' state, completing the cycle.
          program { name: "anim5";
             action: STATE_SET "default" 0.0;
             transition: LINEAR 1.0;

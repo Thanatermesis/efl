@@ -1,6 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
+// This group defines a non-blocking background for the context popup. It is
+// used when the popup should not prevent interaction with underlying elements.
 group { name: "elm/ctxpopup/bg/noblock";
    parts {
+      // The base part is a rectangle that covers the entire area of the popup's
+      // parent. It is completely transparent (0,0,0,0 -> #00000000) and set to
+      // ignore mouse events, allowing clicks to pass through to elements behind it.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -9,13 +14,20 @@ group { name: "elm/ctxpopup/bg/noblock";
    }
 }
 
+// This group provides a default, blocking background for the context popup.
+// It dims the area behind the popup and intercepts mouse clicks.
 group { name: "elm/ctxpopup/bg/default";
    parts {
+      // A rectangle that acts as a modal background. Unlike the 'noblock'
+      // version, this part receives mouse events, "blocking" interaction
+      // with elements underneath. The default state is transparent white
+      // (255,255,255,0 -> #FFFFFF00).
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color: 255 255 255 0; // no cc
             color_class: "/dim/normal/hover";
          }
+         // When visible, the background becomes opaque white (255,255,255,255 -> #FFFFFFFF).
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             color: 255 255 255 255; // no cc
@@ -23,14 +35,20 @@ group { name: "elm/ctxpopup/bg/default";
       }
    }
    programs {
+      // When the background is clicked, it emits a signal to the application,
+      // typically to dismiss the context popup.
       program { signal: "mouse,clicked,*"; source: "base";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // On receiving the "elm,state,show" signal, the background transitions
+      // to the "visible" state, fading in over 0.3 seconds.
       program { signal: "elm,state,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: SINUSOIDAL 0.3;
          target: "base";
       }
+      // On "elm,state,hide", it fades out over 0.5 seconds by transitioning
+      // back to the "default" (transparent) state.
       program { signal: "elm,state,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
@@ -39,14 +57,20 @@ group { name: "elm/ctxpopup/bg/default";
    }
 }
 
+// This is the main group for the context popup, defining its appearance,
+// content area, and arrow. It uses a clipping mechanism for show/hide
+// animations.
 group { name: "elm/ctxpopup/base/default";
    parts {
+      // The main background of the popup content area, clipped by the "clip" part.
       part { name: "base"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
             color_class: "/dim/normal/ctxpopup";
          }
       }
+      // A swallow part for a custom background (e.g., a pattern). It is also
+      // clipped, making it visible only when the popup is shown.
       part { name: "elm.swallow.background"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -54,6 +78,10 @@ group { name: "elm/ctxpopup/base/default";
             rel.to: "base";
          }
       }
+      // Swallows the main content (e.g., a list of items). The offsets create
+      // an 8px padding. 'offscale' is crucial as it prevents the content from
+      // being scaled along with the parent, which is important for maintaining
+      // crisp text and icons during animations.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          scale: 1;
@@ -64,6 +92,10 @@ group { name: "elm/ctxpopup/base/default";
             offscale;
          }
       }
+      // An invisible rectangle used to control event propagation. In the "default"
+      // state it is visible and can catch mouse events. When the popup is shown
+      // (transitions to "visible" state), this part is hidden (`visible: 0;`),
+      // disabling its event-catching capabilities.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -73,6 +105,12 @@ group { name: "elm/ctxpopup/base/default";
             visible: 0;
          }
       }
+      // This rectangle is the core of the popup's reveal animation.
+      // In the "default" state, it is invisible (`visible: 0;`), transparent
+      // white (#FFFFFF00), and positioned far off-screen with a large size.
+      // When transitioning to "visible", it becomes visible, opaque white
+      // (#FFFFFFFF), and its geometry is animated to the final size of the popup,
+      // clipping the other parts ('base', 'content', etc.) into view.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             color: 255 255 255 0; // no cc
@@ -88,6 +126,13 @@ group { name: "elm/ctxpopup/base/default";
          }
       }
 
+      // Arrow positioning system:
+      // The four 'arrow_area_*' parts are SPACERs that define draggable regions
+      // for the arrow on each side of the popup. They are positioned slightly
+      // outside the 'base' part.
+      // The 'elm.swallow.arrow_*' parts are where the actual arrow objects are
+      // placed. Each is confined to its corresponding 'arrow_area_*', allowing
+      // the arrow to be moved along the popup edge.
       part { name: "arrow_area_left"; type: SPACER;
          scale : 1;
          description { state: "default" 0.0;
@@ -189,12 +234,18 @@ group { name: "elm/ctxpopup/base/default";
       }
    }
    programs {
+      // When the "elm,state,show" signal is received, this program triggers the
+      // "visible" state on the "clip" and "event" parts, initiating the
+      // appear animation over 0.1 seconds.
       program { signal: "elm,state,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: SINUSOIDAL 0.1;
          target: "clip";
          target: "event";
       }
+      // When hiding, this program transitions "clip" and "event" back to their
+      // default states over 0.3 seconds. After the transition, it runs the
+      // "hide2" program.
       program { signal: "elm,state,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.3;
@@ -202,6 +253,9 @@ group { name: "elm/ctxpopup/base/default";
          target: "event";
          after: "hide2";
       }
+      // After the hide animation completes, this emits a signal to notify the
+      // application that the popup is fully hidden. This is useful for cleaning
+      // up resources or queuing other actions.
       program { name: "hide2";
          action: SIGNAL_EMIT "elm,action,hide,finished" "elm";
       }
@@ -209,8 +263,12 @@ group { name: "elm/ctxpopup/base/default";
    }
 }
 
+// This group defines the visual appearance of the popup arrow. It uses a state
+// machine to select the correct arrow image based on its orientation.
 group { name: "elm/ctxpopup/arrow/default";
    parts {
+      // The 'base' part displays the arrow image. Because it uses the 'image'
+      // property, it is implicitly an IMAGE part. Its color can be themed.
       part { name: "base";
          scale: 1;
          description { state: "default" 0.0;
@@ -219,6 +277,8 @@ group { name: "elm/ctxpopup/arrow/default";
             image.normal: "i-arrow-l";
             color_class: "/fg/normal/ctxpopup/arrow";
          }
+         // The following states inherit from "default" and override the image
+         // to show the arrow pointing in the correct direction.
          description { state: "left" 0.0;
             inherit: "default" 0.0;
             image.normal: "i-arrow-l";
@@ -238,6 +298,8 @@ group { name: "elm/ctxpopup/arrow/default";
       }
    }
    programs {
+      // Application signals like "elm,state,left" trigger state changes on the
+      // "base" part, which in turn updates the arrow's visual representation.
       program { signal: "elm,state,left"; source: "elm";
          action: STATE_SET "left" 0.0;
          target: "base";

@@ -1,5 +1,12 @@
+// This group defines the basic layout for a photo widget. It includes a
+// border, a clipping area, a background, and a content area. This is the
+// default style, which other styles can inherit from.
 group { name: "elm/photo/base/default";
    parts {
+      // The 'base' part serves as the outer frame or border for the photo.
+      // The offsets create a small margin, and `offscale` ensures the border
+      // thickness remains constant regardless of scaling. The color is defined
+      // by the theme through the 'color_class'.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -9,6 +16,10 @@ group { name: "elm/photo/base/default";
             offscale;
          }
       }
+      // The 'clip' part is a clipping rectangle. Any content rendered by parts
+      // that are clipped to it (like 'elm.swallow.content') will not be visible
+      // outside this area. It is positioned relative to the 'base' part,
+      // creating an inner area for the photo content.
       part { name: "clip"; type: RECT;
          scale: 1;
          description { state:    "default" 0.0;
@@ -18,12 +29,17 @@ group { name: "elm/photo/base/default";
             offscale;
          }
       }
+      // A background rectangle for the photo content area, placed inside the
+      // 'clip' area. Its color is defined by the theme.
       part { name: "bg"; type: RECT;
          description { state:    "default" 0.0;
             rel.to: "clip";
             color_class: "/bg/normal/photo/base";
          }
       }
+      // This 'SWALLOW' part is a placeholder where the actual photo image or
+      // other widget content is displayed. 'clip_to: "clip"' ensures the
+      // content does not spill outside the clipping rectangle.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -33,13 +49,24 @@ group { name: "elm/photo/base/default";
    }
 }
 
+// This group inherits from the 'default' style to add a shadow effect and
+// dynamic aspect-ratio handling. It uses an Embryo script to resize a spacer
+// part, which in turn controls the layout of the other elements.
 group { name: "elm/photo/base/shadow";
    inherit: "elm/photo/base/default";
+   // This Embryo script receives messages from the application code to
+   // dynamically adjust the layout based on the photo's dimensions.
    script {
+      // This function is called when the Edje object receives a message. It
+      // expects two integers (width and height) to adjust the aspect ratio.
+      // The script only acts on integer messages with id 0.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_INT_SET) && (id == 0)) {
             new w, h;
             w = getarg(2); h = getarg(3);
+            // If valid dimensions are provided, a custom state is created for
+            // the 'size' part. This forces the spacer to have a minimum size
+            // equal to the photo's dimensions, preserving its aspect ratio.
             if ((w > 0) && (h > 0)) {
                custom_state(PART:"size", "default", 0.0);
                set_state_val(PART:"size", STATE_MIN, w, h);
@@ -49,12 +76,16 @@ group { name: "elm/photo/base/shadow";
                set_state_val(PART:"size", STATE_REL2_OFFSET, -1, -1);
                set_state(PART:"size", "custom", 0.0);
             } else {
+               // If dimensions are invalid, revert to the default state.
                set_state(PART:"size", "default", 0.0);
             }
          }
       }
    }
    parts {
+      // The 'size' part is an invisible spacer. Its state is manipulated by the
+      // script to control the aspect ratio of the photo display area.
+      // Other parts are positioned relative to this spacer.
       part { name: "size"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -63,6 +94,9 @@ group { name: "elm/photo/base/shadow";
             offscale;
          }
       }
+      // This overrides the 'base' part from the inherited 'default' group.
+      // It is now positioned relative to the 'size' spacer and made invisible.
+      // Its purpose is to act as a reference for positioning the 'clip' part.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "size";
@@ -71,6 +105,9 @@ group { name: "elm/photo/base/shadow";
             visible: 0;
          }
       }
+      // This overrides the 'clip' part's description from the 'default' group.
+      // It uses the inherited 'rel.to: "base"' but changes the offsets to
+      // fill the new 'base' part completely.
       part { name: "clip";
          description { state: "default" 0.0;
             rel1.offset: 0 0;

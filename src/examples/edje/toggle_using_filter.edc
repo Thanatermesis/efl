@@ -1,14 +1,17 @@
+// Collections are sets of groups, data, and scripts.
 collections {
+   // A group defines a user interface layout. "main" is a common name for the primary layout.
    group { name: "main";
+      // Parts are the visual elements of the group.
       parts {
-         /* white background */
+         // A solid white (#FFFFFFFF) rectangle serving as the background.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
-         /* title label */
+         // A black (#000000FF) text label for the title.
          part { name: "title";
             type: TEXT;
             description { state: "default" 0.0;
@@ -21,14 +24,21 @@ collections {
                }
             }
          }
-         /* the rectangle, will toggle color on click */
+         // A rectangle that changes color on click. 'mouse_events: 1' enables input handling.
          part { name: "rect";
             type: RECT;
             mouse_events: 1;
+            // The default state description.
             description { state: "default" 0.0;
+               // Semi-transparent red color (#FF000096).
                color: 255 0 0 150;
                max: 150 150;
                align: 0.5 0.5;
+               // The map property enables 3D transformations like rotation.
+               // It's necessary for effects, even if not used for complex 3D here.
+               // 'on: 1' activates mapping. 'perspective_on: 1' enables perspective.
+               // 'smooth: 1' ensures smooth rendering during transformations.
+               // 'alpha: 1' allows the part's alpha channel to be used.
                map {
                   on: 1;
                   perspective_on: 1;
@@ -36,26 +46,36 @@ collections {
                   alpha: 1;
                }
             }
+            // A second state named "blue". It inherits properties from the "default" state.
             description { state: "blue" 0.0;
                inherit: "default" 0.0;
+               // Overrides the color to be solid blue (#0000FFFF).
                color: 0 0 255 255;
             }
          }
       }
+      // Programs define the logic and interactivity of the interface.
       programs {
-         /* on mouse click set the blue state, if we are in the default state */
+         // This program toggles the rectangle to its "blue" state.
          program {
+            // Triggered by the "mouse,down,1" (left mouse button click) signal from the "rect" part.
             signal: "mouse,down,1";
             source: "rect";
+            // The 'filter' is a crucial condition. This program only runs if the "rect" part
+            // is currently in its "default" state. This prevents conflicting program executions.
             filter: "rect" "default";
+            // The action sets the state of the target part to "blue".
             action: STATE_SET "blue" 0.0;
+            // A smooth transition lasting 0.4 seconds.
             transition: SINUSOIDAL 0.4;
             target: "rect";
          }
-         /* or back to the default state if we are in the blue state */
+         // This program toggles the rectangle back to its "default" state.
          program {
             signal: "mouse,down,1";
             source: "rect";
+            // This program only runs if the "rect" part is in the "blue" state.
+            // Using filters on the same signal source creates a toggle mechanism.
             filter: "rect" "blue";
             action: STATE_SET "default" 0.0;
             transition: SINUSOIDAL 0.4;

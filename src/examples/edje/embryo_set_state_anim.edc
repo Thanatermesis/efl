@@ -1,49 +1,77 @@
 collections {
+   // The 'main' group defines the primary layout and behavior of this UI component.
    group { name: "main";
+      // This script block contains Embryo code for dynamic interactions.
       script{
+        // This function is called by the 'anim' program to update the animation.
+        // 'pos' is a float from 0.0 to 1.0 indicating the animation's progress.
+        // 'val' is an integer from the program, unused here.
         public test(val, Float:pos)
           {
+             // Animates the "red_rect" part to its "default" 1.0 state.
+             // ACCELERATE makes the animation speed up over time.
+             // 'pos' sets the starting point of the animation.
              set_state_anim(PART:"red_rect", "default", 1.0, ACCELERATE, pos);
           }
       }
       parts {
+         // A background part, filling the entire area of the object.
          part { name: "bg";
             type: RECT;
+            // This is the 'start' state for the animation (state "default", value 0.0).
             description { state: "default" 0.0;
+               // Opaque white color (#FFFFFFFF).
                color: 255 255 255 255;
             }
          }
+         // A text label that also serves as a clickable area to trigger the animation.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Opaque black color (#000000FF).
                color: 0 0 0 255;
                text {
                   text: "Click me.";
                   font: "Sans";
                   size: 12;
+                  // Aligned to the left and slightly below the vertical center.
                   align: 0.0 0.7;
                }
             }
          }
+         // This rectangle is the element that gets animated.
+         // Despite its name, it's colored blue.
          part { name: "red_rect";
             type: RECT;
             description { state: "default" 0.0;
+               // The part is colored blue (#0000FFFF).
+               // The color remains the same. This line is redundant due to 'inherit' but is harmless.
                color: 0 0 255 255;
                max: 30 30;
+               // Aligned towards the left side of the container.
                align: 0.1 0.2;
             }
+            // This is the 'end' state for the animation (state "default", value 1.0).
             description { state: "default" 1.0;
+               // It inherits properties from the initial state, so only changes need to be specified.
                inherit: "default" 0.0;
                color: 0 0 255 255;
+               // Aligned towards the right side, defining the end position of the animation.
                align: 0.9 0.2;
             }
          }
       }
+      // Programs define interactions and reactions to events.
       programs {
+         // This program triggers an animation when the "label" part is clicked.
          program {
+            // Listens for a left mouse button click ("mouse,down,1") on the "label" part.
             signal: "mouse,down,1";
             source: "label";
             script {
+              // The 'anim' action calls the 'test' script function over a duration of 0.9 seconds.
+              // It provides a 'pos' value that tweens from 0.0 to 1.0 over the animation's lifetime.
+              // The integer '1' is passed as the 'val' argument to the 'test' function.
               anim(0.9, "test", 1);
             }
          }

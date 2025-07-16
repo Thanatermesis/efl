@@ -33,44 +33,65 @@ Group: efl/scroller:popup/no_inset_shadow (@since 1.23)
 	 Signal: efl,vertical_bar,visible,off
 	 Signal: efl,vertical_bar,visible,on
 */
+// This group defines the main appearance and behavior of the EFL scroller widget.
+// It includes the content area, scrollbars, and shadow effects that indicate
+// scrollable content.
 group { name: "efl/scroller";
+   // data.item allows embedding arbitrary key-value string data.
+   // "version" is a custom data item, perhaps for tracking the theme version.
    data.item: "version" "123";
 
+   // Pre-loading images used for shadow effects. COMP is for compression.
    images.image: "shadow_circle_horiz.png" COMP;
    images.image: "shadow_circle_vert.png" COMP;
 
    data.item: "focus_highlight" "on";
 
    parts {
+      // This program runs once when the object is created ("load" signal).
       program { signal: "load"; source: "";
+         // Embryo scripts allow for more complex logic than simple state changes.
+         // This script emits a "reload" signal to the "efl" source, which could
+         // be used to trigger other actions within the UI, like reloading styles.
          script {
             emit("reload", "efl");
          }
       }
 
       //////////////////////////////////////////////////////////////////////
+      // A background rectangle that inherits its size from "efl.background".
+      // It uses a color_class to be styled externally by the application's theme.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.background";
             color_class: "/bg/normal/scroller/base";
          }
       }
+      // The "clipper" is a rectangle used as a clipping mask. Any part that
+      // sets 'clip_to: "clipper";' will only be visible within the bounds of this part.
+      // This is fundamental for hiding the parts of the content that are scrolled out of view.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.background";
          }
       }
+      // "efl.background" is a SWALLOW part, a placeholder where the application
+      // can add its own content (e.g., a custom background widget). It's clipped by "clipper".
       part { name: "efl.background"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
          }
       }
+      // "efl.content" is the main SWALLOW part for the scrollable content.
+      // The application places its content widget here. It's also clipped by "clipper".
       part { name: "efl.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "efl.background";
          }
       }
+      // "efl.overlay" is another SWALLOW part, rendered on top of the content.
+      // It can be used for things like floating buttons or informational overlays.
       part { name: "efl.overlay"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -78,11 +99,14 @@ group { name: "efl/scroller";
          }
       }
 
+      // This part displays a shadow at the top edge of the content area.
+      // It's used to visually indicate that there is more content to scroll upwards.
       part { name: "sh_top"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
          description { state: "default" 0.0;
             color_class: "/shadow/normal/scroller";
+            // color: 255 255 255 0 (#FFFFFF00) - Initially fully transparent.
             color: 255 255 255 0; // no cc
             rel.to: "efl.content";
             rel1.offset: 0 -1;
@@ -90,27 +114,34 @@ group { name: "efl/scroller";
             rel2.relative: 1.0 0.0;
             image.normal: "shadow_circle_horiz.png";
             visible: 0;
+            // 'offscale' ensures that even if visible, it won't affect geometry calculations
+            // when it has zero size, preventing visual artifacts during animations.
             offscale;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // color: 255 255 255 255 (#FFFFFFFF) - Becomes fully opaque.
             color: 255 255 255 255; // no cc
             rel1.offset: 0 -16;
             rel2.offset: -1 15;
             visible: 1;
          }
       }
+      // When the scroller logic emits "efl,action,show,up", this program is triggered.
       program { signal: "efl,action,show,up"; source: "efl";
+         // It smoothly transitions the "sh_top" part to the "visible" state.
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
          target: "sh_top";
       }
+      // Triggered by "efl,action,hide,up" to hide the shadow again.
       program { signal: "efl,action,hide,up"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.3;
          target: "sh_top";
       }
 
+      // Bottom shadow, indicating more content downwards. Behaves similarly to "sh_top".
       part { name: "sh_bottom"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -144,6 +175,7 @@ group { name: "efl/scroller";
          target: "sh_bottom";
       }
 
+      // Left shadow, indicating more content to the left.
       part { name: "sh_left"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -177,6 +209,7 @@ group { name: "efl/scroller";
          target: "sh_left";
       }
 
+      // Right shadow, indicating more content to the right.
       part { name: "sh_right"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -210,6 +243,8 @@ group { name: "efl/scroller";
          target: "sh_right";
       }
 
+      // This is a clipping rectangle for all the shadow parts. It ensures that the shadows
+      // do not render outside the main background area of the scroller.
       part { name: "sh_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.background";
@@ -218,6 +253,8 @@ group { name: "efl/scroller";
       //////////////////////////////////////////////////////////////////////
 
 // vert bar ////////////////////////////////////////////////////////////////
+      // This part acts as a visibility toggle for the vertical scrollbar's visual elements.
+      // It is used as a clip for "color_vbar" below.
       part { name: "sb_vbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -226,26 +263,33 @@ group { name: "efl/scroller";
             visible: 0;
          }
       }
+      // This part defines the geometry and area of the vertical scrollbar track.
       part { name: "sb_vbar"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
-            min: 15 1;
-            align: 1.0 0.0;
+            min: 15 1; // Minimum width of 15px.
+            align: 1.0 0.0; // Aligns to the right.
             rel1.relative: 1.0 0.0;
             rel1.offset: -1 0;
             rel2.relative: 1.0 0.0;
+            // The bottom edge of the vbar is aligned with the top edge of the hbar.
+            // This prevents them from overlapping.
             rel2.to_y: "sb_hbar";
          }
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
+            // When hidden, its size is effectively collapsed to zero.
             min: 0 0;
             max: 0 999999;
          }
       }
+      // An invisible rectangle covering the area of the scrollbar track ABOVE the handle.
+      // It is used to capture mouse clicks for "page up" scrolling.
       part { name: "sb_vbar_p1"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
+            // color: 0 0 0 0 (#00000000) - Fully transparent.
             color: 0 0 0 0; // no cc
             rel1.to: "sb_vbar";
             rel2.relative: 1.0 0.0;
@@ -253,9 +297,12 @@ group { name: "efl/scroller";
             fixed: 1 1;
          }
       }
+      // An invisible rectangle covering the area of the scrollbar track BELOW the handle.
+      // Used to capture clicks for "page down" scrolling.
       part { name: "sb_vbar_p2"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
+            // color: 0 0 0 0 (#00000000) - Fully transparent.
             color: 0 0 0 0; // no cc
             rel1.relative: 0.0 1.0;
             rel1.to: "efl.draggable.vertical_bar";
@@ -263,11 +310,15 @@ group { name: "efl/scroller";
             fixed: 1 1;
          }
       }
+      // This is the draggable handle (or "thumb") of the vertical scrollbar.
       part { name: "efl.draggable.vertical_bar"; type: RECT;
          clip_to: "sb_vbar";
          scale: 1;
+         // dragable.y: 1 1 0; -> The '1 1' enables dragging on the Y-axis.
+         // The step values are set by the scroller code, not here.
          dragable.x: 0 0 0;
          dragable.y: 1 1 0;
+         // The handle's movement is confined within the "sb_vbar" part.
          dragable.confine: "sb_vbar";
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -275,6 +326,7 @@ group { name: "efl/scroller";
             rel1.relative: 0.5  0.5;
             rel2.relative: 0.5  0.5;
             rel.to: "sb_vbar";
+            // color: 0 0 0 0 (#00000000) - Fully transparent. The visual is "base_vbar".
             color: 0 0 0 0; // no cc
          }
          description { state: "hidden" 0.0;
@@ -285,27 +337,38 @@ group { name: "efl/scroller";
             inherit: "default" 0.0;
          }
       }
+      // This is an expanded, invisible area around the vertical scrollbar.
+      // Its purpose is to detect the mouse approaching the scrollbar to trigger a
+      // hover effect (e.g., making the scrollbar wider) before the cursor is directly over it.
       part { name: "sb_vbar_over"; type: RECT;
          repeat_events: 1;
          scale: 1;
          description { state: "default" 0.0;
+            // color: 0 0 0 0 (#00000000) - Fully transparent.
             color: 0 0 0 0; // no cc
-            rel1.offset: -45 0;
+            rel1.offset: -45 0; // Extends 45px to the left of the scrollbar track.
             rel.to: "sb_vbar";
             fixed: 1 1;
             offscale;
          }
       }
+      // When the mouse enters the "sb_vbar_over" area...
       program { signal: "mouse,in"; source: "sb_vbar_over";
+         // ...the "base_vbar" (the visible part of the handle) transitions to its "over" state.
          action: STATE_SET "over" 0.0;
          transition: DECELERATE 0.2;
          target: "base_vbar";
       }
+      // When the mouse leaves, it transitions back to the "default" state.
       program { signal: "mouse,out"; source: "sb_vbar_over";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
          target: "base_vbar";
       }
+      // These SPACER parts are used by the C code to map scroll units to pixels.
+      // "y_vbar_up_mapper" and "y_vbar_down_mapper" relate to the full track ("sb_vbar"),
+      // while "y_vbar_up" and "y_vbar_down" relate to the draggable handle.
+      // They are not visible but provide geometry information for calculations.
       part { name: "y_vbar_up_mapper"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -370,7 +433,9 @@ group { name: "efl/scroller";
             max: 0 0;
          }
       }
+      // This program listens for a signal from the C code to make the vertical scrollbar visible.
       program { signal: "efl,vertical_bar,visible,on"; source: "efl";
+         // It sets the state of all parts related to the vertical bar to "default", making them appear.
          action: STATE_SET "default" 0.0;
          target: "sb_vbar";
          target: "sb_vbar_show";
@@ -380,6 +445,7 @@ group { name: "efl/scroller";
          target: "y_vbar_down_mapper";
          target: "y_vbar_down";
       }
+      // This program hides the vertical scrollbar by setting all its related parts to the "hidden" state.
       program { signal: "efl,vertical_bar,visible,off"; source: "efl";
          action: STATE_SET "hidden" 0.0;
          target: "sb_vbar";
@@ -390,10 +456,14 @@ group { name: "efl/scroller";
          target: "y_vbar_down_mapper";
          target: "y_vbar_down";
       }
+      // When the "page up" area ("sb_vbar_p1") is clicked...
       program { signal: "mouse,down,1*"; source: "sb_vbar_p1";
+         // ...it triggers a "page scroll" action on the draggable handle.
+         // DRAG_VAL_PAGE changes the drag value by a page size (-1.0 for one page up).
          action: DRAG_VAL_PAGE 0.0 -1.0;
          target: "efl.draggable.vertical_bar";
       }
+      // When the "page down" area ("sb_vbar_p2") is clicked, it scrolls one page down.
       program { signal: "mouse,down,1*"; source: "sb_vbar_p2";
          action: DRAG_VAL_PAGE  0.0 1.0;
          target: "efl.draggable.vertical_bar";
@@ -414,6 +484,9 @@ group { name: "efl/scroller";
 //      }
 
 // horiz bar /////////////////////////////////////////////////////////////
+// The horizontal scrollbar implementation follows the same principles as the
+// vertical one, using a track, a draggable handle, click areas for paging,
+// and a hover-detection area.
       part { name: "sb_hbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -610,6 +683,9 @@ group { name: "efl/scroller";
 //      }
 
       //////////////////////////////////////////////////////////////////////
+      // This part provides the actual color and visual style for the scrollbar track/background.
+      // It is clipped by "sb_vbar_show" to control its visibility.
+      // Using color_class allows it to be themed.
       part { name: "color_vbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_vbar_show";
          description { state: "default" 0.0;
@@ -626,16 +702,21 @@ group { name: "efl/scroller";
          }
       }
 
+      // This is the visible representation of the scrollbar handle.
+      // It is a separate part from the draggable area ("efl.draggable.vertical_bar")
+      // to allow for visual effects (like size change on hover) without affecting the draggable logic.
       part { name: "base_vbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_vbar";
          description { state: "default" 0.0;
             fixed: 1 1;
+            // It gets its position from the draggable part.
             rel.to: "efl.draggable.vertical_bar";
-            min: 5 15;
+            min: 5 15; // Default width of 5px.
             max: 5 999999;
             align: 1.0 0.5;
          }
+         // On hover ("over" state), the handle becomes wider (15px) for easier interaction.
          description { state: "over" 0.0;
             inherit: "default" 0.0;
             min: 15 15;
@@ -644,6 +725,7 @@ group { name: "efl/scroller";
       }
 
       //////////////////////////////////////////////////////////////////////
+      // This part provides the color for the horizontal scrollbar track, similar to "color_vbar".
       part { name: "color_hbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_hbar_show";
          description { state: "default" 0.0;
@@ -660,6 +742,7 @@ group { name: "efl/scroller";
          }
       }
 
+      // This is the visible representation of the horizontal scrollbar handle, similar to "base_vbar".
       part { name: "base_hbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_hbar";
@@ -679,43 +762,58 @@ group { name: "efl/scroller";
 
       //////////////////////////////////////////////////////////////////////
 
+      // This part is used to create a dimming overlay effect, typically when the
+      // scroller hits the edge and enters a "looping" animation (like on a smartwatch).
       part { name: "dim_effect"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // color: 32 32 32 0 (#20202000) - Transparent by default.
             color: 32 32 32 0; // no cc
          }
          description { state: "effect" 0.0;
+            // color: 32 32 32 255 (#202020FF) - Becomes a semi-transparent dark overlay.
             color: 32 32 32 255; // no cc
          }
       }
    }
+   // This block contains programs that apply to the group as a whole.
    programs {
+      // When the scroller is disabled, set the scrollbar color parts to their "disabled" state.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "color_hbar";
          target: "color_vbar";
       }
+      // When the scroller is enabled, revert to the "default" state.
       program { signal: "efl,state,enabled"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "color_hbar";
          target: "color_vbar";
       }
+      // When the vertical scrollbar handle is pressed with the left mouse button (1*)...
       program { signal: "mouse,down,1*"; source: "efl.draggable.vertical_bar";
+         // ...change its state and the color part to "clicked".
          action: STATE_SET "clicked" 0.0;
          target: "efl.draggable.vertical_bar";
          target: "color_vbar";
       }
+      // For any mouse down event on the handle, emit a signal back to the C code.
+      // This is useful for providing feedback to the application logic.
       program { signal: "mouse,down,*"; source: "efl.draggable.vertical_bar";
          action: SIGNAL_EMIT "efl,vertical_bar,press" "efl";
       }
+      // When the left mouse button is released, revert the states to "default".
       program { signal: "mouse,up,1"; source: "efl.draggable.vertical_bar";
          action: STATE_SET "default" 0.0;
          target: "efl.draggable.vertical_bar";
          target: "color_vbar";
       }
+      // Similarly, emit an "unpress" signal on any mouse up.
       program { signal: "mouse,up,*"; source: "efl.draggable.vertical_bar";
          action: SIGNAL_EMIT "efl,vertical_bar,unpress" "efl";
       }
 
+      // These programs handle click and press/unpress signals for the horizontal
+      // scrollbar handle, mirroring the behavior of the vertical one.
       program { signal: "mouse,down,1*"; source: "efl.draggable.horizontal_bar";
          action: STATE_SET "clicked" 0.0;
          target: "efl.draggable.horizontal_bar";
@@ -732,20 +830,30 @@ group { name: "efl/scroller";
       program { signal: "mouse,up,*"; source: "efl.draggable.horizontal_bar";
          action: SIGNAL_EMIT "efl,horizontal_bar,unpress" "efl";
       }
+      // The following set of programs handles the "looping" visual effect.
+      // This is often used on circular screens where scrolling past the end wraps around.
+      // When the C code signals a loop action is starting...
       program { signal: "efl,action,looping,left"; source: "efl";
+         // ...it transitions the "dim_effect" part to its "effect" state.
          action: STATE_SET "effect" 0.0;
          transition: LINEAR 0.3;
          target: "dim_effect";
+         // After the transition completes, it runs the "looping,left,done" program.
          after: "looping,left,done";
       }
+      // This program is triggered by the 'after' keyword above.
       program { name: "looping,left,done";
+         // It emits a signal back to the C code to let it know the animation has finished.
          action: SIGNAL_EMIT "efl,looping,left,done" "efl";
       }
+      // When the C code signals the looping has ended, this fades the dim effect out.
       program { signal: "efl,action,looping,left,end"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 0.3;
          target: "dim_effect";
       }
+      // The programs for "right", "up", and "down" looping follow the same pattern
+      // of showing an effect, signaling completion, and hiding the effect on 'end'.
       program { signal: "efl,action,looping,right"; source: "efl";
          action: STATE_SET "effect" 0.0;
          transition: LINEAR 0.3;
@@ -791,11 +899,17 @@ group { name: "efl/scroller";
    }
 }
 
+// This group inherits from "efl/scroller" and provides a "noclip" variant.
+// It's designed for cases where the content should not be clipped, allowing it
+// to overflow the scroller's boundaries.
 group { name: "efl/scroller:noclip";
    inherit: "efl/scroller";
    parts {
+      // It overrides the "clipper" part from the base group.
       part { name: "clipper";
          description { state: "default" 0.0;
+            // By setting a massive negative offset, the clipper is made effectively
+            // infinite, thus disabling any clipping of the content.
             rel1.offset: -999999 -999999;
             rel2.offset: 999999 999999;
          }
@@ -812,6 +926,7 @@ group { name: "efl/scroller:noclip";
             rel2.offset: -1 -1;
          }
       }
+      // The shadow clipper is also disabled by making it invisible.
       part { name: "sh_clip"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -820,11 +935,18 @@ group { name: "efl/scroller:noclip";
    }
 }
 
+// Another inherited group, this one seems to be for use in popups
+// where the default inset shadow is not desired.
 group { name: "efl/scroller:popup/no_inset_shadow";
    inherit: "efl/scroller";
    parts {
+      // It overrides the "efl.content" part to adjust its geometry.
       part { name: "efl.content"; type: SWALLOW;
          description { state: "default" 0.0;
+            // The original content part was relative to "efl.background".
+            // This override makes it relative to the parent group and sets offsets
+            // to make it fill the entire area, removing the 1-pixel inset border
+            // where a shadow might otherwise be drawn.
             rel1.offset: 0 0;
             rel2.offset: 0 0;
          }

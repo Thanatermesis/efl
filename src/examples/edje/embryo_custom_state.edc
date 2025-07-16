@@ -1,16 +1,30 @@
 collections {
+   // The 'images' block preloads image files into memory.
+   // 'COMP' specifies that the images should be stored compressed,
+   // which is ideal for reducing file size and memory usage.
    images {
       image: "bubble.png" COMP;
       image: "bubble-blue.png" COMP;
    }
 
+   // The 'main' group encapsulates the entire UI layout and its interactive logic.
+   // It uses an Embryo script to dynamically manage state changes,
+   // providing a flexible way to handle complex interactions without defining
+   // an excessive number of static states.
    group { name: "main";
+      // The 'script' block contains Embryo code, a lightweight scripting language
+      // for Edje. This script handles the logic for rotating the rectangle and
+      // changing the image on the fly.
       script {
-         /* define 3 global vars to hold the rotation values */
+         // These global variables persist the rotation state of the 'rect' part
+         // across different program executions.
          public rotx;
          public roty;
          public rotz;
 
+         // This function dynamically changes the image of a specified part.
+         // It is more efficient than defining separate states for each image,
+         // as it modifies the image property on a temporary 'custom' state.
          public change_image(part[], img[]) {
                new imgid;
                new partid;
@@ -18,35 +32,43 @@ collections {
                partid = get_part_id(part);
                imgid = get_image_id(img);
 
+               // Create a new custom state based on the 'default' state.
                custom_state(partid, "default", 0.0);
-               /* change the rotation in the custom state */
+               // Set the image for the new custom state.
                set_state_val(partid, STATE_IMAGE, imgid);
-               /* apply the custom state */
+               // Apply the custom state to the part, triggering a visual update.
                set_state(partid, "custom", 0.0);
         }
       }
+      // The 'parts' block defines all the UI elements (widgets) in the group.
       parts {
+         // A simple white rectangle (#FFFFFFFF) that serves as the background.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
+         // This IMAGE part displays a bubble image.
          part { name: "img";
             type: IMAGE;
             description { state: "default" 0.0;
               image { normal: "bubble.png"; }
             }
-            /* Dummy state - otherwise edje_cc discards bubble-blue.png
-               as it thinks it's unused */
+            // This 'foo' state is a workaround to prevent the edje compiler (edje_cc)
+            // from optimizing away 'bubble-blue.png'. By referencing the image here,
+            // we ensure it's included in the final output file and available for
+            // dynamic loading by the Embryo script.
             description { state: "foo" 0.0;
               image { normal: "bubble-blue.png"; }
             }
          }
-            
+
+         // An instructional text label at the top of the interface.
          part { name: "title";
             type: TEXT;
             description { state: "default" 0.0;
+               // color: Black (#000000FF)
                color: 0 0 0 255;
                text {
                   text: "Click labels to rotate";
@@ -56,6 +78,9 @@ collections {
                }
             }
          }
+         // This text part acts as a clickable label to control rotation on the X-axis.
+         // It both displays the current rotation value and serves as a click target
+         // to trigger the corresponding rotation program.
          part { name: "X";
             type: TEXT;
             description { state: "default" 0.0;
@@ -68,6 +93,7 @@ collections {
                }
             }
          }
+         // Label to control rotation on the Y-axis.
          part { name: "Y";
             type: TEXT;
             description { state: "default" 0.0;
@@ -80,6 +106,7 @@ collections {
                }
             }
          }
+         // Label to control rotation on the Z-axis.
          part { name: "Z";
             type: TEXT;
             description { state: "default" 0.0;
@@ -92,6 +119,7 @@ collections {
                }
             }
          }
+         // This text part acts as a clickable label to change the image.
          part { name: "setimg";
             type: TEXT;
             description { state: "default" 0.0;
@@ -104,13 +132,20 @@ collections {
                }
             }
          }
+         // This is the main rectangle that will be rotated.
          part { name: "rect";
             type: RECT;
+            // 'mouse_events: 0' makes this part transparent to mouse events,
+            // allowing clicks to pass through to parts behind it.
             mouse_events: 0;
             description { state: "default" 0.0;
+               // color: Semi-transparent red (#FF000096)
                color: 255 0 0 150;
                max: 150 150;
                align: 0.5 0.5;
+               // The 'map' block enables 3D transformations on this part.
+               // 'on: 1' activates mapping.
+               // 'perspective_on: 1' enables a 3D perspective projection.
                map {
                   on: 1;
                   perspective_on: 1;
@@ -120,30 +155,39 @@ collections {
             }
          }
       }
+      // The 'programs' block defines the application's event handling and logic.
+      // Each program listens for a specific signal from a source part and executes
+      // an Embryo script in response.
       programs {
+         // This program executes when the 'X' part is left-clicked ("mouse,down,1").
          program {
             signal: "mouse,down,1";
             source: "X";
             script {
-               /* define local vars */
                new buf[32];
                new Float:x;
 
-               /* get global var (and increment) */
+               // Retrieve the current X rotation, increment by 10 degrees,
+               // and store it back in the global variable.
                x = get_int(rotx) + 10;
-               /* set global var */
                set_int(rotx, round(x));
-               /* crete a new custom state (inherit from default 0.0) */
+
+               // This is the core of dynamic state manipulation in Edje.
+               // 1. A new, temporary "custom" state is created for the 'rect' part,
+               //    inheriting all properties from its "default" state.
                custom_state(PART:"rect", "default", 0.0);
-               /* change the rotation in the custom state */
+               // 2. A single property of this new state, the map rotation on the X-axis,
+               //    is modified to the new value.
                set_state_val(PART:"rect", STATE_MAP_ROT_X, x);
-               /* apply the custom state */
+               // 3. The "custom" state is applied to the 'rect' part, causing it to
+               //    re-render with the new rotation. This is very efficient.
                set_state(PART:"rect", "custom", 0.0);
-               /* update the label to show the current value */
+               // Update the 'X' label to display the new rotation value.
                snprintf(buf, sizeof(buf), "Rot X (%d)", round(x));
                set_text(PART:"X", buf);
             }
          }
+         // This program rotates the rectangle on the Y-axis when 'Y' is clicked.
          program {
             signal: "mouse,down,1";
             source: "Y";
@@ -158,6 +202,7 @@ collections {
                set_text(PART:"Y", buf);
             }
          }
+         // This program rotates the rectangle on the Z-axis when 'Z' is clicked.
          program {
             signal: "mouse,down,1";
             source: "Z";
@@ -172,6 +217,7 @@ collections {
                set_text(PART:"Z", buf);
             }
          }
+         // This program calls the 'change_image' script function when 'setimg' is clicked.
          program {
             signal: "mouse,down,1";
             source: "setimg";

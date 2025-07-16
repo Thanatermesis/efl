@@ -1,98 +1,139 @@
 // compile: edje_cc edje_example.edc
+// An Edje file is composed of collections, which are libraries of UI components.
 collections {
+   // A group is a self-contained UI layout or widget. It encapsulates
+   // a set of parts and the logic that governs their behavior.
    group {
-      name: "my_group"; // must be the same as in edje_example.c
+      // The name is used to reference this group from the C code,
+      // allowing the application to instantiate this UI component.
+      name: "my_group";
 
+      // The 'parts' block contains all the visual elements that make up this group.
+      // Parts are stacked on top of each other in the order they are defined.
       parts {
+         // This is the first part, a background rectangle. It will be drawn first.
          part {
             name: "background";
-            type: RECT; // plain boring rectangle
-            mouse_events: 0; // we don't need any mouse event on the background
+            type: RECT; // A simple rectangle primitive.
+            // Mouse events are disabled for this part. This is an optimization; if a part
+            // doesn't need to react to the mouse, turning events off prevents Edje
+            // from doing unnecessary calculations.
+            mouse_events: 0;
 
-            // just one state "default"
+            // A 'description' defines the state of a part. A part can have multiple
+            // descriptions to represent different states (e.g., "clicked", "disabled").
             description {
-               state: "default" 0.0; // must always exist
-               color: 255 255 255 255; // white
+               // Every part must have a "default" state. The '0.0' is the state value,
+               // used for animations between states.
+               state: "default" 0.0;
+               color: 255 255 255 255; // Opaque white (#FFFFFFFF).
 
-               // define part coordinates:
-
-               rel1 { // top-left point at (0, 0) [WIDTH * 0 + 0, HEIGHT * 0 + 0]
+               // The geometry of the part is defined by its corner points, rel1 and rel2.
+               // 'rel1' corresponds to the top-left corner.
+               rel1 {
+                  // 'relative' positions the corner as a fraction of the parent container's size.
+                  // '0.0 0.0' means the top-left corner of the container.
                   relative: 0.0 0.0;
+                  // 'offset' provides an additional displacement in pixels.
                   offset: 0 0;
                }
-               rel2 { // bottom-right point at (WIDTH * 1.0 - 1, HEIGHT * 1.0 - 1)
+               // 'rel2' corresponds to the bottom-right corner.
+               rel2 {
+                  // '1.0 1.0' means the bottom-right corner of the container.
                   relative: 1.0 1.0;
+                  // Offsets of '-1 -1' make the part fit exactly within the container's
+                  // boundaries, as coordinates are 0-indexed.
                   offset: -1 -1;
                }
             }
          }
 
+         // This part is for the text. It's defined after the background,
+         // so it will be rendered on top of it.
          part {
             name: "text";
             type: TEXT;
-            mouse_events: 1; // we want to change the color on mouse-over
+            // Mouse events are enabled because this part is interactive.
+            // This allows it to be a 'source' for signals in the 'programs' block.
+            mouse_events: 1;
 
-            // 2 states, one "default" and another "over" to be used
-            // on mouse over effect
+            // This part has two states: "default" and "over". This allows it to
+            // visually change when the mouse pointer is over it.
 
+            // The 'default' description for the text part.
             description {
                state: "default" 0.0;
-               color: 255 0 0 255; // red
+               color: 255 0 0 255; // Opaque red (#FF0000FF).
 
-               // define part coordinates:
-
-               rel1 { // top-left at (WIDTH * 0.1 + 5, HEIGHT * 0.2 + 10)
+               // Here, the relative positioning and offsets are used to create
+               // margins around the text, placing it inside the background part
+               // without touching the edges.
+               rel1 {
                   relative: 0.1 0.2;
                   offset: 5 10;
                }
-               rel2 { // bottom-right at (WIDTH * 0.9 - 6, HEIGHT * 0.8 - 11)
+               rel2 {
                   relative: 0.9 0.8;
                   offset: -6 -11;
                }
 
-               // define text specific state details
+               // The 'text' block is specific to parts of type TEXT and defines
+               // text-related properties.
                text {
-                  font: "Sans"; // using fontconfig name!
+                  font: "Sans"; // Font name, resolved by Fontconfig.
                   size: 10;
                   text: "hello world";
                }
             }
 
+            // The 'over' description for when the mouse is over the text.
             description {
                state: "over" 0.0;
-               inherit: "default" 0.0; // copy everything from "default" at this point
+               // 'inherit' is a powerful property that copies all attributes from another
+               // state. This avoids repetition. Here, it copies from the "default"
+               // state of this same part.
+               inherit: "default" 0.0;
 
-               color: 0 255 0 255; // override color, now it is green
+               // We only need to specify what changes. In this case, the color is
+               // overridden to green.
+               color: 0 255 0 255; // Opaque green (#00FF00FF).
             }
          }
 
-         // do programs to change color on text mouse in/out (over)
+         // The 'programs' block defines the logic and interactivity of the group.
+         // Programs listen for signals (events) and execute actions in response.
          programs {
+            // This program handles the mouse entering the 'text' part's area.
             program {
-               // what triggers this program:
+               // Trigger: emitted when the mouse cursor enters the source part.
                signal: "mouse,in";
+               // The part that emits the signal.
                source: "text";
 
-               // what this program does:
+               // Action: what to do when the signal is received.
+               // 'STATE_SET' changes the state of a target part.
                action: STATE_SET "over" 0.0;
+               // The part to which the action is applied.
                target: "text";
 
-               // do the state-set in a nice interpolation animation
-               // using linear time in 0.1 second
+               // A transition animates the state change. Here, the properties
+               // (just the color) will animate from the "default" state to the
+               // "over" state over 0.1 seconds using a linear interpolator.
                transition: LINEAR 0.1;
             }
 
+            // This program handles the mouse leaving the 'text' part's area,
+            // resetting it to its original state.
             program {
-               // what triggers this program:
+               // Trigger: emitted when the mouse cursor leaves the source part.
                signal: "mouse,out";
                source: "text";
 
-               // what this program does:
+               // Action: change the state of the 'text' part back to "default".
                action: STATE_SET "default" 0.0;
                target: "text";
 
-               // do the state-set in a nice interpolation animation
-               // using linear time in 0.1 second
+               // The transition back to the default state is also animated.
                transition: LINEAR 0.1;
             }
          }

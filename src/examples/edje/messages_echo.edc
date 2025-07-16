@@ -1,29 +1,33 @@
-/* Simple EDC exemplifying how to receive and emit all types of messages */
-
-/* Actually for sets it will send back a message of the same type with the
- * first item and N other messages with the remaining items. */
-
+// This EDC file defines a simple Edje object that demonstrates message
+// handling by echoing back any message it receives.
 collections {
+   // A group defines a single object or interface layout.
    group {
       name: "messages_echo";
 
+      // The 'parts' block contains all the visual elements of the group.
       parts {
          part {
+            // This part is a simple rectangle that serves as the background.
             name: "bg";
             type: RECT;
             description {
                state: "default" 0.0;
+               // Sets a fixed size for the object.
                min: 400 50;
                max: 400 50;
+               // Sets the color to black (#000000) with full opacity.
                color: 0 0 0 255;
             }
          }
 
          part {
+            // This part displays a static text message.
             name: "text";
             type: TEXT;
             description {
                state: "default" 0.0;
+               // Sets the text color to white (#FFFFFF) with full opacity.
                color: 255 255 255 255;
                text {
                   font: "Sans";
@@ -34,12 +38,24 @@ collections {
          }
       }
 
+      // The 'script' block contains Embryo script code that runs within the
+      // context of this Edje object. It's used for dynamic behavior.
       script {
+         // This is a public function that acts as a message handler. It gets
+         // called whenever the Edje object receives a message from the application.
+         // The function inspects the message type and payload, then sends a
+         // corresponding message back to the sender.
          public message(Msg_Type:type, id, ...) {
+            // The '...' signifies a variable number of arguments.
+            // Handle simple message types by echoing them back directly.
             if (type == MSG_INT)
                send_message(type, id, getarg(2));
             else if (type == MSG_FLOAT)
                send_message(type, id, getfarg(2));
+            // For messages containing strings, a buffer is allocated to hold the string
+            // data before it's sent back. This is necessary because Embryo does not
+            // have a native string type that can be passed directly, requiring manual
+            // buffer management.
             else if (type == MSG_STRING) {
                new buf[1024];
                getsarg(2, buf, sizeof(buf));
@@ -55,6 +71,11 @@ collections {
                getsarg(2, buf, sizeof(buf));
                send_message(type, id, buf, getfarg(3));
             }
+            // For 'SET' message types, which can contain multiple values, a different
+            // strategy is used. The first item of the set is sent back in a message
+            // of the same type. The remaining items are sent individually in separate,
+            // simpler messages. This design handles variable-length data sets by
+            // decomposing them into a series of smaller, fixed-size messages.
             else if (type == MSG_INT_SET) {
                new i, n = numargs();
                send_message(type, id, getarg(2));

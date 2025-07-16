@@ -1,8 +1,12 @@
 #if 1
+// This group defines the appearance of the text within a tooltip.
+// It is aliased for backward compatibility and for transparent tooltips.
 group { name: "efl/label/tooltip";
    alias: "efl/label/base/tooltip"; //XXX: Remove it in EFL 2.0
    alias: "efl/label/base/tooltip/transparent";
    styles {
+      // Defines the text style for the tooltip content, including font, size, and color.
+      // It also sets up tags for basic text formatting like line breaks and bold text.
       style { name: "tooltip_style2";
          base: "font="FNBD" font_size=10 color=cc:/fg/normal/tooltip/text text_class=bubble align=0.5";
          tag:  "br" "\n";
@@ -12,29 +16,40 @@ group { name: "efl/label/tooltip";
       }
    }
    parts {
+      // The TEXTBLOCK part that will display the tooltip's text content.
+      // It's not interactive (mouse_events: 0).
       part { name: "efl.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             text {
                style: "tooltip_style2";
                min: 1 1;
-               ellipsis: -1;
+               ellipsis: -1; // Ellipsis is disabled to show the full text.
             }
          }
       }
    }
 }
 
+// This group defines the main tooltip widget, including its frame, shadow,
+// content area, and the logic for positioning an arrow pointing towards the
+// parent widget. It's designed to be highly customizable, with different
+// parts for corners and edges that can be shown or hidden based on the
+// tooltip's position relative to its target.
 group { name: "efl/tooltip";
    min: 30 30;
+   // 'pad_x' and 'pad_y' define the padding around the tooltip.
    data.item: "pad_x" "10";
    data.item: "pad_y" "10";
+   // 'pad_border_x' and 'pad_border_y' define the padding for the border.
    data.item: "pad_border_x" "1";
    data.item: "pad_border_y" "1";
    /* tooltip is hidden after this amount.
     Keep in sync with hide animations */
+   // The timeout before the tooltip automatically hides.
    data.item: "hide_timeout" "0.35";
    // if in a window... it's transparent!
+   // Indicates that the tooltip supports a transparent background.
    data.item: "transparent" "enabled";
    images.image: "tooltip-corner-top-left-tip.png" COMP;
    images.image: "tooltip-corner-top-right-tip.png" COMP;
@@ -44,19 +59,25 @@ group { name: "efl/tooltip";
    images.image: "tooltip-edge-right-tip.png" COMP;
    images.image: "tooltip-edge-bottom-tip.png" COMP;
    images.image: "tooltip-edge-top-tip.png" COMP;
+   // The script handles the dynamic positioning of the tooltip's arrow.
+   // It receives messages with coordinates and determines which edge or corner
+   // arrow to display. This allows the tooltip to point towards its anchor widget.
    script {
+      // Hides all corner arrow parts by setting them to the "default" state (invisible).
       hide_corners() {
          set_state(PART:"corner-top-left", "default", 0.0);
          set_state(PART:"corner-top-right", "default", 0.0);
          set_state(PART:"corner-bottom-left", "default", 0.0);
          set_state(PART:"corner-bottom-right", "default", 0.0);
       }
+      // Hides all edge arrow parts by setting their clippers to the "default" state.
       hide_edges() {
          set_state(PART:"clipper-edge-left", "default", 0.0);
          set_state(PART:"clipper-edge-right", "default", 0.0);
          set_state(PART:"clipper-edge-top", "default", 0.0);
          set_state(PART:"clipper-edge-bottom", "default", 0.0);
       }
+      // Shows the top-left corner arrow and hides all other corners and edges.
       show_corner_top_left() {
          set_state(PART:"corner-top-left", "visible", 0.0);
          set_state(PART:"corner-top-right", "default", 0.0);
@@ -85,6 +106,9 @@ group { name: "efl/tooltip";
          set_state(PART:"corner-top-right", "default", 0.0);
          hide_edges();
       }
+      // Shows the left edge arrow and positions it vertically based on 'val'.
+      // Other 'show_edge_*' and 'show_corner_*' functions work similarly for
+      // their respective positions.
       show_edge_left(Float:val) {
          set_state(PART:"clipper-edge-left", "visible", 0.0);
          set_drag(PART:"edge-drag-left", 0.0, val);
@@ -117,6 +141,10 @@ group { name: "efl/tooltip";
          set_state(PART:"clipper-edge-right", "default", 0.0);
          hide_corners();
       }
+      // Public message handler that receives signals from the application code.
+      // It expects a MSG_FLOAT_SET message with id 1, containing x and y
+      // coordinates. Based on these coordinates (which are relative to the
+      // anchor), it decides which arrow part to show.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_FLOAT_SET) && (id == 1)) {
             new Float:x, Float:y;
@@ -124,6 +152,9 @@ group { name: "efl/tooltip";
             x = getfarg(2);
             y = getfarg(3);
 
+            // The logic determines the tooltip's position relative to the anchor.
+            // A value < 0.0 or > 1.0 means the anchor is outside the tooltip's
+            // area on that axis, so an arrow is needed on that side.
             if (x < 0.0) {
                if (y < 0.0) show_corner_top_left();
                else if (y > 1.0) show_corner_bottom_left();
@@ -144,9 +175,14 @@ group { name: "efl/tooltip";
       }
    }
    parts {
+      // A clipping rectangle that controls the overall visibility of the tooltip.
+      // It's initially transparent and positioned far off-screen.
+      // When the tooltip is shown, it becomes opaque and encloses the 'pop' part,
+      // effectively making the tooltip and its shadow visible.
       part { name: "clipper"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Transparent color (RGBA: 255, 255, 255, 0 -> #FFFFFF00).
             color: 255 255 255 0; // no cc
             rel1 { to: "pop"; offset: -500 -500; }
             rel2 { to: "pop"; offset: 499 499; }
@@ -154,9 +190,12 @@ group { name: "efl/tooltip";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque color (RGBA: 255, 255, 255, 255 -> #FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
+      // A part to display a window shadow, clipped by the main 'clipper'.
+      // It is positioned relative to the 'pop' part.
       part { name: "shadow"; mouse_events: 0;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -164,6 +203,8 @@ group { name: "efl/tooltip";
             WIN_SHADOW;
          }
       }
+      // The main background and container for the tooltip content.
+      // It is also clipped by the main 'clipper'.
       part { name: "pop"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clipper";
@@ -175,6 +216,9 @@ group { name: "efl/tooltip";
             offscale;
          }
       }
+      // Macro to generate the corner arrow parts of the tooltip.
+      // These parts are small images that are made visible when the tooltip
+      // needs to point from a corner. They are clipped by the main 'clipper'.
       #define TT_CORNER(name_, rx, ry, ax, ay, ox, oy)             \
       part { name: "corner-"name_; mouse_events: 0;                \
          clip_to: "clipper";                                       \
@@ -206,6 +250,10 @@ group { name: "efl/tooltip";
       TT_CORNER("bottom-right", 1, 1, 1, 1, 5, 5);
       #undef TT_CORNER
 
+      // Macro to generate vertical edge arrow parts. This is more complex than
+      // corners because the arrow can slide along the edge. It uses a clipping
+      // rectangle ('clipper-edge-'), a draggable area ('edge-area-' and 'edge-drag-'),
+      // and an image part ('edge-img-') to create a movable arrow.
       #define TT_EDGE_VERT(name_, rx, ax, ox)                      \
       part { name: "clipper-edge-"name_; type: RECT;               \
          clip_to: "clipper";                                       \
@@ -276,6 +324,8 @@ group { name: "efl/tooltip";
       TT_EDGE_VERT("right", 1, 1, 5);
       #undef TT_EDGE_VERT
 
+      // Macro to generate horizontal edge arrow parts, similar in concept to
+      // the vertical edge macro but for top and bottom edges.
       #define TT_EDGE_HORIZ(name_, ry, ay, oy)                     \
       part { name: "clipper-edge-"name_; type: RECT;               \
          clip_to: "clipper";                                       \
@@ -337,16 +387,22 @@ group { name: "efl/tooltip";
       TT_EDGE_HORIZ("bottom", 1, 1, 5);
       #undef TT_EDGE_HORIZ
 
+      // A clipping rectangle for the content area. This allows the content
+      // to have its own show/hide animation, independent of the main tooltip frame.
       part { name: "clipper_content"; type: RECT;
          description { state: "default" 0.0;
+            // Transparent color (RGBA: 255, 255, 255, 0 -> #FFFFFF00).
             color: 255 255 255 0; // no cc
             rel.to: "efl.content";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque color (RGBA: 255, 255, 255, 255 -> #FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
+      // The SWALLOW part where the actual tooltip content (e.g., a label or an icon)
+      // is placed. It is clipped by 'clipper_content'.
       part { name: "efl.content"; type: SWALLOW;
          clip_to: "clipper_content";
          scale: 1;
@@ -358,6 +414,8 @@ group { name: "efl/tooltip";
          }
       }
       programs {
+         // This program is triggered by the "efl,action,show" signal.
+         // It stops any ongoing hide animations and starts the show animations.
          program { name: "show0";
             signal: "efl,action,show"; source: "efl";
             action: ACTION_STOP;
@@ -368,17 +426,21 @@ group { name: "efl/tooltip";
             after: "show1";
             after: "show2";
          }
+         // Fades in the main tooltip clipper, making the frame and shadow visible.
          program { name: "show1";
             action: STATE_SET "visible" 0.0;
             transition: LINEAR 0.15;
             target: "clipper";
          }
+         // Fades in the content clipper with a slight delay, making the content visible.
          program { name: "show2";
             in: 0.1 0.0;
             action: STATE_SET "visible" 0.0;
             transition: LINEAR 0.15;
             target: "clipper_content";
          }
+         // This program is triggered by the "efl,action,hide" signal.
+         // It stops any ongoing show animations and starts the hide animations.
          program { name: "hide0";
             signal: "efl,action,hide"; source: "efl";
             action: ACTION_STOP;
@@ -389,17 +451,20 @@ group { name: "efl/tooltip";
             after: "hide2";
             after: "hide3";
          }
+         // Immediately hides any visible corner or edge arrows by calling the script functions.
          program { name: "hide1";
             script {
                hide_corners();
                hide_edges();
             }
          }
+         // Fades out the content clipper.
          program { name: "hide2";
             action: STATE_SET "default" 0.0;
             transition: LINEAR 0.1;
             target: "clipper_content";
          }
+         // Fades out the main tooltip clipper with a slight delay.
          program { name: "hide3";
             in: 0.1 0.0;
             action: STATE_SET "default" 0.0;
@@ -410,6 +475,9 @@ group { name: "efl/tooltip";
    }
 }
 
+// A simplified tooltip group for use in transparent windows.
+// This version lacks the complex frame, shadow, and arrow logic of the main
+// tooltip. It simply provides a content area.
 group { name: "efl/tooltip:transparent";
    data.item: "pad_x" "10";
    data.item: "pad_y" "10";
@@ -424,6 +492,10 @@ group { name: "efl/tooltip:transparent";
 
 ///////////////////////////////////////////////////////////////////////////////
 #else
+// The following is an alternative/older implementation of the tooltip,
+// compiled when the preprocessor condition at the top of the file is false.
+// It shares many concepts with the primary implementation but differs in
+// visual details and part structure.
 
 
 

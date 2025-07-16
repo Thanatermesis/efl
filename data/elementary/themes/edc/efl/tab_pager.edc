@@ -1,57 +1,90 @@
+// Defines the theme for the Efl.Ui.Tab_Pager widget.
+// This group is responsible for laying out the tab bar and the page content area.
 group { "efl/tab_pager";
    data.item: "version" "123";
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // A rectangle part used as a base for the shadow. Its geometry is defined
+      // by the WIN_SHAD macro via the "_sh1" part (which it creates).
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
+            // Uses a color from the application's color class definitions.
+            // This is typically a semi-transparent black for shadows.
             color_class: "/shadow/normal/tab";
          }
       }
+      // This macro generates shadow effects for a window or a widget. It creates
+      // multiple image parts around the "bg" part to simulate a drop shadow using
+      // the "win_shad_flat.png" image. The numbers control the border sizes and
+      // shadow offsets.
       WIN_SHAD("bg", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25)
+      // This is a swallow part, a container for external Evas objects.
+      // "efl.tab_root" will hold the tab bar widget provided by the C code.
       swallow { "efl.tab_root"; required;
          scale;
          desc { "default";
+            // Enforces a fixed height of 46 pixels for the tab bar area, while
+            // allowing the width to be flexible.
             fixed: 0 1;
             min: 0 46;
             max: -1 46;
+            // The tab root is horizontally aligned with the "bg" part, with some
+            // horizontal padding (4px on the left, 5px on the right).
             rel1.to_x: "bg";
             rel2.to_x: "bg";
             rel1.offset: 4 4;
             rel2.offset: -5 4;
+            // Aligns the content to the top-center of the available space.
             align: 0.5 0.0;
+            // Prevents the content from being distorted by parent scaling.
             offscale;
          }
       }
+      // This is the main background for the page content area.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positions the top of this part at the bottom of the tab bar area.
             rel1.to_y: "efl.tab_root";
             rel1.relative: 0.0 1.0;
+            // Use a standard background color from the color class.
             color_class: "/bg/normal/tab";
             rel1.offset: 4 0;
             rel2.offset: -5 -5;
             offscale;
          }
       }
+      // An invisible rectangle used for clipping. It has the same geometry as
+      // the "bg" part. Anything swallowed into "efl.page_root" will be clipped
+      // by this part, ensuring content doesn't draw outside the background.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // This swallows the main content of the current tab page.
       swallow { "efl.page_root"; required;
+         // The content is clipped by the "clip" part.
          clip_to: "clip";
          scale;
          desc { "default";
+            // The content area is inset within the "bg" part to create a
+            // padded look.
             rel.to: "bg";
             rel1.offset: 4 4;
             rel2.offset: -5 4;
             offscale;
          }
       }
+      // An invisible event-catching layer on top of the page content.
+      // This is often used for gesture detection (like swipes to change tabs)
+      // without interfering with the widgets inside the page content.
       swallow { "efl.event"; required;
+         // Events are passed through to the parts underneath this one.
          repeat_events: 1;
          desc { "default";
+            // It exactly covers the page content area.
             rel.to: "efl.page_root";
          }
       }

@@ -1,7 +1,21 @@
+// This group defines a visual highlight effect for accessibility, creating a
+// "dimmed" overlay around a focused widget. It's constructed from five
+// rectangle parts: a central 'base' part that frames the widget, and four
+// 'block' parts that cover the surrounding areas of the screen. This method
+// effectively creates a "hole" in the overlay, drawing attention to the
+// highlighted element.
 group { name: "elm/access/base/default";
    parts {
+      // This part is the top section of the dimming overlay. It's a rectangle
+      // that stretches horizontally across the screen and covers the area
+      // from the top edge down to the top of the 'base' part. The large
+      // negative and positive offsets (-100000, 100000) are a common Edje
+      // technique to ensure the rectangle extends far beyond the visible area,
+      // effectively covering the entire width.
       part { name: "block1"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
+            // The color_class "/dim/normal/access" provides a semi-transparent
+            // color defined in the theme, used here to dim the area.
             color_class: "/dim/normal/access";
             fixed: 0 1;
             rel1.to: "base";
@@ -11,6 +25,8 @@ group { name: "elm/access/base/default";
             rel2.offset: 100000 96;
          }
       }
+      // This is the bottom section of the overlay, mirroring 'block1'. It
+      // covers the area from below the 'base' part to the bottom of the screen.
       part { name: "block2"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             color_class: "/dim/normal/access";
@@ -22,6 +38,9 @@ group { name: "elm/access/base/default";
             rel2.offset: 100000 100000;
          }
       }
+      // 'block3' is the left-side panel of the dimmed overlay. It fills the
+      // vertical space between 'block1' and 'block2', to the left of the
+      // 'base' part, completing the frame on that side.
       part { name: "block3"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             color_class: "/dim/normal/access";
@@ -34,6 +53,10 @@ group { name: "elm/access/base/default";
             rel2.offset: 96 -1;
          }
       }
+      // 'block4' is the right-side panel, mirroring 'block3'. It fills the
+      // space to the right of 'base', between 'block1' and 'block2'. Together,
+      // the four 'block' parts create a continuous dimmed area surrounding the
+      // central highlighted widget.
       part { name: "block4"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             color_class: "/dim/normal/access";
@@ -46,10 +69,16 @@ group { name: "elm/access/base/default";
             rel2.offset: -1 -1;
          }
       }
+      // The 'base' part is the central rectangle that frames the focused widget.
+      // It is slightly larger than the widget itself (20 pixels on each side)
+      // to provide a visible border. mouse_events are disabled to allow clicks
+      // to pass through to the widget underneath.
       part { name: "base"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             rel1.offset: -20 -20;
             rel2.offset:  19 19;
+            // The "/bg/normal/access" color_class is likely a distinct color
+            // for the highlight frame, distinguishing it from the dimmed area.
             color_class: "/bg/normal/access";
          }
       }

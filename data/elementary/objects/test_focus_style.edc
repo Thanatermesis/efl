@@ -2,6 +2,9 @@
 //  |base|
 //  |    |
 //  c3 - c2
+// The OUTER_BASE_PARTS macro defines a set of spacer parts that form a
+// rectangular layout. The "base" part serves as a central reference,
+// while "c1" through "c4" act as corner anchors for positioning other elements.
 #define OUTER_BASE_PARTS(w, h)               \
    part { name: "base"; type: SPACER;        \
       description {                          \
@@ -42,6 +45,10 @@
          min: w h;                           \
          max: w h; } }
 
+// This group defines a glowing focus highlight effect that animates to follow
+// the focused UI element. It uses a script to smoothly transition the highlight's
+// position and size, providing visual feedback to the user about the currently
+// focused widget.
 collections {
    group { name: "elm/focus_highlight/top/glow";
       images {
@@ -49,6 +56,15 @@ collections {
       }
       data.item: "animate" "on";
 
+      // The script manages the animation of the focus highlight.
+      // It receives the geometry of the old and new focused widgets,
+      // calculates the difference, and then interpolates the position
+      // and size of the highlight over a short duration.
+      // - 'message' function: Entry point for C code to trigger the animation.
+      //   It receives coordinates (x1,y1,w1,h1 for source, x2,y2,w2,h2 for destination)
+      //   and stores them in script variables.
+      // - 'anim_highlight' function: The core animation callback, executed on each frame.
+      // - 'update_offset' function: Helper to apply the calculated geometry to the 'base' part.
       script {
          public src_x, src_y, src_w, src_h;
          public diffx, diffy, diffw, diffh;
@@ -107,7 +123,13 @@ collections {
          }
       } //script ends
       parts {
+         // Create the base and corner spacers with a size of 12x12 for the corners.
          OUTER_BASE_PARTS(12, 12);
+         // The "highlight" part is the visual representation of the focus border.
+         // It is an IMAGE part that uses "border6.png" and is stretched between
+         // the top-left ("c1") and bottom-right ("c2") corners, creating a
+         // resizable frame. The "visible" and "invisible" states control its
+         // appearance.
          part { name: "highlight"; type: IMAGE;
             mouse_events: 0;
             description { state: "default" 0.0;
@@ -126,6 +148,9 @@ collections {
          }
       } //parts ends
       programs {
+         // This program is triggered by the "elm,action,focus,show" signal
+         // from the application. It stops any ongoing hide animations and
+         // initiates the 'show_start' program to make the focus highlight appear.
          program { name: "show";
             signal: "elm,action,focus,show";
             source: "elm";
@@ -135,15 +160,20 @@ collections {
             target: "hide_end";
             after: "show_start";
          }
+         // Sets the "highlight" part to the "visible" state, making it appear
+         // with a sinusoidal transition over 0.2 seconds (fade-in effect).
          program { name: "show_start";
             action: STATE_SET "visible" 0.0;
             transition: SIN 0.2;
             target: "highlight";
             after: "show_end";
          }
+         // Emits a signal to notify the application that the show animation has completed.
          program { name: "show_end";
             action: SIGNAL_EMIT "elm,action,focus,show,end" "";
          }
+         // The "hide" programs work analogously to the "show" programs,
+         // hiding the focus highlight when triggered by "elm,action,focus,hide".
          program { name: "hide";
             signal: "elm,action,focus,hide";
             source: "elm";
@@ -165,6 +195,9 @@ collections {
       } //programs ends
    } //group ends
 
+// This group inherits from "elm/focus_highlight/top/glow" and provides a more
+// complex, multi-stage focus animation. It includes an initial "dimming"
+// effect followed by a continuous "glowing" pulse.
    group { name: "elm/focus_highlight/top/glow_effect";
       inherit: "elm/focus_highlight/top/glow";
       images {
@@ -177,6 +210,10 @@ collections {
       }
       data.item: "animate" "on";
 
+      // The script is overridden to change the animation curve and to trigger
+      // a "dim" signal when the main highlight animation completes.
+      // The easing function 'p = 1.0 - ((1.0 - pos) * (1.0 - pos) * (1.0 - pos))'
+      // creates a fast start and slow end (ease-out) effect.
       script {
          public src_x, src_y, src_w, src_h;
          public diffx, diffy, diffw, diffh;
@@ -237,6 +274,9 @@ collections {
          }
       } //script ends
       parts {
+         // The highlight part is redefined with multiple "visible" states.
+         // These states use different border images and sizes to create a
+         // frame-by-frame animation effect when transitioned.
          part { name: "highlight"; type: IMAGE;
             mouse_events: 0;
             description { state: "default" 0.0;
@@ -281,6 +321,8 @@ collections {
          }
       }//parts ends
       programs {
+         // The show/hide programs are redefined to implement the new
+         // multi-stage animation.
          program { name: "show";
             signal: "elm,action,focus,show";
             source: "elm";
@@ -290,10 +332,14 @@ collections {
             target: "hide_end";
             after: "show_start";
          }
+         // Instead of directly showing the highlight, this program emits the
+         // "dim" signal to start the first phase of the animation.
          program { name: "show_start";
             action: SIGNAL_EMIT "dim" "";
             after: "show_end";
          }
+         // This program sequence creates a "dimming" animation by stepping
+         // through the "visible" states from 0.4 down to 0.1.
          program { name: "dim_start";
             signal: "dim";
             in: 2 0.4;
@@ -324,6 +370,8 @@ collections {
          program { name: "dim_end";
             action: SIGNAL_EMIT "glow" "";
          }
+         // This program sequence creates a "glowing" animation by stepping
+         // through the "visible" states from 0.0 up to 0.5.
          program { name: "glow_start";
             signal: "glow";
             source: "";
@@ -357,6 +405,8 @@ collections {
             target: "highlight";
             after: "glow5";
          }
+         // This program transitions to state "visible" 0.5 and then calls
+         // "glow1", creating a continuous pulsating glow effect.
          program { name: "glow5";
             action: STATE_SET "visible" 0.5;
             transition: SINUSOIDAL 0.2;
@@ -366,6 +416,8 @@ collections {
          program { name: "show_end";
             action: SIGNAL_EMIT "elm,action,focus,show,end" "";
          }
+         // The hide animation is simpler, it just sets the highlight to invisible
+         // with a linear transition.
          program { name: "hide";
             signal: "elm,action,focus,hide";
             source: "elm";
@@ -387,9 +439,15 @@ collections {
       } //programs ends
    } //group ends
 
+// This group provides an example of a layout with a specific focus area.
+// It demonstrates how to use "focus_part" to direct the focus highlight
+// to a sub-component of a widget.
    group { name: "elm/layout/focus/example";
+      // This data item specifies that the part named "focus_area" should
+      // receive the focus highlight, not the entire layout.
       data.item: "focus_part" "focus_area";
       parts {
+         // Background part, a solid yellow rectangle (#FFFF00FF).
          part { name: "bg"; type: RECT;
             scale: 1;
             description { state: "default" 0.0;
@@ -408,6 +466,9 @@ collections {
                color: 0 0 0 255;
             }
          }
+         // This is the designated focus area, a semi-transparent gray
+         // rectangle (#7D7D7D7D). When the layout receives focus, the
+         // highlight effect will be applied to this part.
          part { name: "focus_area"; type: RECT;
             scale: 1;
             description { state: "default" 0.0;
@@ -442,6 +503,9 @@ collections {
 
 // to customize check default style
 #include "../../../data/elementary/themes/edc/elm/check.edc"
+   // This group customizes the default check widget style.
+   // It sets the focus highlight to appear around the "elm.text" part,
+   // meaning the text label of the check widget will be highlighted on focus.
    group { name: "elm/check/base/focus_text";
       data.item: "focus_part" "elm.text";
       inherit: "elm/check/base/default";
@@ -449,6 +513,9 @@ collections {
 
 // to customize button default style
 #include "../../../data/elementary/themes/edc/elm/button.edc"
+   // This group customizes the default button style.
+   // It sets the focus highlight to appear around the "elm.swallow.content" part.
+   // This is typically where a button's icon or other custom content is placed.
    group { name: "elm/button/base/focus_icon";
       data.item: "focus_part" "elm.swallow.content";
       inherit: "elm/button/base/default";

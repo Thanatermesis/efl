@@ -1,28 +1,48 @@
+// This group defines the layout and behavior of the "About Theme" dialog,
+// which provides information about the current visual theme.
 group { name: "e/theme/about";
+   // These data items hint that the window should be borderless and shaped,
+   // common for splash screens or about dialogs for a custom look.
    // data.item: "borderless" "1";
    // data.item: "shaped" "1";
+   // Pre-loading images used in this group. 'COMP' indicates they should be
+   // loaded compressed to save memory, and decompressed on-demand.
    images.image: "about-flat-bg.png" COMP;
    images.image: "win_shadow.png" COMP;
+   // Minimum dimensions for this UI component.
    min: 220 320;
    parts {
+      // A SPACER part to enforce the minimum size of the whole group.
+      // It's an invisible element that influences layout.
       part { name: "sizer"; type: SPACER;
+         // scale: 1 ensures this part scales along with the window,
+         // maintaining its proportional influence on the layout.
          scale: 1;
          description { state: "default" 0.0;
+            // Sets the minimum size, matching the group's minimum size.
             min: 220 320;
          }
       }
+      // The main background image for the dialog.
       part { name: "image";
          description { state: "default" 0.0;
+            // 'fixed: 1 1' prevents the image from resizing with the window.
             fixed: 1 1;
             image.normal: "about-flat-bg.png";
+            // 'aspect_preference: NONE' allows the image to stretch, not
+            // preserving its aspect ratio if the container is resized.
             aspect: 1.0 1.0; aspect_preference: NONE;
          }
       }
+      // Displays the theme's name, "FLAT".
       part { name: "name"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // Color is white (#FFFFFFFF). The "no cc" comment likely means
+            // this color is intentionally not using a theme color_class.
             color: 255 255 255 255; // no cc
+            // Centering the part in the middle of the parent container.
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
             text { font: FNBD; size: 48;
@@ -31,14 +51,19 @@ group { name: "e/theme/about";
                ellipsis: -1;
                align: 0.5 0.5;
             }
+            // An optimization: if scaling makes this part smaller than its
+            // minimum size, it won't be rendered.
             offscale;
          }
       }
+      // Displays the theme's description text.
       part { name: "name2"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // Color is semi-transparent white (#FFFFFFC0).
             color: 255 255 255 192; // no cc
+            // Positioned relative to the "name" part, appearing just below it.
             rel.to: "name";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 16;
@@ -55,25 +80,36 @@ group { name: "e/theme/about";
          }
       }
       ////////////////////////////////////////////////////////////////
+      // This section defines a "Close" button, composed of a shadow,
+      // a base rectangle, and a text label.
+
+      // The shadow effect for the button. It doesn't receive mouse events.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // WIN_SHADOW_SMALL is a macro that applies a predefined
+            // set of properties for a small shadow effect.
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal";
             offscale;
          }
          description { state: "clicked" 0.0;
             inherit;
+            // Scales the border of the shadow image when clicked,
+            // creating a subtle press effect.
             image.border_scale_by: 0.125;
+            // Adjusts offsets to give a pressed-in look.
             rel1.offset: -2 -1;
             rel2.offset: 1 2;
             color_class: "/shadow/pressed";
          }
       }
+      // The button's background, an invisible clickable rectangle.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned relative to the text label, providing padding around it.
             rel.to: "e.text.label";
             rel1.offset: -6 -6;
             rel2.offset: 5 5;
@@ -82,14 +118,18 @@ group { name: "e/theme/about";
          }
          description { state: "clicked" 0.0;
             inherit: "default" 0.0;
+            // Offsets are adjusted slightly to enhance the "pressed" feel.
             rel1.offset: -5 -5;
             rel2.offset: 4 4;
             color_class: "/bg/pressed/button";
          }
       }
+      // The text label for the "Close" button. The name "e.text.label" is
+      // a convention for parts that can be modified externally by the application.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned at the bottom-right of the parent.
             rel1.offset: -14 -14;
             rel1.relative: 1.0 1.0;
             rel2.offset: -14 -14;
@@ -101,6 +141,8 @@ group { name: "e/theme/about";
                min: 1 1;
                ellipsis: -1;
                align: 0.5 0.5;
+               // Using a text_class allows for global styling of all
+               // elements with this class.
                text_class: "button";
             }
             fixed: 1 1;
@@ -111,22 +153,30 @@ group { name: "e/theme/about";
             color_class: "/fg/pressed/button";
          }
       }
+      // When the left mouse button is pressed down on the "base" part,
+      // it changes the state of the button parts to "clicked".
       program { signal: "mouse,down,1*"; source: "base";
          action: STATE_SET "clicked" 0.0;
          target: "base";
          target: "shadow";
          target: "e.text.label";
       }
+      // When the left mouse button is released, it reverts the state
+      // of the button parts back to "default".
       program { signal: "mouse,up,1"; source: "base";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "shadow";
          target: "e.text.label";
       }
+      // On a full click (down and up), it emits the "e,action,close" signal,
+      // which is typically handled by the application to close the window.
       program { signal: "mouse,clicked,1*"; source: "base";
          action: SIGNAL_EMIT "e,action,close" "";
       }
       ////////////////////////////////////////////////////////////////
+      // This section defines the "Theme Settings" button. Its structure and
+      // behavior are analogous to the "Close" button above.
       part { name: "shadow2"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -157,9 +207,11 @@ group { name: "e/theme/about";
             color_class: "/bg/pressed/button";
          }
       }
+      // The text label for the "Theme Settings" button.
       part { name: "e.text.theme"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned at the bottom-left of the parent.
             rel1.offset: 13 -14;
             rel1.relative: 0.0 1.0;
             rel2.offset: 13 -14;
@@ -193,6 +245,7 @@ group { name: "e/theme/about";
          target: "shadow2";
          target: "e.text.theme";
       }
+      // On click, this emits a signal to open the theme settings dialog.
       program { signal: "mouse,clicked,1*"; source: "base2";
          action: SIGNAL_EMIT "e,action,settings,theme" "";
       }

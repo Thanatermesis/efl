@@ -1,27 +1,38 @@
+// An Edje collection can contain multiple groups, which are individual UI layouts.
 collections {
 
+   // This group defines a layout with a title and a box container.
+   // The box uses a horizontal flow layout, which arranges items
+   // from left to right, wrapping to a new line when space runs out.
    group {
       name: "example/group";
 
       parts {
+         // 'bg' is a background rectangle for the whole group.
+         // It's slightly smaller than the container due to the offsets,
+         // effectively creating a 20px margin on all sides.
          part {
             name: "bg";
             type: RECT;
 
             description {
             state: "default" 0.0;
+               // color: Gray (#808080)
                color: 128 128 128 255;
                rel1.offset: 20 20;
                rel2.offset: -21 -21;
             }
          }
 
+         // 'example/title' is a text part that serves as the title.
+         // It is positioned at the top 20% of the 'bg' part.
          part {
             name: "example/title";
             type: TEXT;
 
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -42,6 +53,8 @@ collections {
             }
          }
 
+         // 'example/box' is a container that will hold other elements.
+         // It is positioned below the title, ready to be populated from code.
          part {
             name: "example/box";
             type: BOX;
@@ -50,6 +63,10 @@ collections {
                state: "default" 0.0;
 
                box {
+                  // 'horizontal_flow' arranges child elements horizontally,
+                  // wrapping them to the next line if they don't fit.
+                  // 'padding' adds space between the elements in the box.
+                  // 'align' centers the elements within the box area.
                   layout: "horizontal_flow";
                   padding: 2 2;
                   align: 0.5 0.5;
@@ -70,6 +87,8 @@ collections {
       }
    }
 
+   // This group is similar to the first one but demonstrates a different
+   // box layout, which is specified as a custom layout.
    group {
       name: "example/group2";
 
@@ -120,6 +139,10 @@ collections {
                state: "default" 0.0;
 
                box {
+                  // 'custom_layout' is not a standard Edje layout. It implies that
+                  // a custom layout function is set from the application's C code
+                  // using evas_object_box_layout_set(). This provides great flexibility
+                  // for complex, application-specific arrangements of child elements.
                   layout: "custom_layout";
                   padding: 2 2;
                   align: 0.5 0.5;

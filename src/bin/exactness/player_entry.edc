@@ -2,12 +2,16 @@ efl_version: 1 25;
 
 collections {
    #include "../../../data/elementary/themes/fonts.edc"
+   // This group defines the appearance and behavior of the text cursor in an entry widget.
+   // It consists of a visible cursor shape and a clipper to control its visibility.
    group { name: "elm/entry/cursor/default";
       min: 1 0;
       parts {
+         // The actual visual representation of the cursor. It's a white rectangle.
          part { name: "cursor"; type: RECT; mouse_events: 0;
             clip_to: "clipper";
             description { state: "default" 0.0;
+               // Color: white (#FFFFFFFF)
                color: 255 255 255 255;
                min: 1 10;
             }
@@ -16,6 +20,8 @@ collections {
                color: 255 255 255 255;
             }
          }
+         // A clipper part is used to show or hide the cursor.
+         // When text is selected, the cursor is hidden by making this clipper invisible.
          part { name: "clipper"; type: RECT;
             description { state: "default" 0.0;
                rel1.to: "cursor";
@@ -29,11 +35,13 @@ collections {
          }
       }
       programs {
+         // When the text selection changes, the cursor is hidden.
          program {
             signal: "selection,changed"; source: "elm.text";
             action: STATE_SET "hidden" 0.0;
             target: "clipper";
          }
+         // When the text selection is cleared or reset, the cursor becomes visible again.
          program {
             signal: "selection,cleared"; source: "elm.text";
             action: STATE_SET "default" 0.0;
@@ -44,6 +52,8 @@ collections {
             action: STATE_SET "default" 0.0;
             target: "clipper";
          }
+         // When the entry widget gains focus, it initiates the cursor blinking animation.
+         // It stops any ongoing animations and starts the "cursor_show" program.
          program {
             signal: "elm,action,focus"; source: "elm";
             action: ACTION_STOP;
@@ -53,6 +63,8 @@ collections {
             target: "cursor_hide_timer";
             after: "cursor_show";
          }
+         // When the entry widget loses focus, it stops the cursor blinking animation
+         // and hides the cursor.
          program {
             signal: "elm,action,unfocus"; source: "elm";
             action: ACTION_STOP;
@@ -62,6 +74,7 @@ collections {
             target: "cursor_hide_timer";
             after: "cursor_hide_stop";
          }
+         // Explicitly shows the cursor, for example, when the user clicks in the entry.
          program {
             signal: "elm,action,show,cursor"; source: "elm";
             action: ACTION_STOP;
@@ -71,25 +84,31 @@ collections {
             target: "cursor_hide_timer";
             after: "cursor_show";
          }
+         // Hides the cursor and stops any animations.
          program { name: "cursor_hide_stop";
             action: STATE_SET "default" 0.0;
             target: "cursor";
          }
+         // This program sequence creates the blinking effect for the cursor.
+         // "cursor_show" makes the cursor visible and starts a timer.
          program { name: "cursor_show";
             action: STATE_SET "default" 0.0;
             target: "cursor";
             after: "cursor_show_timer";
          }
+         // "cursor_hide" animates the cursor to fade out, and then starts a timer to show it again.
          program { name: "cursor_hide";
             action: STATE_SET "default" 0.0;
             target: "cursor";
             transition: SINUSOIDAL 0.2;
             after: "cursor_hide_timer";
          }
+         // Timer to keep the cursor visible for 0.5 seconds before hiding it.
          program { name: "cursor_show_timer";
             in: 0.5 0.0;
             after: "cursor_hide";
          }
+         // Timer to keep the cursor hidden for 0.2 seconds before showing it.
          program { name: "cursor_hide_timer";
             in: 0.2 0.0;
             after: "cursor_show";
@@ -97,18 +116,23 @@ collections {
       }
    }
 
+   // This group defines the visual style for selected text.
    group { name: "elm/entry/selection/default";
       parts {
+         // The selection is a simple colored rectangle behind the text.
          part { name: "base"; type: RECT;
             description { state: "default" 0.0;
+               // Color: a shade of blue (#3399FFFF)
                color: 51 153 255 255;
             }
          }
       }
    }
 
+   // This group defines the style for text anchors, which are used for selection handles.
    group { name: "elm/entry/anchor/default";
       parts {
+         // The anchor is a thin bar, typically shown at the start or end of a selection.
          part { name: "bar"; type: RECT;
             scale: 1;
             description { state: "default" 0.0;
@@ -123,7 +147,10 @@ collections {
       }
    }
 
+   // This is the main group for the entry widget. It defines the base layout,
+   // text properties, and interaction logic.
    group { name: "elm/entry/base/default";
+      // Sound samples for key presses to provide auditory feedback.
       sounds {
          sample { name: "key-tap1" LOSSY 64;
             source: "kbd-tap.wav";
@@ -142,23 +169,31 @@ collections {
          }
       }
 
+      // Defines text styles for different states of the entry.
       styles {
+         // Default text style: white text with a bottom shadow. Word wrap is enabled.
          style { name: "entry_style";
             base: "font="FN" font_size=10 color=#ffffff style=shadow,bottom shadow_color=#00000080 wrap=word text_class=entry_text color_class=entry_text left_margin=2 right_margin=2";
+            // The ENABLED_TEXTBLOCK_TAGS macro enables mouse events for tags like <a href...>, etc.
             ENABLED_TEXTBLOCK_TAGS
          }
+         // Style for when word wrap is disabled.
          style { name: "entry_nowrap_style";
             base: "font="FN" font_size=10 color=#ffffff style=shadow,bottom shadow_color=#00000080 text_class=entry_text color_class=entry_text left_margin=2 right_margin=2";
             ENABLED_TEXTBLOCK_TAGS
          }
+         // Style for the disabled state: dark text (#151515) with a light shadow (#FFFFFF19).
          style { name: "entry_disabled_style";
             base: "font="FN" font_size=10 color=#151515 style=shadow,bottom shadow_color=#ffffff19 wrap=word text_class=entry_text_disabled color_class=entry_text_disabled left_margin=2 right_margin=2";
+            // The DISABLED_TEXTBLOCK_TAGS macro disables mouse events for tags.
             DISABLED_TEXTBLOCK_TAGS
          }
+         // Disabled style for no-wrap entries.
          style { name: "entry_nowrap_disabled_style";
             base: "font="FN" font_size=10 color=#151515 style=shadow,bottom shadow_color=#ffffff19 text_class=entry_text_disabled color_class=entry_text_disabled left_margin=2 right_margin=2";
             DISABLED_TEXTBLOCK_TAGS
          }
+         // Style for the guide text (placeholder): dark text (#000000) with a light shadow (#FFFFFF19).
          style { name: "entry_guide_style";
             base: "font="FN" font_size=10 color=#000000 style=shadow,bottom shadow_color=#ffffff19 wrap=word text_class=entry_guide_text color_class=entry_guide_text left_margin=2 right_margin=2 ellipsis=0.0";
             DISABLED_TEXTBLOCK_TAGS
@@ -166,12 +201,14 @@ collections {
       }
    //   data.item: "context_menu_orientation" "horizontal";
       parts {
+         // A swallow part that holds the background widget of the entry.
          part { name: "elm.swallow.background"; type: SWALLOW;
             description { state: "default" 0.0;
                rel1.offset: 1 1;
                rel2.offset: -2 -2;
             }
          }
+         // The guide text (placeholder) part. It's a textblock that overlays the main text part.
          part { name: "elm.guide"; type: TEXTBLOCK; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -182,24 +219,27 @@ collections {
                   align: 0.0 0.0;
                }
             }
+            // The guide text is hidden when it's not needed (e.g., when the entry has content).
             description { state: "hidden" 0.0;
                inherit: "default" 0.0;
                visible: 0;
             }
          }
+         // The main textblock part where the user enters text.
          part { name: "elm.text"; type: TEXTBLOCK;
             scale: 1;
-            entry_mode: EDITABLE;
-            select_mode: DEFAULT;
+            entry_mode: EDITABLE; // Allows text editing.
+            select_mode: DEFAULT; // Standard text selection behavior.
    //         select_mode: EXPLICIT;
-            cursor_mode: BEFORE;
-            multiline: 1;
-            source: "elm/entry/selection/default"; // selection under
+            cursor_mode: BEFORE; // Cursor is drawn before the character.
+            multiline: 1; // Allows multiple lines of text.
+            // Sources provide styling for different elements within the textblock.
+            source: "elm/entry/selection/default"; // Uses the selection style defined above.
    //         source2: "X"; // selection over
    //         source3: "X"; // cursor under
-            source4: "elm/entry/cursor/default"; // cursorover
+            source4: "elm/entry/cursor/default"; // Uses the cursor style defined above.
    //         source5: "elm/entry/anchor/default"; // anchor under
-            source6: "elm/entry/anchor/default"; // anchor over
+            source6: "elm/entry/anchor/default"; // Uses the anchor style defined above.
             description { state: "default" 0.0;
                /* we gotta use 0 0 here, because of scrolled entries */
                fixed: 0 0;
@@ -219,39 +259,48 @@ collections {
          }
       }
       programs {
+         // When the widget is loaded, set focus to the text part.
          program {
             signal: "load"; source: "";
             action: FOCUS_SET;
             target: "elm.text";
          }
+         // When the entry is disabled, set the text part to its "disabled" state.
          program {
             signal: "elm,state,disabled"; source: "elm";
             action: STATE_SET "disabled" 0.0;
             target: "elm.text";
          }
+         // When the entry is enabled, set the text part to its "default" state.
          program {
             signal: "elm,state,enabled"; source: "elm";
             action: STATE_SET "default" 0.0;
             target: "elm.text";
          }
+         // Hides the guide text.
          program {
             signal: "elm,guide,disabled"; source: "elm";
             action: STATE_SET "hidden" 0.0;
             target: "elm.guide";
          }
+         // Shows the guide text.
          program {
             signal: "elm,guide,enabled"; source: "elm";
             action: STATE_SET "default" 0.0;
             target: "elm.guide";
          }
+         // This program plays a random key-tap sound on each keydown event.
          program { name: "key-down";
             signal: "entry,keydown"; source: "elm.text";
+            // The script generates a program name like "key-down1", "key-down2", etc.,
+            // randomly, and then executes that program. This adds variation to the key tap sounds.
             script {
                new buf[32];
                snprintf(buf, 31, "key-down%i", (rand() % 5) + 1);
                run_program(get_program_id(buf));
             }
          }
+         // These programs play the actual sound samples.
          program { name: "key-down1";
             action: PLAY_SAMPLE "key-tap1" 1.0 INPUT;
          }
@@ -270,9 +319,12 @@ collections {
       }
    }
 
+   // This group inherits from the base entry and modifies it for mixed-mode word wrapping.
+   // Mixed wrapping breaks lines at word boundaries but will break words if a single word is too long.
    group { name: "elm/entry/base-mixedwrap/default";
       inherit: "elm/entry/base/default";
       styles {
+         // Style with `wrap=mixed`.
          style { name: "entry_style_mixedwrap";
             base: "font="FN" font_size=10 color=#ffffff style=shadow,bottom shadow_color=#00000080 wrap=mixed text_class=entry_text color_class=entry_text left_margin=2 right_margin=2";
             ENABLED_TEXTBLOCK_TAGS
@@ -320,9 +372,12 @@ collections {
       }
    }
 
+   // This group inherits from the base entry and modifies it for character-based wrapping.
+   // Character wrapping breaks lines at any character, without regard for words.
    group { name: "elm/entry/base-charwrap/default";
       inherit: "elm/entry/base/default";
       styles {
+         // Style with `wrap=char`.
          style { name: "entry_style_charwrap";
             base: "font="FN" font_size=10 color=#ffffff style=shadow,bottom shadow_color=#00000080 wrap=char text_class=entry_text color_class=entry_text left_margin=2 right_margin=2";
             ENABLED_TEXTBLOCK_TAGS
@@ -370,6 +425,7 @@ collections {
       }
    }
 
+   // Disables wrapping, making the text scroll horizontally if it exceeds the entry's width.
    group { name: "elm/entry/base-nowrap/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -406,9 +462,11 @@ collections {
       }
    }
 
+   // A single-line entry. It disables multiline support and vertically centers the text.
    group { name: "elm/entry/base-single/default";
       inherit: "elm/entry/base/default";
       styles {
+         // Style with `wrap=none`.
          style { name: "entry_single_style";
             base: "font="FN" font_size=10 color=#ffffff style=shadow,bottom shadow_color=#00000080 wrap=none text_class=entry_text color_class=entry_text left_margin=2 right_margin=2";
             ENABLED_TEXTBLOCK_TAGS
@@ -457,6 +515,7 @@ collections {
       }
    }
 
+   // A single-line entry styled for use in a spinner widget, with centered text.
    group { name: "elm/entry/base-single/spinner/default";
       alias: "elm/entry/base-single/spinner/vertical";
       inherit: "elm/entry/base-single/default";
@@ -475,6 +534,7 @@ collections {
       }
    }
 
+   // A non-editable single-line entry. It still allows text selection.
    group { name: "elm/entry/base-single-noedit/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -501,6 +561,7 @@ collections {
       }
    }
 
+   // A non-editable, multi-line entry.
    group { name: "elm/entry/base-noedit/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -525,6 +586,7 @@ collections {
       }
    }
 
+   // A non-editable, multi-line entry with mixed wrapping.
    group { name: "elm/entry/base-noedit-mixedwrap/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -549,6 +611,7 @@ collections {
       }
    }
 
+   // A non-editable, multi-line entry with char wrapping.
    group { name: "elm/entry/base-noedit-charwrap/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -573,6 +636,7 @@ collections {
       }
    }
 
+   // A non-editable, single-line entry with no wrapping.
    group { name: "elm/entry/base-nowrap-noedit/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -597,6 +661,7 @@ collections {
       }
    }
 
+   // A password entry. Characters are replaced with an asterisk ('*').
    group { name: "elm/entry/base-password/default";
       inherit: "elm/entry/base/default";
       parts {
@@ -639,12 +704,14 @@ collections {
       }
    }
 
+   // This group defines the magnifier that can appear when interacting with text on touch devices.
    group { name: "elm/entry/magnifier/default";
       parts {
          part { name: "bg"; type: RECT; mouse_events: 0;
             description { state: "default" 0.0;
                rel1.offset: 10 10;
                rel2.offset: -11 -11;
+               // Color: dark grey (#303030FF)
                color: 48 48 48 255;
             }
             description { state: "hidden" 0.0;
@@ -679,6 +746,7 @@ collections {
       }
    }
 
+   // Defines the handle that appears at the start of a text selection.
    group { name: "elm/entry/handler/start/default";
       images.image: "handle_pick_up_left.png" COMP;
       parts {
@@ -727,6 +795,7 @@ collections {
       }
    }
 
+   // Defines the handle that appears at the end of a text selection.
    group { name: "elm/entry/handler/end/default";
       images.image: "handle_pick_up_right.png" COMP;
       parts {
@@ -780,6 +849,8 @@ collections {
    // Tanya - Latvia
    // http://lazycrazy.deviantart.com/
    // http://lazycrazy.deviantart.com/art/Very-Emotional-Emoticons-144461621
+   // These are simple groups that just display an emoticon image.
+   // They are used for displaying emoticons inside the entry via markup like <item...>.
    group { name: "elm/entry/emoticon/angry/default"; images.image:
       "emo-angry.png" COMP; parts { part { name: "icon"; mouse_events: 0; description { state: "default" 0.0; max: 64 64; image.normal:
                "emo-angry.png"; } } } }

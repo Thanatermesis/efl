@@ -1,10 +1,20 @@
+// The main group for the wizard interface, providing the basic layout,
+// background, and navigation controls. It inherits from "e/desktop/background"
+// to reuse a common desktop background style.
 group { name: "e/wizard/main";
    inherit: "e/desktop/background";
+   // These macros define rotating ring images used for a subtle animated background effect.
+   // Each IMAGE_RING creates a part with an image that is animated to rotate.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
+   // A shadow image for the main window, loaded with compression enabled.
    images.image: "win_shadow.png" COMP;
    parts {
+      // A SWALLOW part that serves as a container for the wizard page content.
+      // External UI components will be "swallowed" into this part.
+      // It is positioned between the title and the bottom label, providing a
+      // flexible area for different wizard pages.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -14,11 +24,14 @@ group { name: "e/wizard/main";
             rel2.relative: 0.8 0.0;
             rel2.offset: -17 -21;
             rel2.to_y: "e.text.label";
+            // Sets a maximum width of 400px.
             max: 400 99999;
+            // offscale avoids rendering this part if it's not visible, which is an optimization.
             offscale;
          }
       }
 
+      // Defines a fixed-size area in the bottom-right corner for the busy indicator.
       part { name: "busy_area"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -33,8 +46,11 @@ group { name: "e/wizard/main";
             offscale;
          }
       }
+      // This macro creates a busy animation part that is shown when the "next"
+      // button is disabled and hidden when it's enabled. It uses the "busy_area" part as its container.
       BUSY("busy_area", "e,state,next,disable", "e", "e,state,next,enable", "e")
 
+      // A decorative shadow for the "next" button, positioned relative to the "base" part.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -42,6 +58,7 @@ group { name: "e/wizard/main";
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal/wizard";
          }
+         // When clicked, the shadow slightly grows and moves, giving a pressed-down effect.
          description { state: "clicked" 0.0;
             inherit;
             image.border_scale_by: 0.25;
@@ -49,6 +66,8 @@ group { name: "e/wizard/main";
             rel2.offset: 4 6;
          }
       }
+      // The clickable base of the "next" button. It's a rectangle sized relative
+      // to the button's text label.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -63,6 +82,9 @@ group { name: "e/wizard/main";
             color_class: "/bg/pressed/button";
          }
       }
+      // An invisible rectangle used to block mouse events on the "next" button.
+      // It is made visible in the "disabled" state, effectively overlaying the button
+      // and preventing clicks. The color is transparent (0,0,0,0 or #00000000).
       part { name: "block"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -74,6 +96,8 @@ group { name: "e/wizard/main";
             visible: 1;
          }
       }
+      // The text label for the "next" button. It's not interactive itself
+      // (mouse_events: 0) as the "base" part handles clicks.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -100,6 +124,7 @@ group { name: "e/wizard/main";
          }
       }
 
+      // The main title text at the top of the wizard.
       part { name: "e.text.title"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -118,6 +143,9 @@ group { name: "e/wizard/main";
          }
       }
 
+      // A full-window rectangle used to create a fade-in effect when the wizard appears.
+      // It starts as fully opaque black (0,0,0,255 or #000000FF) and transitions
+      // to transparent (0,0,0,0 or #00000000).
       part { name: "blanker"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color: 0 0 0 255; // no cc
@@ -130,11 +158,18 @@ group { name: "e/wizard/main";
       }
    }
    programs {
+      // When the wizard is shown ("show" signal), this program starts a transition
+      // on the "blanker" part to the "visible" state, creating a fade-in effect.
       program { signal: "show"; source: "";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 1.0 USE_DURATION_FACTOR 1;
          target: "blanker";
       }
+      // The following programs manage the "next" button's click behavior.
+      // They use an Embryo script to check if the button is enabled by inspecting
+      // the state of the "block" part before reacting to mouse events.
+
+      // On mouse down, change appearance to "clicked" if not disabled.
       program { signal: "mouse,down,1"; source: "base";
          script {
             new st[31];
@@ -147,6 +182,7 @@ group { name: "e/wizard/main";
             }
          }
       }
+      // On mouse up, revert appearance to "default" if not disabled.
       program { signal: "mouse,up,1"; source: "base";
          script {
             new st[31];
@@ -159,6 +195,7 @@ group { name: "e/wizard/main";
             }
          }
       }
+      // On a full click, emit a signal to the application code to proceed to the next step.
       program { signal: "mouse,clicked,1"; source: "base";
          script {
             new st[31];
@@ -168,11 +205,18 @@ group { name: "e/wizard/main";
               emit("e,action,next", "");
          }
       }
+      // These programs are controlled by signals from the application logic
+      // to enable or disable the "next" button.
+
+      // Enables the "next" button by making the "block" part invisible and
+      // setting the label to its default state.
       program { signal: "e,state,next,enable"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "block";
          target: "e.text.label";
       }
+      // Disables the "next" button by making the "block" part visible
+      // and setting the label to its disabled state.
       program { signal: "e,state,next,disable"; source: "e";
          action: STATE_SET "disabled" 0.0;
          target: "block";
@@ -181,7 +225,12 @@ group { name: "e/wizard/main";
    }
 }
 
+// This group defines the content for the first page of the wizard, which
+// prominently features a pulsing logo.
 group { name: "e/wizard/firstpage";
+   // Defines a scalable image set for the logo. Edje will automatically
+   // select the best-sized image from this set based on the display resolution
+   // and the part's size, optimizing for quality and performance.
    set { name: "logo_mono";
       image { image: "logo.png" COMP;  size: 601 601 99999 99999; }
       image { image: "logo2.png" COMP; size: 301 301   600   600; }
@@ -190,6 +239,8 @@ group { name: "e/wizard/firstpage";
       image { image: "logo5.png" COMP; size:  0    0    75    75; }
    }
    parts {
+      // The logo part, centered on the page. It has two states, "default" and "active",
+      // which are used by the programs below to create a pulsing animation.
       part { name: "logo";
          scale: 1;
          description { state: "default" 0.0;
@@ -206,6 +257,10 @@ group { name: "e/wizard/firstpage";
       }
    }
   programs {
+     // These two programs create a continuous pulsing animation for the logo.
+     // "logo_pulse" is triggered on "show", and then the two programs call
+     // each other in a loop using the "after" property. The SINUSOIDAL transition
+     // creates a smooth, breathing-like effect.
      program { name: "logo_pulse";
         signal: "show"; source: "";
         action: STATE_SET "active" 0.0;
@@ -222,9 +277,15 @@ group { name: "e/wizard/firstpage";
   }
 }
 
+// A minimal group that inherits the desktop background and provides a simple
+// fade-in effect. This could be used for simple pages or transitions that
+// don't need the full wizard chrome.
 group { name: "e/wizard/extra";
    inherit: "e/desktop/background";
    parts {
+      // A full-window rectangle for the fade-in effect, similar to the one
+      // in "e/wizard/main". It starts as opaque black (#000000FF) and fades
+      // to transparent (#00000000).
       part { name: "blanker"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color: 0 0 0 255; // no cc
@@ -237,6 +298,7 @@ group { name: "e/wizard/extra";
       }
    }
    programs {
+      // Triggers the fade-in animation when the group is shown.
       program { signal: "show"; source: "";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 1.0;

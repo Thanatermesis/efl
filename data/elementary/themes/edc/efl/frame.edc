@@ -1,138 +1,206 @@
+// This group defines the visual style and behavior of a frame widget.
+// It includes a title area, a content area that can be collapsed, and a shadow.
 group { name: "efl/frame";
    data.item: "version" "123";
+   // Pre-load the shadow image with compression.
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // The shadow part is a rectangle that provides a shadow effect.
+      // It is initially linked to "_sh1", which is defined inside the WIN_SHAD macro.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
+            // The color is defined by the theme's color class for shadows.
             color_class: "/shadow/normal/frame";
          }
+         // The "hidden" state makes the shadow invisible.
          description { state: "hidden" 0.0;
             inherit;
             visible: 0;
          }
       }
+      // WIN_SHAD is a macro that creates a complex window shadow effect using multiple parts.
+      // It uses "base" as the main part to attach the shadow to, "shadow" as the shadow part,
+      // and "win_shad_flat.png" as the image for the shadow.
+      // The numbers define the geometry and blur of the shadow.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // The "base" part is a spacer that defines the main area of the frame,
+      // providing padding around the edges. Other parts are relative to this.
       part { name: "base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets define the padding inside the widget's area.
             rel1.offset: 6 6;
             rel2.offset: -7 -7;
+            // offscale ensures that scaling does not affect the border thickness.
             offscale;
          }
       }
+      // A background rectangle for the title area.
       part { name: "top_bg"; type: RECT;
          description { state: "default" 0.0;
+            // It is placed relative to the "top" part, filling the same space.
             rel.to: "top";
+            // Its color is determined by the theme's color class for title backgrounds.
             color_class: "/bg/normal/frame/title";
          }
       }
+      // This spacer defines the title area of the frame.
       part { name: "top"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
+            // It's positioned at the top of the "base" part.
             rel1.to: "base";
+            // Its width is the same as "base".
             rel2.to_x: "base";
+            // Its bottom edge is aligned with the bottom of the "efl.text" part, with an offset.
             rel2.to_y: "efl.text";
             rel2.offset: -1 3;
             offscale;
          }
       }
+      // The text part for the frame's title.
       part { name: "efl.text"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned within the "base" part, with padding.
             rel.to: "base";
             rel1.offset: 4 4;
+            // The text part stretches horizontally but has a fixed vertical size based on the font.
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 4;
+            // Aligned to the top-left.
             align: 0.0 0.0;
+            // The color is set by the theme's color class for title text.
             color_class: "/fg/normal/frame/title";
             text { font: FNBD; size: 10;
                align: 0.0 0.0;
+               // Ensures the text part has a minimum height of 1 pixel.
                min: 0 1;
             }
+            // The height is fixed, but the width is not.
             fixed: 0 1;
             offscale;
          }
       }
+      // The background for the content area.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned below the "top" (title) area.
             rel1.to_x: "base";
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
+            // Fills the rest of the "base" part.
             rel2.to: "base";
+            // Color is from the theme's color class for frame backgrounds.
             color_class: "/bg/normal/frame";
          }
       }
+      // A clipping rectangle for the content area. This ensures that the
+      // content does not draw outside the "bg" part's boundaries.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // This is a SWALLOW part, which acts as a container for external content provided by the application.
       part { name: "efl.content"; type: SWALLOW;
+         // The content will be clipped by the "clip" part.
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
             align: 0.0 1.0;
+            // Positioned within the "bg" part with padding.
             rel.to: "bg";
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
             offscale;
          }
+         // The "collapsed" state description makes the content area have zero height,
+         // effectively hiding it.
          description { state: "collapsed" 0.0;
             inherit: "default" 0.0;
+            // minmul scales the minimum size. Setting the y-factor to 0.0 makes its minimum height 0.
             minmul: 1.0 0.0;
             rel1.offset: 4 0;
             rel2.offset: -5 -1;
          }
       }
+      // An invisible rectangle used to capture mouse events over the title area.
+      // ignore_flags: ON_HOLD prevents this part from changing its state when held down.
       part { name: "event"; type: RECT; ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
+            // Transparent color (RGBA: 0, 0, 0, 0 or #00000000).
             color: 0 0 0 0; // no cc
+            // It is vertically aligned with the title text part "efl.text", and horizontally spans the entire widget.
             rel1.to_y: "efl.text";
             rel2.to_y: "efl.text";
          }
       }
    }
+   // The programs section defines the interactive logic of the frame.
+   // It handles clicks on the title bar to toggle the content's visibility.
    programs {
+      // This macro handles standard clickable behavior for the "event" part,
+      // such as emitting signals for pressed and unpressed states.
       EFL_UI_CLICKABLE_PART_BIND("event")
+      // This program animates the "efl.content" part to its "collapsed" state over 0.3 seconds.
       program { name: "collapse";
          action:  STATE_SET "collapsed" 0.0;
          target: "efl.content";
          transition: ACCELERATE 0.3;
+         // After the animation finishes, it runs the "signal" program.
          after: "signal";
       }
+      // This program animates the "efl.content" part back to its "default" state.
       program { name: "expand";
          action:  STATE_SET "default" 0.0;
          target: "efl.content";
          transition: DECELERATE 0.3;
          after: "signal";
       }
+      // When the left mouse button is released over the "event" part,
+      // it emits the "efl,action,click" signal.
       program { signal:  "mouse,up,1"; source:  "event";
          action:  SIGNAL_EMIT "efl,action,click" "efl";
       }
+      // This program is triggered by the "efl,action,toggle" signal.
+      // It checks the current state of "efl.content" and runs either
+      // the "collapse" or "expand" program to toggle its visibility with an animation.
       program { signal:  "efl,action,toggle"; source: "efl";
+         // Embryo script to implement the toggle logic.
          script {
+            // A buffer to store the state name.
             new st[31];
             new Float:vl;
+            // Get the current state of the "efl.content" part.
             get_state(PART:"efl.content", st, 30, vl);
+            // If the state is "default" (expanded), run "collapse".
             if (!strcmp(st, "default"))
               run_program(PROGRAM:"collapse");
+            // Otherwise (it's "collapsed"), run "expand".
             else
               run_program(PROGRAM:"expand");
          }
       }
+      // This program is triggered by "efl,action,switch" and toggles the
+      // state of "efl.content" instantly, without any animation.
       program { signal:  "efl,action,switch"; source: "efl";
          script {
             new st[31];
             new Float:vl;
             get_state(PART:"efl.content", st, 30, vl);
+            // If expanded, set state to "collapsed" immediately.
             if (!strcmp(st, "default"))
               set_state(PART:"efl.content", "collapsed", 0.0);
+            // If collapsed, set state to "default" immediately.
             else
               set_state(PART:"efl.content", "default", 0.0);
          }
       }
+      // This program is run by "collapse" and "expand" programs after they finish.
+      // It emits a signal to notify that the animation is complete.
       program { name: "signal";
          action: SIGNAL_EMIT "efl,anim,done" "efl";
       }

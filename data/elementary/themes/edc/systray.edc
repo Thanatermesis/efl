@@ -1,37 +1,72 @@
+// This group defines the main widget for the system tray module. It handles
+// the layout and behavior of the area where notification icons are displayed.
 group { name: "e/modules/systray/main";
+   // These aliases provide alternative names for this group. "default" is a
+   // standard alias, while "invisible" can be used by themes that wish to
+   // render the systray without a visible background, relying on the shelf's
+   // styling instead.
    alias: "e/modules/systray/main/default";
    alias: "e/modules/systray/main/invisible";
    parts {
+      // Creates a public-facing alias "box" for the internal "e.box" part.
+      // This allows external code (like the systray module's C code) to
+      // easily access and add icons to the box container.
       alias: "box" "e.box";
+      // The "base" part is a simple rectangle that serves as the background
+      // for the systray widget.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The background is set to be fully transparent (RGBA: #00000000).
+            // This is a common technique to make the widget itself invisible,
+            // allowing it to blend seamlessly with the container it's placed in (e.g., a shelf).
             color: 0 0 0 0; // no cc
          }
       }
+      // This "e.box" part is a container that will hold the individual systray icons.
       part { name: "e.box"; type: BOX;
+        // The "default" state description defines a horizontal layout for the icons.
         description { state: "default" 0.0;
             align: 0 0;
             box {
+               // The icons are arranged from left to right.
                layout: "horizontal";
+               // Padding is applied to the left and right sides of the box.
                padding: 4 0;
+               // Icons are centered vertically within the box.
                align: 0.5 0.5;
+               // Ensures the box is at least 1x1 pixels, preventing it from collapsing.
                min: 1 1;
             }
         }
+        // The "vertical" state description defines a vertical layout for the icons.
         description { state: "vertical" 0.0;
+            // It inherits properties from the "default" state, so we only need to
+            // specify what changes.
             inherit: "default" 0.0;
             box {
+               // The icons are arranged from top to bottom.
                layout: "vertical";
+               // Padding is applied to the top and bottom of the box.
                padding: 0 4;
             }
         }
       }
    }
+   // The 'programs' block defines how the widget reacts to events (signals).
+   // These programs listen for orientation changes from Enlightenment ("e")
+   // and adjust the layout of the "e.box" part accordingly. This ensures
+   // that the systray icons are arranged correctly whether the shelf is
+   // horizontal or vertical.
    programs {
+      // When the container's orientation becomes horizontal (e.g., a top or bottom shelf),
+      // this program sets the "e.box" part to its "default" state, which has a
+      // horizontal layout.
       program { signal: "e,action,orient,horiz"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.box";
       }
+      // When the container's orientation becomes vertical (e.g., a left or right shelf),
+      // this program sets the "e.box" part to its "vertical" state.
       program { signal: "e,action,orient,vert"; source: "e";
          action: STATE_SET "vertical" 0.0;
          target: "e.box";

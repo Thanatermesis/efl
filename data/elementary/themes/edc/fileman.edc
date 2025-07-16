@@ -1,34 +1,44 @@
+// Defines the appearance of a standard list item in the file manager.
+// This group is used for both variable and fixed-size items.
 group { name: "e/fileman/default/list/variable";
    alias: "e/fileman/default/list/fixed";
 //   data.item: "stacking" "above";
 //   data.item: "stacking" "below";
 //   data.item: "selectraise" "on";
+   // Pre-compresses images for faster loading.
    images.image: "speaker_vol.png" COMP;
    images.image: "sym_icon_op_ask.png" COMP;
    images.image: "sym_icon_op_copy.png" COMP;
    images.image: "sym_icon_op_move.png" COMP;
+   // The script block allows for complex logic using the Embryo scripting language.
    script {
+      // A public variable to track if a long press event has occurred.
       public longpressed;
    }
    parts {
+      // The 'base' part serves as the background for the list item.
+      // 'mouse_events: 0' ensures it doesn't interfere with other interactive parts.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/list/item";
          }
       }
+      // 'sel_base' is the selection highlight, visible only when the item is selected.
       part { name: "sel_base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/selected/list/item";
-            visible: 0;
+            visible: 0; // Initially hidden.
          }
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
-            visible: 1;
+            visible: 1; // Becomes visible on selection.
          }
       }
+      // This part displays the item's name (e.g., file or folder name).
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned to the right of the 'icon0' spacer.
             rel1.offset: 4 4;
             rel1.relative: 1.0 0.0;
             rel1.to_x: "icon0";
@@ -45,6 +55,7 @@ group { name: "e/fileman/default/list/variable";
          }
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
+            // Text color changes when selected.
             color_class: "/fg/selected/list/item";
          }
          description { state: "disabled" 0.0;
@@ -53,6 +64,7 @@ group { name: "e/fileman/default/list/variable";
          }
       }
 //////////////////////////
+      // A spacer to reserve a fixed-size area for the icon, ensuring consistent layout.
       part { name: "icon0"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -65,10 +77,13 @@ group { name: "e/fileman/default/list/variable";
             offscale;
          }
       }
+      // A rectangle that serves as the container for the main icon.
+      // It can be animated, for instance, during thumbnail generation.
       part { name: "icon"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "icon0";
          }
+         // The 'start' state is used for animation, initially setting the height to 0.
          description { state: "start" 0.0;
             inherit: "default" 0.0;
             max: 99999 0;
@@ -77,6 +92,7 @@ group { name: "e/fileman/default/list/variable";
             inherit: "default" 0.0;
          }
       }
+      // This part provides a monochrome effect for the icon.
       part { name: "icon_mono"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -86,12 +102,14 @@ group { name: "e/fileman/default/list/variable";
             color_class: "/fg/selected/grid/item";
          }
       }
+      // A swallow part to display a monochrome version of the icon, clipped by 'icon_mono'.
       part { name: "e.swallow.icon_mono"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_mono";
          description { state: "default" 0.0;
             rel.to: "icon0";
          }
       }
+      // The main icon of the file is swallowed here.
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon";
          description { state: "default" 0.0;
@@ -99,6 +117,7 @@ group { name: "e/fileman/default/list/variable";
             fixed: 1 1;
          }
       }
+      // An overlay effect for the icon, typically used for hover or selection feedback.
       part { name: "icon_over"; type: RECT; mouse_events: 0;
          clip_to: "icon";
          description { state: "default" 0.0;
@@ -110,12 +129,14 @@ group { name: "e/fileman/default/list/variable";
             inherit: "default" 0.0;
             visible: 1;
          }
+         // In the 'visible' state, the overlay becomes transparent.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00 (fully transparent)
             visible: 0;
          }
       }
+      // Displays an indicator for symbolic links.
       part { name: "link"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -128,24 +149,29 @@ group { name: "e/fileman/default/list/variable";
             visible: 0;
             fixed: 1 1;
          }
+         // 'link' state for valid symbolic links.
          description { state: "link" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
+         // 'broken' state for broken symbolic links.
          description { state: "broken" 0.0;
             inherit: "default" 0.0;
             image.normal: "i-close";
             visible: 1;
          }
       }
+      // When 'e,state,link' is emitted, the 'link' part becomes visible.
       program { signal: "e,state,link"; source: "e";
          action: STATE_SET "link" 0.0;
          target: "link";
       }
+      // When 'e,state,broken' is emitted, the 'link' part shows the broken state.
       program { signal: "e,state,broken"; source: "e";
          action: STATE_SET "broken" 0.0;
          target: "link";
       }
+      // An icon to indicate the mount status of a volume.
       part { name: "vol"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -157,20 +183,23 @@ group { name: "e/fileman/default/list/variable";
             visible: 0;
             fixed: 1 1;
          }
+         // 'unmounted' state for unmounted volumes.
          description { state: "unmounted" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
+         // 'mounted' state for mounted volumes.
          description { state: "mounted" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/fileman/mount/on";
             visible: 1;
          }
       }
+      // Displays an icon indicating a file operation (copy, move, etc.).
       part { name: "op"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
-            align: 1.0 0.5;
+            align: 1.0 0.5; // Aligns to the right.
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
             rel1.offset: -5 0;
@@ -181,18 +210,21 @@ group { name: "e/fileman/default/list/variable";
             color_class: "/fg/normal/fileman/operation/ask";
             offscale;
          }
+         // 'ask' state for operations requiring user confirmation.
          description { state: "ask" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/fileman/operation/ask";
             image.normal: "sym_icon_op_ask.png";
             visible: 1;
          }
+         // 'copy' state for copy operations.
          description { state: "copy" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/fileman/operation/copy";
             image.normal: "sym_icon_op_copy.png";
             visible: 1;
          }
+         // 'move' state for move operations.
          description { state: "move" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/fileman/operation/move";
@@ -201,26 +233,31 @@ group { name: "e/fileman/default/list/variable";
          }
       }
 //////////////////////////
+      // A transparent rectangle that captures mouse events for the entire item.
       part { name: "event"; type: RECT;
+         // 'ON_HOLD' allows other handlers to process hold events, which is useful for drag-and-drop.
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000 (fully transparent). Not using a color class for performance.
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
             visible: 0;
          }
       }
+      // A specific event-capturing rectangle for the label area.
+      // This is used to implement long-press-to-rename functionality.
       part { name: "label_event"; type: RECT;
          ignore_flags: ON_HOLD;
          scale: 1;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000
             rel1.to_x: "e.text.label";
             rel1.offset: -5 0;
             offscale;
          }
       }
+      // A swallow part used for in-place editing of the label, e.g., when renaming a file.
       part { name: "e.swallow.entry"; type: SWALLOW;
          description {state: "default" 0.0;
             rel.to: "e.text.label";
@@ -228,29 +265,35 @@ group { name: "e/fileman/default/list/variable";
       }
    }
    programs {
+      // When the item is selected, update the state of the selection background, label, and icon.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "icon_mono";
       }
+      // When the item is unselected, revert the parts to their default state.
       program { signal: "e,state,unselected"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "icon_mono";
       }
+      // The following three programs implement a long-press detection on the label.
+      // On mouse down, reset the 'longpressed' flag.
       program { signal: "mouse,down,1"; source: "label_event";
          script {
             set_int(longpressed, 0);
          }
       }
+      // If the mouse is still down after 0.4 seconds, set the 'longpressed' flag.
       program { signal: "mouse,down,1"; source: "label_event";
          in: 0.4 0.0;
          script {
             set_int(longpressed, 1);
          }
       }
+      // On mouse up, if 'longpressed' is true, emit a custom signal for a label click.
       program { signal: "mouse,up,1"; source: "label_event";
          script {
             if (get_int(longpressed)) {
@@ -259,36 +302,44 @@ group { name: "e/fileman/default/list/variable";
             }
          }
       }
+      // These programs manage the icon animation during thumbnail generation.
+      // 'e,action,thumb,gen' is for opaque thumbnails.
       program { signal: "e,action,thumb,gen"; source: "e";
          action: STATE_SET "start" 0.0;
          target: "icon";
          target: "icon_over";
          after: "gen";
       }
+      // 'e,action,thumb,gen,alpha' is for thumbnails with an alpha channel.
       program { signal: "e,action,thumb,gen,alpha"; source: "e";
          action: STATE_SET "start" 0.0;
          target: "icon";
          target: "icon_over";
          after: "gen";
       }
+      // The 'gen' program animates the icon to its 'visible' state.
       program { name: "gen";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2;
          target: "icon";
          target: "icon_over";
       }
+      // Sets the operation icon to 'ask' state.
       program { signal: "e,state,ask"; source: "e";
          action: STATE_SET "ask" 0.0;
          target: "op";
       }
+      // Sets the operation icon to 'move' state.
       program { signal: "e,state,move"; source: "e";
          action: STATE_SET "move" 0.0;
          target: "op";
       }
+      // Sets the operation icon to 'copy' state.
       program { signal: "e,state,copy"; source: "e";
          action: STATE_SET "copy" 0.0;
          target: "op";
       }
+      // Programs to update the volume icon based on its state.
       program { signal: "e,state,volume,off"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "vol";
@@ -304,30 +355,38 @@ group { name: "e/fileman/default/list/variable";
    }
 }
 
+// This group defines the style for odd-numbered list items, creating a "zebra" effect.
+// It inherits from the base list item and only overrides the background color.
 group { name: "e/fileman/default/list_odd/variable";
    inherit: "e/fileman/default/list/variable";
    alias: "e/fileman/default/list_odd/fixed";
    parts {
       part { name: "base";
          description { state: "default" 0.0;
+            // Uses an alternate background color for the zebra stripe effect.
             color_class: "/bg-alt/normal/list/item";
          }
       }
    }
 }
 
+// Defines a widget for displaying file sizes, including a graphical bar.
 group { name: "e/fileman/default/filesize";
+   // This script handles messages sent to the object to update the file size bar.
    script {
+    // It receives a floating-point number (id == 1) representing the size percentage.
     public message(Msg_Type:type, id, ...) {
        if ((type == MSG_FLOAT) && (id == 1)) {
           new state[10], state2[10];
           new Float:tween;
           new Float:val = getfarg(2);
 
+          // Update the width of the 'bar' part based on the received value.
           custom_state(PART:"bar", "default", 0.0);
           set_state_val(PART:"bar", STATE_REL2, val, 1.0);
           set_state(PART:"bar", "custom", 0.0);
 
+          // The bar color changes based on the size value, creating a gradient effect.
           if (val < 0.25) {
             snprintf(state,  10, "default");
             snprintf(state2, 10, "default1");
@@ -345,12 +404,14 @@ group { name: "e/fileman/default/filesize";
             snprintf(state2, 10, "default4");
             tween = (val - 0.75) * 4.0;
           }
+          // Smoothly transition between color states.
           set_tween_state(PART:"bar_color", tween, state, 0.0, state2, 0.0);
           set_tween_state(PART:"bar_color2", tween, state, 0.0, state2, 0.0);
        }
     }
    }
    parts {
+      // A spacer for the base of the progress bar.
       part { name: "bar_base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -362,6 +423,7 @@ group { name: "e/fileman/default/filesize";
             offscale;
          }
       }
+      // The main rectangle for the progress bar, its width is controlled by the script.
       part { name: "bar"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -372,6 +434,7 @@ group { name: "e/fileman/default/filesize";
             offscale;
          }
       }
+      // The visual representation of the bar in its normal (unselected) state.
       part { name: "bar_normal"; type: RECT; mouse_events: 0;
          clip_to: "bar";
          description { state: "default" 0.0;
@@ -383,6 +446,7 @@ group { name: "e/fileman/default/filesize";
             visible: 0;
          }
       }
+      // The visual representation of the bar in its selected state.
       part { name: "bar_selected"; type: RECT; mouse_events: 0;
          clip_to: "bar";
          description { state: "default" 0.0;
@@ -394,6 +458,7 @@ group { name: "e/fileman/default/filesize";
             visible: 1;
          }
       }
+      // The color of the bar for the normal state, with multiple states for the gradient effect.
       part { name: "bar_color"; type: RECT; mouse_events: 0;
          clip_to: "bar_normal";
          description { state: "default" 0.0;
@@ -417,6 +482,7 @@ group { name: "e/fileman/default/filesize";
             color_class: "/fg/normal/fileman/filesize/4";
          }
       }
+      // The color of the bar for the selected state.
       part { name: "bar_color2"; type: RECT; mouse_events: 0;
          clip_to: "bar_selected";
          description { state: "default" 0.0;
@@ -440,6 +506,7 @@ group { name: "e/fileman/default/filesize";
             color_class: "/fg/selected/fileman/filesize/4";
          }
       }
+      // Displays the unit of the file size (e.g., KB, MB).
       part { name: "e.text.unit"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -461,6 +528,7 @@ group { name: "e/fileman/default/filesize";
             color_class: "/fg/selected/list/item";
          }
       }
+      // Displays the numerical value of the file size.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -484,6 +552,7 @@ group { name: "e/fileman/default/filesize";
       }
    }
    programs {
+      // Handles the selection and unselection of the filesize widget.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "e.text.unit";
@@ -501,6 +570,7 @@ group { name: "e/fileman/default/filesize";
    }
 }
 
+// This group defines a visual representation of file permissions (e.g., rwx).
 group { name: "e/fileman/default/fileperms";
    parts {
       part { name: "clip"; type: RECT;
@@ -1402,7 +1472,7 @@ group { name: "e/fileman/default/icon/fixed";
             visible: 1;
          }
       }
-//////////////////////////////      
+//////////////////////////////
       part { name: "label0"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;

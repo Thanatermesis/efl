@@ -1,31 +1,49 @@
+// Color classes allow applications to dynamically set colors for theming.
 color_classes {
    color_class { name: "/fg/normal/text";
+     // Default text color: light gray (#A0A0A0FF).
      color: 160 160 160 255;
    }
 }
 
-collections { group { name: "font_preview";
+// Collections group parts and programs into reusable UI components.
+collections {
+   // This group defines a simple widget for previewing fonts.
+   group { name: "font_preview";
       parts {
          /* some fonts have weird alignments, thus they overflow badly */
+         // An invisible rectangle used to clip the text part, preventing it from
+         // rendering outside its bounds.
          part { name: "clipper"; type: RECT;
             description {
                state: "default" 0.0;
             }
          }
+         // This part displays the preview text. "elm.text" is a conventional name
+         // for the main text part that an Elementary widget will control.
          part { name: "elm.text"; type: TEXT;
+            // Enables scaling of the text with the global UI scale factor.
             scale: 1;
+            // Disables mouse events for this part, improving performance.
             mouse_events: 0;
+            // Clips this part to the "clipper" part's boundaries.
             clip_to: "clipper";
             description { state: "default" 0.0;
+               // Use a themeable color for the text.
                color_class: "/fg/normal/text";
                text { font: "Sans";
+                  // Guarantees the part has a minimum height of one line.
                   min: 0 1;
                   size: 10;
+                  // Center the text horizontally and vertically.
                   align: 0.5 0.5;
+                  // Assigns a text class for theme-based styling.
                   text_class: "font_preview";
                }
+               // Add padding of 16px on top/left and 17px on bottom/right.
                rel1.offset: 16 16;
                rel2.offset: -17 -17;
+               // 'offscale' prevents padding from changing with UI scaling.
                offscale;
             }
          }

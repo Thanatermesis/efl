@@ -6,28 +6,47 @@
       elm.swallow.content: Used for elm_layout_part_content_set(bg, "overlay", content).
 */
 
+// The "elm/bg/base/default" group defines the fundamental appearance of the
+// background widget. It sets up a layered structure that can accommodate a solid
+// color, a background image, and content on top. This setup allows for flexible
+// customization of the background's look and feel.
 group { name: "elm/bg/base/default";
    data.item: "version" "119";
    parts {
+      // The "clipper" part is a rectangle that acts as a clipping mask for other
+      // parts. Any part that is clipped to "clipper" will only be visible
+      // within the boundaries of this rectangle.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // The "base" part is a rectangle that provides a solid background color.
+      // The color is defined by the "/bg/normal/background" color class, which
+      // can be customized in the theme's color definitions.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/background";
          }
       }
+      // The "elm.swallow.rectangle" part is a swallow area for setting a solid
+      // color on the background using elm_bg_color_set().
       part { name: "elm.swallow.rectangle"; type: SWALLOW;
          description { state: "default" 0.0;
          }
       }
+      // The "elm.swallow.background" part is a swallow area for displaying a
+      // background image using elm_bg_file_set(). It is clipped by the "clipper"
+      // part to ensure it stays within the widget's boundaries. The `fixed`
+      // property prevents the image from being scaled with the widget.
       part { name: "elm.swallow.background"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
             fixed: 1 1;
          }
       }
+      // The "elm.swallow.content" part is a swallow area used to place content
+      // over the background, typically via elm_layout_part_content_set() with
+      // the part name "overlay".
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
@@ -35,6 +54,24 @@ group { name: "elm/bg/base/default";
    }
 }
 
+// The BG_PAT macro is a factory for creating background styles that feature a
+// repeating pattern. It abstracts the common structure for such backgrounds,
+// reducing code duplication.
+//
+// Parameters:
+//   _name: The name of the group to be created (e.g., "elm/bg/base/stripes").
+//   _img: The image file to be used for the pattern.
+//   _w, _h: The width and height of the pattern tile.
+//   _colbg: The color class for the solid background layer beneath the pattern.
+//   _colfg: The color class used to tint the pattern image itself.
+//
+// The structure includes:
+// - A "base" RECT part for the background color.
+// - A "pat" part that displays the pattern image. The image is tiled, not
+//   stretched, due to `scale: 1;` and the PAT_FILL_SCALE() macro.
+// - Standard "clipper" and swallow parts ("elm.swallow.rectangle",
+//   "elm.swallow.background", "elm.swallow.content") for consistency with the
+//   base background widget, allowing for overlays and dynamic content.
 #define BG_PAT(_name, _img, _w, _h, _colbg, _colfg) \
 group { name: _name; \
    data.item: "version" "119"; \
@@ -74,6 +111,9 @@ group { name: _name; \
    } \
 }
 
+// Here we use the BG_PAT macro to generate several background styles with
+// diagonal stripe patterns. Variations for normal, dark, and light themes are
+// created, each with a regular and a "big" version of the stripes.
 BG_PAT("elm/bg/base/stripes",     "stripes-diag.png",     160, 160, "/bg/normal/background", "/bg-alt/normal/background")
 BG_PAT("elm/bg/base/stripes_big", "stripes-diag-big.png", 160, 160, "/bg/normal/background", "/bg-alt/normal/background")
 
@@ -83,6 +123,9 @@ BG_PAT("elm/bg/base/stripes_big_dark", "stripes-diag-big.png", 160, 160, "/bg-da
 BG_PAT("elm/bg/base/stripes_light",     "stripes-diag.png",     160, 160, "/bg-light/normal/background", "/bg-light-alt/normal/background")
 BG_PAT("elm/bg/base/stripes_big_light", "stripes-diag-big.png", 160, 160, "/bg-light/normal/background", "/bg-light-alt/normal/background")
 
+// Similarly, these lines create backgrounds with a checkerboard pattern.
+// Different sizes (small, normal, big) and theme variations (normal, dark,
+// light) are defined.
 BG_PAT("elm/bg/base/checks",       "checks.png", 160, 160, "/bg/normal/background", "/bg-alt/normal/background")
 BG_PAT("elm/bg/base/checks_big",   "checks.png", 320, 320, "/bg/normal/background", "/bg-alt/normal/background")
 BG_PAT("elm/bg/base/checks_small", "checks.png",  80,  80, "/bg/normal/background", "/bg-alt/normal/background")
@@ -97,6 +140,23 @@ BG_PAT("elm/bg/base/checks_small_light", "checks.png",  80,  80, "/bg-light/norm
 
 #undef BG_PAT
 
+// The BG_GRADV macro creates a vertical gradient background.
+//
+// Parameters:
+//   _name: The name of the group to be created.
+//   _colbg: The color class for the solid base color.
+//   _colfg: The color class for the gradient overlay.
+//
+// The structure is similar to the default background but adds a "grad" part.
+// - The "grad" part is an IMAGE part using "grad_v.png", which is a reusable
+//   vertical gradient image.
+// - `fill.size.relative: 0.0 1.0;` makes the gradient fill the full height of
+//   the widget but not scale horizontally.
+// - `fill.size.offset: 256 0;` sets a fixed width of 256 pixels for the
+//   gradient image, which is then tiled horizontally. The vertical offset is 0.
+//   This is an efficient way to draw a gradient without calculating it in code.
+// - The gradient is tinted with the _colfg color class, blending it over the
+//   _colbg base color.
 #define BG_GRADV(_name, _colbg, _colfg) \
 group { name: _name; \
    data.item: "version" "119"; \
@@ -136,6 +196,9 @@ group { name: _name; \
    } \
 }
 
+// These lines generate various vertical gradient backgrounds for different
+// states and themes, such as a standard vertical gradient, one that matches
+// a focused title bar, and dark/light theme variations.
 BG_GRADV("elm/bg/base/grad_vert", "/bg-alt/normal/background", "/bg/normal/background")
 BG_GRADV("elm/bg/base/grad_vert_focus_title_match", "/bg/normal/background", "/bg/selected/titlebar")
 BG_GRADV("elm/bg/base/grad_vert_dark", "/bg-light/normal/background", "/bg-dark-alt/normal/background")

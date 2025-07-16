@@ -1,30 +1,40 @@
+// This group defines the main layout of the color selector, which can display
+// a color picker, a color palette, and component sliders (like RGBA).
+// It's designed to be modular, allowing different combinations of these elements
+// to be shown or hidden via signals.
 group { name: "elm/colorselector/palette/default";
+   // Default padding for the layout.
    data.item: "horizontal_pad" 0;
    data.item: "vertical_pad" 0;
    parts {
+      // A swallow part that will hold the main color picker widget (e.g., a color wheel).
+      // It is positioned at the top of the container.
       part { name: "elm.picker"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            fixed: 0 1;
-            align: 0.5 0.0;
+            fixed: 0 1; // Flexible width, fixed height.
+            align: 0.5 0.0; // Centered horizontally, aligned to the top.
             rel2.relative: 1.0 0.0;
             offscale;
          }
       }
+      // A horizontal separator line.
       part { name: "sep1"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // Positioned just below the 'elm.picker' part.
             rel1.to_y: "elm.picker";
             rel1.offset: 5 2;
             rel1.relative: 0.0 1.0;
             rel2.to_y: "elm.picker";
             rel2.offset: -6 2;
-            min: 64 1;
+            min: 64 1; // Minimum width of 64px.
             max: 99999 1;
             color_class: "/fg/normal/separator/horizontal";
             offscale;
          }
+         // An 'off' state to hide the separator.
          description { state: "off" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 5 -1;
@@ -33,10 +43,12 @@ group { name: "elm/colorselector/palette/default";
             visible: 0;
          }
       }
+      // A swallow part to hold the color palette (grid of color swatches).
       part { name: "elm.palette"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
             align: 0.5 0.0;
+            // Positioned between the two separators, 'sep1' and 'sep2'.
             rel1.to_y: "sep1";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 2;
@@ -51,10 +63,12 @@ group { name: "elm/colorselector/palette/default";
             rel2.offset: -1 0;
          }
       }
+      // A second horizontal separator line.
       part { name: "sep2"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // Positioned just above the 'elm.selector' part.
             rel1.to_y: "elm.selector";
             rel1.offset: 5 -3;
             rel2.to_y: "elm.selector";
@@ -73,32 +87,42 @@ group { name: "elm/colorselector/palette/default";
             visible: 0;
          }
       }
+      // A swallow part to hold the color component controls (e.g., RGBA sliders).
       part { name: "elm.selector"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            fixed: 0 1;
-            align: 0.0 1.0;
+            fixed: 0 1; // Flexible width, fixed height.
+            align: 0.0 1.0; // Aligned to the bottom-left.
             rel1.relative: 0.0 1.0;
             offscale;
          }
       }
    }
+   // Programs define responses to signals, controlling the visibility of parts.
+   // This allows dynamic layout changes based on the color selector's mode.
    programs {
+      // Triggered by "elm,state,palette" signal.
+      // Hides both separators, showing only the picker and palette.
       program { signal: "elm,state,palette"; source: "elm";
          action: STATE_SET "off" 0.0;
          target: "sep1";
          target: "sep2";
       }
+      // Re-enables the palette when the "elm,state,palette" signal is received.
       program { signal: "elm,state,palette"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.palette";
       }
+      // Triggered by "elm,state,components" signal.
+      // Hides separators and the palette, showing only the picker and component selector.
       program { signal: "elm,state,components"; source: "elm";
          action: STATE_SET "off" 0.0;
          target: "sep1";
          target: "sep2";
          target: "elm.palette";
       }
+      // Triggered by "elm,state,both" signal.
+      // Shows palette and component selector, but hides the main picker.
       program { signal: "elm,state,both"; source: "elm";
          action: STATE_SET "off" 0.0;
          target: "sep1";
@@ -108,12 +132,16 @@ group { name: "elm/colorselector/palette/default";
          target: "elm.palette";
          target: "sep2";
       }
+      // Triggered by "elm,state,picker" signal.
+      // Hides everything except the main picker.
       program { signal: "elm,state,picker"; source: "elm";
          action: STATE_SET "off" 0.0;
          target: "sep1";
          target: "sep2";
          target: "elm.palette";
       }
+      // Triggered by "elm,state,all" signal.
+      // Shows all components of the color selector.
       program { signal: "elm,state,all"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "sep1";
@@ -123,18 +151,25 @@ group { name: "elm/colorselector/palette/default";
    }
 }
 
+// This group defines the base layout for the color component picker, which includes
+// a color selection area (e.g., a saturation/value box) and sliders for R, G, B, and Alpha.
 group { name: "elm/colorselector/picker/base/default";
    parts {
+      // A swallow part for the main color selection area (e.g., saturation/value box).
+      // It's positioned on the left side.
       part { name: "elm.swallow.picker"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
             min: 80 80;
             rel2 {
                relative: 0.0 1.0;
-               to_x: "sp1";
+               to_x: "sp1"; // Right edge is aligned with the start of sp1 spacer.
             }
          }
       }
+      // Spacers are used here to manage the vertical alignment of the component labels and sliders.
+      // This is a common technique in Edje for creating flexible layouts without a container like a box.
+      // sp1 aligns the Red and Green labels.
       part { name: "sp1"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "elm.label.red";
@@ -143,6 +178,7 @@ group { name: "elm/colorselector/picker/base/default";
             align: 0.0 0.5;
          }
       }
+      // sp2 aligns the Blue and Alpha labels.
       part { name: "sp2"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "elm.label.blue";
@@ -151,6 +187,7 @@ group { name: "elm/colorselector/picker/base/default";
             align: 0.0 0.5;
          }
       }
+      // sp3 acts as a master spacer to align sp1 and sp2 together.
       part { name: "sp3"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "sp1";
@@ -159,12 +196,14 @@ group { name: "elm/colorselector/picker/base/default";
             align: 0.0 0.5;
          }
       }
+      // Label for the Red component slider.
       part { name: "elm.label.red"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
-            align: 1.0 0.0;
+            align: 1.0 0.0; // Right-aligned horizontally, top-aligned vertically.
             min: 15 0;
             max: 15 -1;
+            // Positioned to the left of the red slider.
             rel2 {
                relative: 0.0 1.0;
                to: "elm.swallow.red";
@@ -178,14 +217,18 @@ group { name: "elm/colorselector/picker/base/default";
             offscale;
          }
       }
+      // Swallow part to hold the Red component slider widget.
       part { name: "elm.swallow.red"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            align: 1.0 0.0;
+            align: 1.0 0.0; // Right-aligned horizontally, top-aligned vertically.
             min: 80 20;
             max: 80 20;
          }
       }
+      // The following parts for Green, Blue, and Alpha components follow the same
+      // pattern as the Red component: a TEXT label and a SWALLOW part for the slider.
+      // They are stacked vertically.
       part { name: "elm.label.green"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -291,9 +334,12 @@ group { name: "elm/colorselector/picker/base/default";
    }
 }
 
+// This group provides a background and a clipped container for a picker widget.
+// It's often used for color pickers that need a checkerboard background to show transparency.
 group { name: "elm/colorselector/picker/default";
    images.image: "stripes-diag.png" COMP;
    parts {
+      // A background rectangle for the picker area.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -302,6 +348,9 @@ group { name: "elm/colorselector/picker/default";
             color_class: "/bg/normal/colorselector";
          }
       }
+      // This macro creates a tiled pattern part. The pattern is used to visualize
+      // transparency (alpha channel) in the color picker.
+      // The checkerboard pattern to show transparency behind the color.
       PAT_FILL_SCALE(160, 160)
       part { name: "pat";
          description { state: "default" 0.0;
@@ -310,11 +359,13 @@ group { name: "elm/colorselector/picker/default";
             color_class: "/bg/normal/colorselector/pattern";
          }
       }
+      // An invisible rectangle used to clip the swallow part.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.picker";
          }
       }
+      // The swallow part where the actual color picker UI will be placed.
       part { name: "elm.picker"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
@@ -328,8 +379,11 @@ group { name: "elm/colorselector/picker/default";
    }
 }
 
+// This group defines a vertical container for multiple color bars (e.g., Hue, Saturation, etc.).
+// It consists of four swallow parts stacked on top of each other.
 group { name: "elm/colorselector/bg/default";
    parts {
+      // Swallow part for the first color bar, positioned at the top.
       part { name: "elm.colorbar_0"; type: SWALLOW;
          description { state: "default" 0.0;
             rel2.relative: 1.0 0.0;
@@ -337,6 +391,7 @@ group { name: "elm/colorselector/bg/default";
             fixed: 0 1;
          }
       }
+      // The subsequent color bars are stacked vertically below the previous one.
       part { name: "elm.colorbar_1"; type: SWALLOW;
          description { state: "default" 0.0;
             rel1.to_y: "elm.colorbar_0";
@@ -367,9 +422,12 @@ group { name: "elm/colorselector/bg/default";
    }
 }
 
+// This group defines a single color bar with a draggable arrow/cursor.
+// It is used for adjusting color properties like hue, brightness, or alpha.
 group { name: "elm/colorselector/base/default";
    images.image: "stripes-diag.png" COMP;
    parts {
+      // Swallow part for the background of the color bar.
       part { name: "elm.bar_bg"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -381,12 +439,14 @@ group { name: "elm/colorselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the color gradient of the bar, displayed on top of the background.
       part { name: "elm.bar"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "elm.bar_bg";
          }
       }
 
+      // Swallow part defining the area where the arrow can be dragged.
       part { name: "elm.arrow_bg"; type: SWALLOW;
          description { state: "default" 0.0;
             rel1 {
@@ -399,10 +459,12 @@ group { name: "elm/colorselector/base/default";
             }
          }
       }
+      // This is an invisible, draggable part that controls the position of the visual arrow.
+      // It is confined to the 'elm.bar_bg' area and only moves horizontally.
       part { name: "elm.arrow"; type: RECT;
          dragable {
             confine: "elm.bar_bg";
-            x: 1 1 0;
+            x: 1 1 0; // Draggable on X-axis, not on Y.
             y: 0 0 0;
          }
          description { state: "default" 0.0;
@@ -410,18 +472,21 @@ group { name: "elm/colorselector/base/default";
             min: 1 1;
             rel1.to_x: "elm.bar_bg";
             rel2.to_x: "elm.bar_bg";
-            visible: 0;
+            visible: 0; // This part is not visible itself.
          }
       }
+      // An invisible event-catching rectangle. Drag events on this part are forwarded to 'elm.arrow'.
+      // This creates a larger, more user-friendly draggable area for the arrow handle.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "elm.arrow_icon";
             rel2.to_x: "elm.arrow_icon";
             rel2.to_y: "elm.arrow_bg";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black (#00000000). no cc
          }
          dragable.events: "elm.arrow";
       }
+      // Swallow parts for left and right buttons, likely for fine-grained adjustments of the value.
       part { name: "elm.l_button"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -446,6 +511,8 @@ group { name: "elm/colorselector/base/default";
             align: 1.0 0.5;
          }
       }
+      // This part is the background of the arrow's handle, styled like a radio button.
+      // Drag events on it are also forwarded to 'elm.arrow'.
       part { name: "arrow_bg";
          scale: 1;
          description { state: "default" 0.0;
@@ -466,6 +533,7 @@ group { name: "elm/colorselector/base/default";
          }
          dragable.events: "elm.arrow";
       }
+      // The checkerboard pattern for transparency, clipped to the arrow shape.
       PAT_FILL_SCALE(160, 160)
       part { name: "pat";
          clip_to: "arrow_clip";
@@ -475,6 +543,7 @@ group { name: "elm/colorselector/base/default";
             color_class: "/bg/normal/colorselector/pattern";
          }
       }
+      // A clipping part that uses the same 'i-radio' image to give the handle a circular shape.
       part { name: "arrow_clip";
          scale: 1;
          description { state: "default" 0.0;
@@ -485,6 +554,9 @@ group { name: "elm/colorselector/base/default";
             fixed: 1 1;
          }
       }
+      // This swallow part is the visible handle of the arrow. It's clipped to a circular
+      // shape and its horizontal position is controlled by the invisible 'elm.arrow' part.
+      // This is where the currently selected color is displayed.
       part { name: "elm.arrow_icon"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          clip_to: "arrow_clip";
@@ -503,6 +575,8 @@ group { name: "elm/colorselector/base/default";
             offscale;
          }
       }
+      // Another invisible event rectangle, specifically covering the arrow icon,
+      // to forward drag events to 'elm.arrow'.
       part { name: "arrow_event"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.arrow_icon";
@@ -510,6 +584,8 @@ group { name: "elm/colorselector/base/default";
          }
          dragable.events: "elm.arrow";
       }
+      // A small rectangle acting as a cursor or indicator line, positioned vertically
+      // through the center of the arrow handle.
       part { name: "cursor"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -526,6 +602,7 @@ group { name: "elm/colorselector/base/default";
          }
          dragable.events: "elm.arrow";
       }
+      // An invisible rectangle for accessibility purposes, covering the arrow background area.
       part { name: "elm.arrow_bg_access"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
@@ -536,17 +613,26 @@ group { name: "elm/colorselector/base/default";
    }
 }
 
+// This group defines the content that is swallowed by 'elm.arrow_icon'.
+// It's a simple rectangle that will be colored programmatically to show the
+// selected color on the slider's handle.
 group { name: "elm/colorselector/arrow/default";
    parts {
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
+            // Default color is opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
    }
 }
 
+// The following four groups define the static image content for each of the
+// four color bars. These images provide the color gradients (e.g., hue spectrum,
+// brightness gradient) against which the user selects a value.
+
+// Color bar for hue.
 group{ name: "elm/colorselector/image/colorbar_0/default";
    images.image: "color_picker_color.png" COMP;
    parts {
@@ -558,6 +644,7 @@ group{ name: "elm/colorselector/image/colorbar_0/default";
    }
 }
 
+// Color bar for saturation/value.
 group { name: "elm/colorselector/image/colorbar_1/default";
    images.image: "color_picker_opacity.png" COMP;
    parts {
@@ -569,6 +656,7 @@ group { name: "elm/colorselector/image/colorbar_1/default";
    }
 }
 
+// Color bar for brightness.
 group { name: "elm/colorselector/image/colorbar_2/default";
    images.image: "color_picker_brightness.png" COMP;
    parts {
@@ -580,6 +668,7 @@ group { name: "elm/colorselector/image/colorbar_2/default";
    }
 }
 
+// Color bar for alpha (transparency).
 group { name: "elm/colorselector/image/colorbar_3/default";
    images.image: "color_picker_alpha.png" COMP;
    parts {
@@ -591,6 +680,8 @@ group { name: "elm/colorselector/image/colorbar_3/default";
    }
 }
 
+// This group defines a background for the alpha color bar, displaying the
+// checkerboard pattern to visualize transparency.
 group { name: "elm/colorselector/bg_image/colorbar_3/default";
    images.image: "stripes-diag.png" COMP;
    parts {
@@ -599,6 +690,7 @@ group { name: "elm/colorselector/bg_image/colorbar_3/default";
             color_class: "/bg/normal/colorselector";
          }
       }
+      // Macro to create the tiled checkerboard pattern.
       PAT_FILL_SCALE(160, 160)
       part { name: "pat";
          description { state: "default" 0.0;
@@ -610,16 +702,20 @@ group { name: "elm/colorselector/bg_image/colorbar_3/default";
    }
 }
 
+// This group defines a single item (a color swatch) in the color palette.
 group { name: "elm/colorselector/item/default";
    images.image: "stripes-diag.png" COMP;
    parts {
+      // A rectangle used as a selection and focus indicator.
       part { name: "sel"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/selected/colorselector";
+            // By default, it's transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // When focused, it becomes opaque white (#FFFFFFFF), highlighting the item.
             color: 255 255 255 255; // no cc
          }
       }
@@ -639,16 +735,19 @@ group { name: "elm/colorselector/item/default";
             color_class: "/bg/normal/colorselector/pattern";
          }
       }
+      // A clipper part that also serves as a disabled state overlay.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel2.to: "color_obj";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // In the disabled state, it shows a semi-transparent white overlay (#FFFFFF40).
             color: 255 255 255 64; // no cc
          }
       }
       alias: "color_obj" "elm.swallow.color_obj";
+      // This swallows the actual color rectangle.
       part { name: "elm.swallow.color_obj"; type: SWALLOW;
          scale: 1;
          clip_to: "clipper";
@@ -661,20 +760,25 @@ group { name: "elm/colorselector/item/default";
       }
    }
    programs {
+      // When the "elm,state,selected" signal is received, show the focus highlight.
       program { signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "focused" 0.0;
          target: "sel";
       }
+      // When the "elm,state,unselected" signal is received, hide the focus highlight.
       program { signal: "elm,state,unselected"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
          target: "sel";
       }
+      // On activation, this program creates a brief "blink" animation by quickly
+      // showing and then hiding the focus highlight.
       program { signal: "elm,anim,activate"; source: "elm";
          action: STATE_SET "focused" 0.0;
          target: "sel";
-         after: "active2";
+         after: "active2"; // Chains to the next program.
       }
+      // The second part of the blink animation.
       program { name: "active2";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
@@ -683,6 +787,8 @@ group { name: "elm/colorselector/item/default";
    }
 }
 
+// This group defines the actual colored rectangle that is swallowed into a palette item.
+// Its color will be set from code to match the swatch's color value.
 group { name: "elm/colorselector/item/color/default";
    parts {
       part { name: "color_rect"; type: RECT;

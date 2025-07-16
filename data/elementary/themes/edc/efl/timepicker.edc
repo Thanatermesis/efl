@@ -24,13 +24,26 @@ Group: efl/timepicker (@since 1.23)
 	 Signal: efl,colon_field1,visible,on
 
 */
+// These macros define bitmasks for controlling the timepicker's display modes.
+// TP_24H: Enables 24-hour format (no AM/PM).
+// TP_HR:  Makes the hour field visible.
+// TP_MN:  Makes the minute field visible.
 #define TP_24H 1
 #define TP_HR 2
 #define TP_MN 4
+// This group defines the main timepicker widget, which dynamically arranges fields
+// for hours, minutes, and AM/PM based on format settings. Its layout logic is
+// controlled by an embedded script that responds to signals from the application.
 group { "efl/timepicker";
    data.item: "version" "123";
+   // This script manages the visibility of timepicker components. 'btmode' is a
+   // public variable that stores the current mode as a bitmask, combining the
+   // TP_24H, TP_HR, and TP_MN flags.
    script {
       public btmode;
+      // eval_mode is the core function that adjusts the visibility of fields and
+      // separators based on the mode 'm'. It is designed to handle all possible
+      // combinations of visible elements (e.g., hour only, hour and minute, etc.).
       public eval_mode(m) {
          new v24h = m & TP_24H;
          new vhr  = m & TP_HR;
@@ -79,6 +92,9 @@ group { "efl/timepicker";
             }
          }
       }
+      // flag_set and flag_unset are helper functions called by programs to
+      // modify the 'btmode' state. They update the bitmask and then call
+      // eval_mode() to apply the changes to the layout.
       flag_set(flag) {
          new m = get_int(btmode) | flag;
          set_int(btmode, m); eval_mode(m);
@@ -88,7 +104,13 @@ group { "efl/timepicker";
          set_int(btmode, m); eval_mode(m);
       }
    }
+   // The 'parts' block defines the graphical elements of the timepicker.
+   // It consists of swallow areas for content, text for the colon, and
+   // spacers/rectangles for layout and background.
    parts {
+      // This invisible spacer defines the widget's overall minimum size.
+      // It has a smaller width in the "24h" state because the AM/PM field
+      // is not displayed, making the widget more compact.
       spacer { "base";
          scale;
          desc { "default";
@@ -98,12 +120,16 @@ group { "efl/timepicker";
             min: 54 77;
          }
       }
+      // A transparent background rectangle (#00000000), filling the entire
+      // widget area. It can be used for event handling.
       rect { "bg";
          desc { "default";
             rel.to: "base";
             color: 0 0 0 0; // no cc
          }
       }
+      // This part displays the colon ":" separator, typically between hours
+      // and minutes. Its visibility is controlled by the script.
       text { "colon";
          scale;
          desc { "default";
@@ -128,6 +154,12 @@ group { "efl/timepicker";
             hid;
          }
       }
+      // These three 'swallow' parts are containers for external content, such
+      // as spinner widgets for hours, minutes, and AM/PM. They are arranged
+      // horizontally across the widget. The script determines which fields are
+      // visible, and the application is responsible for populating the correct
+      // content into each. 'efl.field1' is on the left, 'efl.field2' in the
+      // center, and 'efl.field0' on the right.
       swallow { "efl.field1"; required;
          scale;
          desc { "default";
@@ -171,6 +203,9 @@ group { "efl/timepicker";
             hid;
          }
       }
+      // This invisible rectangle is likely used for accessibility purposes,
+      // providing a single, unified focusable area for the entire timepicker
+      // widget, which simplifies navigation for users of screen readers.
       rect { "access";
          repeat;
          desc { "default";
@@ -179,13 +214,21 @@ group { "efl/timepicker";
          }
       }
    }
+   // The 'programs' section defines how the widget reacts to signals sent
+   // from the application code. These programs update the display mode flags
+   // and trigger the script to refresh the layout accordingly.
    programs {
+      // These two programs toggle the 24-hour mode. "efl,ampm,visible,on"
+      // corresponds to 12-hour mode (TP_24H flag is off), while "off"
+      // corresponds to 24-hour mode (TP_24H flag is on).
       program { signal: "efl,ampm,visible,on"; source: "efl";
          script { flag_unset(TP_24H); }
       }
       program { signal: "efl,ampm,visible,off"; source: "efl";
          script { flag_set(TP_24H); }
       }
+      // These programs toggle the visibility of the hour (TP_HR) and minute
+      // (TP_MN) fields based on corresponding signals.
       program { signal: "efl,colon_field0,visible,on"; source: "efl";
          script { flag_set(TP_HR); }
       }
@@ -201,10 +244,16 @@ group { "efl/timepicker";
    }
 }
 
+// This group defines a specialized button style for use within the timepicker,
+// likely for the up/down spinner buttons in each field. It inherits from the
+// standard "efl/button" and customizes its size to be more compact.
 group { "efl/timepicker/button";
    inherit: "efl/button";
    data.item: "version" "123";
    parts {
+      // Overrides the 'base' image part of the inherited button to enforce a
+      // fixed size of 23x23 pixels. This ensures that the buttons within the
+      // timepicker have a consistent and compact appearance.
       image { "base";
          desc { "default";
             min: 23 23;

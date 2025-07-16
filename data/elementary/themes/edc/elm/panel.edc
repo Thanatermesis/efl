@@ -1,6 +1,12 @@
+// This group defines the basic layout for a scroller panel.
+// It primarily serves as a container for content that can be scrolled.
 group { name: "elm/scroller/panel/default";
+   // "handler_size" is a data item that provides a hint to the C code
+   // about the size of the interactive area (handler) for this panel.
    data.item: "handler_size" "30";
    parts {
+      // This is the main content area of the scroller panel.
+      // External content will be "swallowed" into this part.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
@@ -8,14 +14,22 @@ group { name: "elm/scroller/panel/default";
    }
 }
 
+// This group defines a panel that appears on the left side of a scroller.
+// It includes areas for content, events, and a background.
+// The panel's visibility is controlled by "active" and "inactive" programs.
 group { name: "elm/scroller/panel/left/default";
    parts {
+      // This part defines the area where the panel content is displayed.
       part { name: "elm.panel_area";
          type: SWALLOW;
          description { state: "default" 0.0;
+            // The panel is positioned on the left edge and fills the height.
+            // rel2.relative: 0.0 1.0; -> right edge at 0% of parent width, bottom edge at 100% of parent height.
+            // align: 0.0 0.5; -> aligns horizontally to the left (0.0) and vertically to the center (0.5).
             rel2.relative: 0.0 1.0;
             align: 0.0 0.5;
             fixed: 1 1;
+            // Initially hidden.
             visible: 0;
          }
          description { state: "visible" 0.0;
@@ -23,9 +37,12 @@ group { name: "elm/scroller/panel/left/default";
             visible: 1;
          }
       }
+      // This part covers the area next to the panel. It's used to capture
+      // events (like clicks) to dismiss the panel.
       part { name: "elm.event_area";
          type: SWALLOW;
          description { state: "default" 0.0;
+            // The event area is placed to the right of the panel area, covering the rest of the container.
             rel1 {
                relative: 1.0 0.0;
                to: "elm.panel_area";
@@ -43,18 +60,22 @@ group { name: "elm/scroller/panel/left/default";
             visible: 1;
          }
       }
+      // A transparent rectangle used for accessibility features, like drawing a focus outline.
       part { name: "access.outline";
          type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
             rel.to: "elm.panel_area";
+            // color: 0 0 0 0; -> transparent black (#00000000)
             color: 0 0 0 0; // no cc
          }
       }
+      // The background of the panel.
       part { name: "bg";
          type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.panel_area";
+            // Uses a color class for theming, making it easy to change the panel's background color.
             color_class: "/bg/normal/panel";
             visible: 0;
          }
@@ -63,6 +84,8 @@ group { name: "elm/scroller/panel/left/default";
             visible: 1;
          }
       }
+      // The content of the panel is swallowed here. It is sized and positioned
+      // relative to "elm.panel_area".
       part { name: "elm.swallow.content";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -76,6 +99,8 @@ group { name: "elm/scroller/panel/left/default";
       }
    }
    programs {
+      // When the "elm,state,content,visible" signal is received from "elm" source,
+      // this program sets the state of several parts to "visible", showing the panel.
       program { name: "active";
          signal: "elm,state,content,visible";
          source: "elm";
@@ -85,6 +110,8 @@ group { name: "elm/scroller/panel/left/default";
          target: "bg";
          target: "elm.swallow.content";
       }
+      // When the "elm,state,content,hidden" signal is received,
+      // this program sets the state of the parts back to "default", hiding the panel.
       program { name: "inactive";
          signal: "elm,state,content,hidden";
          source: "elm";
@@ -97,8 +124,11 @@ group { name: "elm/scroller/panel/left/default";
    }
 }
 
+// This group defines a panel that appears on the right side of a scroller.
+// Its structure is similar to the left panel, but parts are positioned on the opposite side.
 group { name: "elm/scroller/panel/right/default";
    parts {
+      // In the right panel, the event area is on the left side of the screen.
       part { name: "elm.event_area";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -112,6 +142,7 @@ group { name: "elm/scroller/panel/right/default";
             visible: 1;
          }
       }
+      // The panel area is positioned to the right of the event area.
       part { name: "elm.panel_area";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -186,8 +217,11 @@ group { name: "elm/scroller/panel/right/default";
    }
 }
 
+// This group defines a panel appearing at the top of a scroller.
+// It follows the same principles as the left/right panels but with vertical alignment.
 group { name: "elm/scroller/panel/top/default";
    parts {
+      // The panel area is at the top.
       part { name: "elm.panel_area";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -201,6 +235,7 @@ group { name: "elm/scroller/panel/top/default";
             visible: 1;
          }
       }
+      // The event area is below the panel area.
       part { name: "elm.event_area";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -275,8 +310,11 @@ group { name: "elm/scroller/panel/top/default";
    }
 }
 
+// This group defines a panel at the bottom of a scroller.
+// The layout is inverted compared to the top panel.
 group { name: "elm/scroller/panel/bottom/default";
    parts {
+      // The event area is positioned first, filling the space above the panel.
       part { name: "elm.event_area"; type: SWALLOW;
          description { state: "default" 0.0;
             rel2.relative: 1.0 0.0;
@@ -289,6 +327,7 @@ group { name: "elm/scroller/panel/bottom/default";
             visible: 1;
          }
       }
+      // The panel area is positioned below the event area, at the bottom.
       part { name: "elm.panel_area"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "elm.event_area";
@@ -332,6 +371,8 @@ group { name: "elm/scroller/panel/bottom/default";
       }
    }
    programs {
+      // This program combines name, signal and source in a single line.
+      // It makes the panel visible when triggered.
       program { signal: "elm,state,content,visible"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.panel_area";
@@ -339,6 +380,7 @@ group { name: "elm/scroller/panel/bottom/default";
          target: "bg";
          target: "elm.swallow.content";
       }
+      // Hides the panel when triggered.
       program { signal: "elm,state,content,hidden"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.panel_area";
@@ -349,47 +391,66 @@ group { name: "elm/scroller/panel/bottom/default";
    }
 }
 
+// This group defines a more complex left-side panel with animations,
+// a toggle button, and support for right-to-left (RTL) languages.
 group { name: "elm/panel/left/default";
+   // Enables the default focus highlight behavior provided by Elementary.
    data.item: "focus_highlight" "on";
    script {
+      // A public variable to track the text direction. 0 for LTR, 1 for RTL.
+      // This is used to flip the toggle arrow icon appropriately.
       public is_rtl = 0;
    }
    parts {
+      // A shadow effect for the panel, positioned relative to the "base" part.
+      // mouse_events: 0; makes it non-interactive. scale: 1; enables scaling.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // WIN_SHADOW_SMALL is a macro that defines shadow properties.
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal/panel";
          }
       }
+      // A rectangle used for a glow effect when the panel is focused.
+      // It's normally invisible and slightly larger than the "base" part when visible.
       part { name: "glow"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
             color_class: "/bg/selected/panel";
             visible: 0;
+            // offscale prevents this part from affecting the container's geometry calculation.
             offscale;
          }
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // The glow is larger than the base part by 5 pixels on left/top and 4 on right/bottom.
             rel1.offset: -5 -5;
             rel2.offset: 4 4;
             visible: 1;
          }
       }
+      // A spacer part that defines the overall area of the widget.
+      // Other parts are positioned relative to this.
       part { name: "all"; type: SPACER;
          description { state: "default" 0.0;
          }
       }
+      // The main background of the panel.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The base part stretches from the left edge of "all"
+            // to the left edge of "elm.swallow.event".
             rel1.to_x: "all";
             rel2.to_x: "elm.swallow.event";
             rel2.relative: 0.0 1.0;
             color_class: "/bg/normal/panel";
          }
       }
+      // This is where the actual content of the panel is placed.
+      // It's slightly smaller than the "base" to create a padding effect.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -399,11 +460,15 @@ group { name: "elm/panel/left/default";
             offscale;
          }
       }
+      // This part serves as the toggle button area.
+      // It is a swallow so a custom toggle button can be provided.
       part { name: "elm.swallow.event"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
+            // The button area has a fixed width of 30px.
             fixed: 1 1;
             min: 30 30; max: 30 999999;
+            // In the "default" (visible) state, it is aligned to the right.
             align: 1.0 0.5;
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
@@ -411,11 +476,14 @@ group { name: "elm/panel/left/default";
          }
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
+            // In the "hidden" state, it moves to the left.
             align: 0.0 0.5;
             rel1.relative: 0.0 0.0;
             rel2.relative: 0.0 1.0;
          }
       }
+      // A transparent rectangle that covers the "elm.swallow.event" area.
+      // It acts as the clickable area to toggle the panel.
       part { name: "btn"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.event";
@@ -425,31 +493,40 @@ group { name: "elm/panel/left/default";
             rel.to: "elm.swallow.event";
          }
       }
+      // The icon for the toggle button (an arrow).
       part { name: "icn"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
             min: 30 30; max: 30 30;
             rel.to: "btn";
+            // In LTR mode, shows a left arrow when panel is open.
             image.normal: "i-arrow-l";
             color_class: "/fg/normal/panel/arrow";
          }
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
+            // In LTR mode, shows a right arrow when panel is hidden.
             image.normal: "i-arrow-r";
          }
       }
    }
    programs {
+      // When the "btn" part is clicked, it emits a signal to the "elm" source,
+      // which is the Elementary widget itself, to toggle the panel's state.
       program { signal: "mouse,clicked,1"; source: "btn";
          action: SIGNAL_EMIT "elm,action,panel,toggle" "elm";
       }
+      // Program to show the panel with an animation.
       program { signal: "elm,action,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
          target: "elm.swallow.event";
          target: "base";
       }
+      // This script runs when showing the panel. It checks the RTL flag
+      // and sets the icon state accordingly. In LTR, "default" shows 'i-arrow-l'.
+      // In RTL, it should point the other way, so it uses the "hidden" state's icon ('i-arrow-r').
       program { signal: "elm,action,show"; source: "elm";
          script {
             if (get_int(is_rtl) == 0)
@@ -458,6 +535,7 @@ group { name: "elm/panel/left/default";
               set_state(PART:"icn", "hidden", 0.0);
          }
       }
+      // Version of "show" that doesn't use an animation.
       program { signal: "elm,action,show,no_animate"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.event";
@@ -471,11 +549,16 @@ group { name: "elm/panel/left/default";
               set_state(PART:"icn", "hidden", 0.0);
          }
       }
+      // This program listens for the global "edje,state,rtl" signal.
+      // It updates the icon direction and sets the is_rtl flag to 1.
       program { signal: "edje,state,rtl"; source: "edje";
          script {
             new st[31];
             new Float:vl;
+            // Get the current state of the event swallow part.
             get_state(PART:"elm.swallow.event", st, 30, vl);
+            // Invert the icon logic for RTL. If panel is open ("default" state),
+            // use the "hidden" icon (right arrow), and vice-versa.
             if (!strcmp(st, "default"))
               set_state(PART:"icn", "hidden", 0.0);
             else
@@ -483,11 +566,15 @@ group { name: "elm/panel/left/default";
             set_int(is_rtl, 1);
          }
       }
+      // This program listens for the global "edje,state,ltr" signal.
+      // It updates the icon direction and sets the is_rtl flag to 0.
       program { signal: "edje,state,ltr"; source: "edje";
          script {
             new st[31];
             new Float:vl;
             get_state(PART:"elm.swallow.event", st, 30, vl);
+            // Restore LTR icon logic. If panel is open ("default" state),
+            // use the "default" icon (left arrow).
             if (!strcmp(st, "default"))
               set_state(PART:"icn", "default", 0.0);
             else
@@ -495,11 +582,14 @@ group { name: "elm/panel/left/default";
             set_int(is_rtl, 0);
          }
       }
+      // Program to hide the panel. It animates the toggle button area first.
       program { signal: "elm,action,hide"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          transition: ACCELERATE 0.2;
          target: "elm.swallow.event";
       }
+      // This script runs when hiding the panel, setting the correct icon.
+      // In LTR, "hidden" shows 'i-arrow-r'. In RTL, it shows 'i-arrow-l' ("default" icon).
       program { signal: "elm,action,hide"; source: "elm";
          script {
             if (get_int(is_rtl) == 0)
@@ -508,16 +598,24 @@ group { name: "elm/panel/left/default";
               set_state(PART:"icn", "default", 0.0);
          }
       }
+      // This program, "hide1", starts the hide animation for the panel's base.
+      // It runs after the toggle button animation and before "hide2".
       program { name: "hide1";
          signal: "elm,action,hide"; source: "elm";
          script {
+            // This script dynamically calculates the off-screen position for the panel base.
             new x, y, w, h;
-            if (get_int(is_rtl) == 0) {
+            if (get_int(is_rtl) == 0) { // LTR
+               // Create a custom state for the "base" part based on its "default" state.
                custom_state(PART:"base", "default", 0.0);
+               // Set the relative position to be off-screen to the left (-1.0).
                set_state_val(PART:"base", STATE_REL1, -1.0, 0.0);
+               // Get the width of the toggle button area.
                get_geometry(PART:"elm.swallow.event", x, y, w, h);
+               // Offset the panel by the width of the toggle button area so it's still visible.
                set_state_val(PART:"base", STATE_REL1_OFFSET, w, 0);
-            } else {
+            } else { // RTL
+               // Similar logic for RTL, but the positioning is more complex due to inverted coordinates.
                custom_state(PART:"base", "default", 0.0);
                set_state_val(PART:"base", STATE_REL1, -1.0, 0.0);
                set_state_val(PART:"base", STATE_REL2, -2.0, 1.0);
@@ -525,13 +623,17 @@ group { name: "elm/panel/left/default";
                set_state_val(PART:"base", STATE_REL2_OFFSET, -w, 0);
             }
          }
+         // After this program completes, it triggers the "hide2" program.
          after: "hide2";
       }
+      // Program "hide2" applies the custom state created by "hide1" to the "base" part,
+      // animating it off-screen.
       program { name: "hide2";
          action: STATE_SET "custom" 0.0;
          transition: ACCELERATE 0.3;
          target: "base";
       }
+      // This is the non-animated version of the hide action.
       program { signal: "elm,action,hide,no_animate"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "elm.swallow.event";
@@ -544,6 +646,8 @@ group { name: "elm/panel/left/default";
               set_state(PART:"icn", "default", 0.0);
          }
       }
+      // This program chain ("hide1_no_animate" and "hide2_no_animate")
+      // instantly hides the panel by setting its position off-screen without a transition.
       program { name: "hide1_no_animate";
          signal: "elm,action,hide,no_animate"; source: "elm";
          script {
@@ -567,11 +671,13 @@ group { name: "elm/panel/left/default";
          action: STATE_SET "custom" 0.0;
          target: "base";
       }
+      // Animates the "glow" part to the "focused" state, making the highlight visible.
       program { signal: "elm,action,focus_highlight,show"; source: "elm";
          action: STATE_SET "focused" 0.0;
          transition: ACCELERATE 0.2;
          target: "glow";
       }
+      // Fades out the focus highlight.
       program { signal: "elm,action,focus_highlight,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -580,9 +686,11 @@ group { name: "elm/panel/left/default";
    }
 }
 
+// Defines the right-side panel by inheriting from the left panel and overriding part positions.
 group { name: "elm/panel/right/default";
    inherit: "elm/panel/left/default";
    parts {
+      // Overrides the "base" part to position it on the right.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 1.0 0.0;
@@ -593,28 +701,35 @@ group { name: "elm/panel/right/default";
             rel2.offset: -1 -1;
          }
       }
+      // Overrides the toggle button area to be on the left of the panel.
       part { name: "elm.swallow.event";
          description { state: "default" 0.0;
             align: 0.0 0.5;
             rel1.relative: 0.0 0.0;
             rel2.relative: 0.0 1.0;
          }
+         // When hidden, it moves to the right.
          description { state: "hidden" 0.0;
             align: 1.0 0.5;
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
          }
       }
+      // Overrides the icon images for the right panel.
       part { name: "icn";
          description { state: "default" 0.0;
+            // A right arrow is shown when the panel is open.
             image.normal: "i-arrow-r";
          }
          description { state: "hidden" 0.0;
+            // A left arrow is shown when the panel is hidden.
             image.normal: "i-arrow-l";
          }
       }
    }
    programs {
+      // Overrides the "hide1" program for right-side animation logic.
+      // The RTL logic from the parent group is no longer needed here as positioning is simpler.
       program { name: "hide1";
          script {
             new x, y, w, h;
@@ -629,9 +744,11 @@ group { name: "elm/panel/right/default";
    }
 }
 
+// Defines the top panel, inheriting from the left panel and adjusting for vertical layout.
 group { name: "elm/panel/top/default";
    inherit: "elm/panel/left/default";
    parts {
+      // Overrides the base to be positioned at the top.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -642,19 +759,24 @@ group { name: "elm/panel/top/default";
             rel2.to_y: "elm.swallow.event";
          }
       }
+      // Overrides the toggle button area for vertical layout.
       part { name: "elm.swallow.event";
          description { state: "default" 0.0;
+            // The button area has a fixed height of 30px.
             min: 30 30; max: 999999 30;
+            // When open, it's at the bottom of the panel.
             align: 0.5 1.0;
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 1.0;
          }
          description { state: "hidden" 0.0;
+            // When hidden, it's at the top of the container.
             align: 0.5 0.0;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 0.0;
          }
       }
+      // Overrides icons for up/down arrows.
       part { name: "icn";
          description { state: "default" 0.0;
             image.normal: "i-arrow-u";
@@ -665,6 +787,7 @@ group { name: "elm/panel/top/default";
       }
    }
    programs {
+      // Overrides the "hide1" program for top-side animation logic.
       program { name: "hide1";
          script {
             new x, y, w, h;
@@ -675,10 +798,15 @@ group { name: "elm/panel/top/default";
             set_state_val(PART:"base", STATE_REL1_OFFSET, 0, h);
          }
       }
+      // The icon state logic for top/bottom panels is simpler, so we override
+      // some programs to just set the state without complex scripts.
       program { signal: "elm,action,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "icn";
       }
+      // RTL/LTR changes don't affect the up/down arrows, so the complex logic from the
+      // parent "elm/panel/left/default" is overridden with a simpler script that
+      // just sets the icon state based on whether the panel is open or closed.
       program { signal: "edje,state,rtl"; source: "edje";
          script {
             new st[31];
@@ -708,9 +836,11 @@ group { name: "elm/panel/top/default";
    }
 }
 
+// Defines the bottom panel, inheriting from the top panel and inverting the layout.
 group { name: "elm/panel/bottom/default";
    inherit: "elm/panel/top/default";
    parts {
+      // Overrides the base to be positioned at the bottom.
       part { name: "base";
          description { state: "default" 0.0;
             rel1.relative: 0.0 1.0;
@@ -721,18 +851,22 @@ group { name: "elm/panel/bottom/default";
             rel2.to_y: "all";
          }
       }
+      // Overrides the toggle button for the bottom panel.
       part { name: "elm.swallow.event";
          description { state: "default" 0.0;
+            // When open, it's at the top of the panel.
             align: 0.5 0.0;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 0.0;
          }
          description { state: "hidden" 0.0;
+            // When hidden, it's at the bottom of the container.
             align: 0.5 1.0;
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 1.0;
          }
       }
+      // Overrides icons for down/up arrows.
       part { name: "icn";
          description { state: "default" 0.0;
             image.normal: "i-arrow-d";
@@ -743,6 +877,7 @@ group { name: "elm/panel/bottom/default";
       }
    }
    programs {
+      // Overrides the "hide1" program for bottom-side animation logic.
       program { name: "hide1";
          script {
             new x, y, w, h;

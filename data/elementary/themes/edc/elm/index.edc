@@ -1,32 +1,44 @@
+// This group defines the base layout for a vertical index widget. It includes
+// a scrollable area for index items and a text indicator that shows the
+// current letter while scrolling.
 group { name: "elm/index/base/vertical/default";
    parts {
+      // Transparent background (#00000000), sized to the swallow part for index items.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.index.0";
             color: 0 0 0 0; // no cc
          }
       }
+      // Clipping rectangle to control the visibility of the main index area,
+      // animated to appear when the index is active.
       part { name: "clip"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             visible:  0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc, transparent white #FFFFFF00
          }
          description { state: "active" 0.0;
             visible:  1;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc, opaque white #FFFFFFFF
          }
       }
+      // A second clipper for the text indicator, which is itself clipped by "clip".
+      // This allows the indicator to have its own show/hide animation.
       part { name: "clip2"; type: RECT; mouse_events:  0;
          clip_to: "clip";
          description { state: "default" 0.0;
             visible: 0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc, transparent white #FFFFFF00
          }
          description { state: "active" 0.0;
             visible:  1;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc, opaque white #FFFFFFFF
          }
       }
+      // This container holds the actual index items (e.g., A, B, C). 'offscale'
+      // allows for smooth scaling animations if the view is resized.
+      // Swallow area for horizontal index items. Alignment and positioning
+      // are adjusted for a horizontal layout.
       part { name: "elm.swallow.index.0"; type: SWALLOW;
          scale: 1;
          clip_to: "clip";
@@ -41,6 +53,8 @@ group { name: "elm/index/base/vertical/default";
             min: 32 0;
          }
       }
+      // The text part displaying the current index letter (e.g., "A") while
+      // the user drags their finger over the index.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "clip2";
@@ -48,6 +62,8 @@ group { name: "elm/index/base/vertical/default";
             align: 1.0 0.5;
             fixed: 1 1;
             offscale;
+            // Its position is dynamically controlled by "elm.dragable.pointer"
+            // to follow the user's finger.
             rel1 {
                to_x: "elm.swallow.event.0";
                to_y: "elm.dragable.pointer";
@@ -69,6 +85,10 @@ group { name: "elm/index/base/vertical/default";
             }
          }
       }
+      // An invisible, draggable rectangle for tracking the user's touch position.
+      // The "elm.text" part is positioned relative to this, making the text
+      // follow the touch.
+      // Invisible draggable part to track horizontal pointer movement.
       part { name: "elm.dragable.pointer"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          scale: 1;
@@ -85,6 +105,9 @@ group { name: "elm/index/base/vertical/default";
             rel2.offset: 0 0;
          }
       }
+      // A swallow part to capture events, where the index widget's event
+      // rectangle is placed.
+      // Event swallow area for the horizontal index.
       part { name: "elm.swallow.event.0"; type: SWALLOW;
          description { state: "default" 0.0;
             align: 1.0 0.5;
@@ -93,6 +116,8 @@ group { name: "elm/index/base/vertical/default";
             rel1.offset: -1 0;
          }
       }
+      // An accessibility object overlaying the event area. 'repeat_events: 1'
+      // passes events to objects below it.
       part { name: "access"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
@@ -101,22 +126,27 @@ group { name: "elm/index/base/vertical/default";
          }
       }
    }
+   // Programs control the widget's dynamic behavior.
    programs {
+      // When the index becomes active (e.g., touched), show the main content.
       program { signal: "elm,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.5;
          target: "clip";
       }
+      // When the index becomes inactive, hide the main content.
       program { signal: "elm,state,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
          target: "clip";
       }
+      // When the indicator is activated by user dragging, make it visible.
       program { signal: "elm,indicator,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.5;
          target: "clip2";
       }
+      // When the indicator is deactivated, make it invisible.
       program { signal: "elm,indicator,state,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -125,20 +155,26 @@ group { name: "elm/index/base/vertical/default";
    }
 }
 
+// This group defines the style for a standard item in a vertical index.
 group { name: "elm/index/item/vertical/default";
+   // "stacking: below" ensures that new items are placed below existing ones.
    data.item: "stacking" "below";
    parts {
+      // The background of the item. 'offscale' allows for smooth scaling
+      // animations if the item resizes.
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/dim/normal/index/item";
             offscale;
          }
+         // When the item is selected ("active"), its color changes.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/dim/selected/index/item";
          }
       }
+      // The text label for the index item.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -155,16 +191,21 @@ group { name: "elm/index/item/vertical/default";
                text_class: "index_item_text";
             }
          }
+         // The text color also changes upon selection.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/index/item/text";
          }
       }
    }
+   // Programs to handle the item's state changes.
    programs {
+      // When the item is activated, this program starts the state change.
       program { signal: "elm,state,active"; source: "elm";
+         // First, change the text state immediately for responsiveness.
          action: STATE_SET "active" 0.0;
          target: "elm.text";
+         // Then, trigger 'active_base' to animate the background separately.
          after: "active_base";
       }
       program { name: "active_base";
@@ -172,6 +213,7 @@ group { name: "elm/index/item/vertical/default";
          target: "base";
          transition: DECELERATE 0.5;
       }
+      // When the item is deactivated, reverse the state changes.
       program { signal: "elm,state,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.text";
@@ -185,22 +227,29 @@ group { name: "elm/index/item/vertical/default";
    }
 }
 
+// This group styles odd-numbered items for a "zebra stripe" effect.
 group { name: "elm/index/item_odd/vertical/default";
+   // 'stacking: above' and 'selectraise: on' help manage layering during
+   // selection animations, ensuring the selected item is visually on top.
    data.item: "stacking" "above";
    data.item: "selectraise" "on";
    parts {
+      // The background for an odd item, using an alternate color class.
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/dim-alt/normal/index/item";
             offscale;
          }
+         // When selected, the item not only changes color but also shifts left
+         // by 16 pixels, providing a clear selection indicator.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/dim-alt/selected/index/item";
             rel1.offset: -16 0;
          }
       }
+      // The text for an odd item, using an alternate color class.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -217,12 +266,14 @@ group { name: "elm/index/item_odd/vertical/default";
                text_class: "index_item_text";
             }
          }
+         // Text color changes on selection.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg-alt/selected/index/item/text";
          }
       }
    }
+   // The state change programs are identical in logic to the standard item.
    programs {
       program { signal: "elm,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
@@ -251,33 +302,38 @@ group { name: "elm/index/item_odd/vertical/default";
 //////////////////////////////////////////////////////////////////////////////
 
 
+// This group defines the base layout for a horizontal index widget, analogous
+// to the vertical version but with adjusted layout properties.
 group { name: "elm/index/base/horizontal/default";
    parts {
+      // Transparent background, sized to the item container.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.index.0";
             color: 0 0 0 0; // no cc
          }
       }
+      // Clipper for the main index area.
       part { name: "clip"; type: RECT; mouse_events:  0;
          description { state: "default" 0.0;
             visible:  0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc, transparent white #FFFFFF00
          }
          description { state: "active" 0.0;
             visible:  1;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc, opaque white #FFFFFFFF
          }
       }
+      // Clipper for the text indicator.
       part { name: "clip2"; type: RECT; mouse_events:  0;
          clip_to: "clip";
          description { state: "default" 0.0;
             visible: 0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc, transparent white #FFFFFF00
          }
          description { state: "active" 0.0;
             visible:  1;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc, opaque white #FFFFFFFF
          }
       }
       part { name: "elm.swallow.index.0"; type: SWALLOW;
@@ -294,6 +350,7 @@ group { name: "elm/index/base/horizontal/default";
             min: 0 32;
          }
       }
+      // The text indicator, positioned to follow horizontal finger movement.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "clip2";
@@ -354,22 +411,27 @@ group { name: "elm/index/base/horizontal/default";
          }
       }
    }
+   // Programs for state changes are identical to the vertical version.
    programs {
+      // When the index becomes active, show it.
       program { signal: "elm,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.5;
          target: "clip";
       }
+      // When the index becomes inactive, hide it.
       program { signal: "elm,state,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
          target: "clip";
       }
+      // When the indicator is activated, show it.
       program { signal: "elm,indicator,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.5;
          target: "clip2";
       }
+      // When the indicator is deactivated, hide it.
       program { signal: "elm,indicator,state,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -378,21 +440,26 @@ group { name: "elm/index/base/horizontal/default";
    }
 }
 
+// This group defines the style for a standard item in a horizontal index.
 group { name: "elm/index/item/horizontal/default";
    data.item: "stacking" "below";
    parts {
+      // The background of the item.
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/dim/normal/index/item";
             offscale;
          }
+         // When selected, the item not only changes color but also shifts
+         // upwards by 16 pixels for a clear visual highlight.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/dim/selected/index/item";
             rel1.offset: 0 -16;
          }
       }
+      // The text label for the item.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -417,6 +484,7 @@ group { name: "elm/index/item/horizontal/default";
          }
       }
    }
+   // State change programs are identical to the vertical item.
    programs {
       program { signal: "elm,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;
@@ -441,22 +509,26 @@ group { name: "elm/index/item/horizontal/default";
    }
 }
 
+// Style for odd-numbered items in a horizontal index, for "zebra-striping".
 group { name: "elm/index/item_odd/horizontal/default";
    data.item: "stacking" "above";
    data.item: "selectraise" "on";
    parts {
+      // The background for an odd horizontal item.
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/dim-alt/normal/index/item";
             offscale;
          }
+         // On selection, it shifts up by 16 pixels.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/dim-alt/selected/index/item";
             rel1.offset: 0 -16;
          }
       }
+      // The text for an odd horizontal item.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -481,6 +553,7 @@ group { name: "elm/index/item_odd/horizontal/default";
          }
       }
    }
+   // State change programs are identical to other items.
    programs {
       program { signal: "elm,state,active"; source: "elm";
          action: STATE_SET "active" 0.0;

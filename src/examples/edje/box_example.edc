@@ -1,12 +1,21 @@
+// An Edje data collection can contain multiple groups and resources.
 collections {
+   // The 'images' block defines all the image files used in this EDC file.
+   // COMP means the image data will be stored compressed in the final .edj file,
+   // which is good for reducing file size.
    images {
       image: "bubble-blue.png" COMP;
    }
+   // A simple group containing a single red rectangle.
+   // This group is designed to be a reusable component, in this case,
+   // it's used as an item in a box layout later on.
    group { name: "red_group";
       parts {
+         // This part is a solid red rectangle that fills the group's area.
          part { name: "red";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: Red (#FF0000FF)
                color: 255 0 0 255;
             }
          }
@@ -17,6 +26,7 @@ collections {
          part { name: "blue";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: Blue (#0000FFFF)
                color: 0 0 255 255;
             }
          }
@@ -27,19 +37,25 @@ collections {
          part { name: "green";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: Green (#00FF00FF)
                color: 0 255 0 255;
             }
          }
       }
    }
+   // A more complex group with multiple parts.
+   // Parts are stacked in the order they are defined. 'bg' will be on top of 'green'.
    group { name: "complex_group";
       parts {
+         // This part is a rectangle that will act as a colored background.
          part { name: "green";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: Magenta (#FF00FFFF). The part is named 'green' but colored magenta.
                color: 255 0 255 255;
             }
          }
+         // An image part on top of the rectangle.
          part {
             type: IMAGE;
             name: "bg";
@@ -48,6 +64,9 @@ collections {
                image {
                   normal: "bubble-blue.png";
                }
+               // 'rel1' and 'rel2' define the top-left and bottom-right corners of the part.
+               // Using relative coordinates, this places the image in the center,
+               // occupying 50% of the group's width and height.
                rel1.relative: 0.25 0.25;
                rel2.relative: 0.75 0.75;
             }
@@ -55,28 +74,45 @@ collections {
       }
    }
 
+   // This group demonstrates a box layout. It consists of a background and a BOX part
+   // that arranges other groups (red_group, blue_group, green_group) horizontally.
    group { name: "box_group";
       parts {
+         // A black background rectangle that fills the entire group area.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                visible: 1;
+               // Color: Black (#000000FF)
                color: 0 0 0 255;
             }
          }
+         // This part is of type BOX. It's a container that arranges child items
+         // according to a specified layout. Note the part name "green" is misleading.
          part { name: "green";
             type: BOX;
+            // The 'box' block defines the items that will be placed in the box.
             box {
                items {
+                  // First item in the box layout.
                   item {
                      type: GROUP;
                      name: "x1";
+                     // It uses the 'red_group' defined earlier as its content.
                      source: "red_group";
+                     // min/max define the size constraints for this item.
                      min: 100 100;
                      max: 200 200;
+                     // align defines how the item is aligned within its allocated cell in the box.
+                     // 0 0 means top-left.
                      align: 0 0;
+                     // weight determines how extra space is distributed. This item will get more
+                     // horizontal space (20) compared to vertical space (10) when resized.
                      weight: 20 10;
                   }
+                  // Second item, using 'blue_group'.
+                  // No weight is specified, so it defaults to 0. It will not expand.
+                  // No align is specified, it defaults to 0.5 0.5 (center).
                   item {
                      type: GROUP;
                      name: "x2";
@@ -84,22 +120,31 @@ collections {
                      min: 200 200;
                      max: 800 800;
                   }
+                  // Third item, using 'green_group'.
                   item {
                      type: GROUP;
                      name: "x3";
                      source: "green_group";
                      min: 20 20;
                      max: 100 100;
+                     // Aligned slightly off-center.
                      align: 0.3 0.7;
+                     // This item will expand more vertically (15) than horizontally (5).
                      weight: 5 15;
                   }
                }
             }
+            // The description for the BOX part itself.
             description { state: "default" 0.0;
                visible: 1;
+               // Color for the box part, likely not visible as it is filled by its items.
+               // Color: White (#FFFFFFFF)
                color: 255 255 255 255;
+               // The 'box' block inside a description configures the layout properties.
                box {
+                  // Items are arranged from left to right. Other options include "vertical".
                   layout: "horizontal";
+                  // Padding in pixels (horizontal and vertical) between items.
                   padding: 5 5;
                }
             }

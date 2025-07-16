@@ -1,5 +1,10 @@
+// The main group for the actionslider widget. It defines the layout and behavior
+// of the slider, including its background, draggable button, and text labels.
+// This group serves as the base for other actionslider styles.
 group { name: "elm/actionslider/base/default";
    parts {
+      // The background of the actionslider. It serves as the main container for other parts.
+      // `mouse_events: 0` means it doesn't react to mouse input directly.
       part { name: "bg"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -8,14 +13,21 @@ group { name: "elm/actionslider/base/default";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // The color when the widget is disabled.
             color_class: "/bg/disabled/actionslider/base";
          }
       }
+      // An invisible spacer that defines the confinement area for the draggable button.
+      // This ensures the button cannot be dragged outside the widget's boundaries.
       part { name: "icon_dragable_area"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // These three text parts ("left", "center", "right") display the labels
+      // for the actionslider's positions. They are initially positioned off-screen
+      // using `offscale` and are made visible by the application logic based
+      // on the slider's state.
       part { name: "elm.text.left"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -32,6 +44,7 @@ group { name: "elm/actionslider/base/default";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // The text color when the widget is disabled.
             color_class: "/fg/disabled/actionslider/left";
          }
       }
@@ -73,6 +86,8 @@ group { name: "elm/actionslider/base/default";
             color_class: "/fg/disabled/actionslider/right";
          }
       }
+      // A SWALLOW part that acts as the container for the draggable button's content
+      // (e.g., an icon). This part is dragged, but events are handled by `elm.drag_button`.
       part { name: "elm.drag_button_base"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -86,16 +101,21 @@ group { name: "elm/actionslider/base/default";
             }
          }
          dragable {
+            // Confines movement to the `icon_dragable_area`.
             confine: "icon_dragable_area";
+            // `x: 1 1 0` enables horizontal dragging. `y: 0 0 0` disables vertical.
             x: 1 1 0;
             y: 0 0 0;
          }
       }
+      // An invisible rectangle used as a hit area for the drag button.
+      // It forwards drag events to `elm.drag_button_base`. This separation allows for
+      // a larger, simpler hit area than the potentially complex visual part.
       part { name: "elm.drag_button"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             min: 40 20;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent (RGBA: #00000000).
             rel1.to_x: "elm.drag_button_base";
             rel1.to_y: "icon_dragable_area";
             rel2.to_x: "elm.drag_button_base";
@@ -105,6 +125,9 @@ group { name: "elm/actionslider/base/default";
             events: "elm.drag_button_base";
          }
       }
+      // The visible representation of the draggable button. It changes color based on
+      // its state ("default", "disabled", "clicked"). Its geometry is tied to
+      // `elm.drag_button`, so it moves along with it.
       part { name: "drag_button"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "elm.drag_button";
@@ -119,6 +142,8 @@ group { name: "elm/actionslider/base/default";
             color_class: "/bg/pressed/actionslider/button";
          }
       }
+      // Text displayed on top of the draggable button, often showing its current value
+      // or state. It is positioned relative to `drag_button` and follows its states.
       part { name: "elm.text.indicator"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -142,9 +167,12 @@ group { name: "elm/actionslider/base/default";
             color_class: "/fg/pressed/actionslider/button";
          }
       }
+      // An invisible rectangle that covers the entire widget when it's disabled.
+      // By becoming visible in the "disabled" state, it intercepts all mouse
+      // events, effectively disabling interaction with other parts.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent (RGBA: #00000000).
             visible: 0;
          }
          description { state: "disabled" 0.0;
@@ -153,28 +181,47 @@ group { name: "elm/actionslider/base/default";
          }
       }
    }
+   // The programs section defines the dynamic behavior of the widget.
+   // These programs react to signals (like mouse clicks or state changes)
+   // and execute actions, such as changing part states or emitting signals
+   // to the application code.
    programs {
+      // When the left mouse button is released on the drag button:
+      // 1. Emits the "elm,action,up,drag_button" signal to notify the application.
+      // 2. Triggers the "button_unclick_anim" program to revert the button's appearance.
       program { signal: "mouse,up,1"; source: "elm.drag_button";
          action: SIGNAL_EMIT "elm,action,up,drag_button" "elm";
          after: "button_unclick_anim";
       }
       program { name: "button_unclick_anim";
+         // Resets the visual state of the button and its text to "default".
          action: STATE_SET "default" 0.0;
          target: "drag_button";
          target: "elm.text.indicator";
       }
+      // When the left mouse button is pressed on the drag button:
+      // 1. Emits the "elm,action,down,drag_button" signal.
+      // 2. Triggers the "button_click_anim" program.
+      // The "*" in "mouse,down,1*" allows other programs to also handle this event.
       program { signal: "mouse,down,1*"; source: "elm.drag_button";
          action: SIGNAL_EMIT "elm,action,down,drag_button" "elm";
          after: "button_click_anim";
       }
       program { name: "button_click_anim";
+         // Sets the visual state of the button and its text to "clicked".
          action: STATE_SET "clicked" 0.0;
          target: "drag_button";
          target: "elm.text.indicator";
       }
+      // As the button is dragged, this program continuously emits the
+      // "elm,action,move,drag_button" signal, allowing the application
+      // to track the slider's position in real-time.
       program { signal: "mouse,move"; source: "elm.drag_button_base";
          action: SIGNAL_EMIT "elm,action,move,drag_button" "elm";
       }
+      // These programs allow the side labels to be clickable. When clicked,
+      // they emit a corresponding signal (e.g., "elm,action,down,right")
+      // which the application can use to snap the slider to a position.
       program { signal: "mouse,down,1*"; source: "elm.text.right";
          action: SIGNAL_EMIT "elm,action,down,right" "elm";
       }
@@ -184,6 +231,8 @@ group { name: "elm/actionslider/base/default";
      program { signal: "mouse,down,1*"; source: "elm.text.center";
          action: SIGNAL_EMIT "elm,action,down,center" "elm";
       }
+      // When the widget receives the "elm,state,disabled" signal from the application,
+      // this program transitions all relevant parts to their "disabled" state.
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "bg";
@@ -194,6 +243,8 @@ group { name: "elm/actionslider/base/default";
          target: "elm.text.right";
          target: "elm.text.indicator";
       }
+      // Reverses the "disabled" state, setting all parts back to "default"
+      // when the "elm,state,enabled" signal is received.
       program { signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "bg";
@@ -207,14 +258,20 @@ group { name: "elm/actionslider/base/default";
    }
 }
 
+// This group inherits from the default actionslider and adds a "bar" part.
+// The bar visually represents the slider's track or progress.
 group { name: "elm/actionslider/base/bar";
    inherit: "elm/actionslider/base/default";
    parts {
+      // The "bar" part is a rectangle that fills the space from the left edge of
+      // the widget to the current position of the drag button. This creates a
+      // "progress" effect as the slider is moved.
       part { name: "bar"; type: RECT; mouse_events: 0;
          insert_before: "elm.drag_button_base";
          description { state: "default" 0.0;
             color_class: "/bg/normal/actionslider/bar";
             rel1.to: "bg";
+            // The right edge of the bar is tied to the X position of the drag button.
             rel2 {
                relative: 0.0 1.0;
                to_x: "elm.drag_button_base";

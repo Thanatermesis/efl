@@ -1,38 +1,51 @@
-/* bg widget style information
-
-Group: efl/bg (@since 1.23)
-	 Part Swallow: efl.background (required)
-	 Part Swallow: efl.content (required)
-	 Part Swallow: efl.rectangle (required)
-
-   [SWALLOW]
-      efl.rectangle: Used for efl_gfx_color_color_set()
-      efl.background: Used for efl_file_set()
-      efl.content: Used for storing the main object for which this is the background
-*/
-
+// The 'efl/bg' group defines a versatile background widget. It is designed to
+// be a container that can display a solid color, an image, and hold content.
+// It is commonly used as a base for other widgets to provide a consistent
+// background treatment.
 group { "efl/bg";
    data.item: "version" "123";
    parts {
+      // A clipper part, of type RECT, used to clip other parts.
+      // This is essential for ensuring that child elements, like the background image,
+      // do not draw outside the boundaries of this container. This is particularly
+      // useful for creating non-rectangular shapes or rounded corners.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // A base rectangle part that provides a solid color background.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The color_class allows the background color to be defined and changed
+            // by the theme, promoting reusability and consistency across an application.
             color_class: "/bg/normal/background";
          }
       }
+      // A SWALLOW part named 'efl.rectangle', which is a placeholder for an
+      // object that will have its color set programmatically. This allows for dynamic
+      // background color changes. The 'required' property ensures that this
+      // part must be present for the group to function correctly. It is typically
+      // used with efl_gfx_color_color_set().
       part { name: "efl.rectangle"; type: SWALLOW; required;
          description { state: "default" 0.0;
          }
       }
+      // A SWALLOW part for holding a background image or object. This allows for
+      // setting a file (e.g., a PNG or JPG) as the background. It is typically
+      // used with efl_file_set().
       part { name: "efl.background"; type: SWALLOW; required;
+         // The background is clipped by the 'clipper' part, ensuring it conforms
+         // to the container's shape.
          clip_to: "clipper";
          description { state: "default" 0.0;
+            // 'fixed: 1 1;' prevents the background image from being scaled with the
+            // container. This is useful for patterns or images that should not be
+            // distorted.
             fixed: 1 1;
          }
       }
+      // A SWALLOW part to hold the main content of the widget.
+      // Any object placed here will appear on top of the background.
       part { name: "efl.content"; type: SWALLOW; required;
          description { state: "default" 0.0;
          }

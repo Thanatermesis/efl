@@ -1,16 +1,33 @@
+// This group defines the desktop background. It's aliased to be the default
+// background for Enlightenment's EWS (Efl Wayland Shims), allowing it to be
+// used without knowing the specific group name.
 group { name: "e/desktop/background";
    alias: "elm/ews/background/default";
+   // The BACKGROUND_IMG macro likely defines the 'background' image resource used below.
+   // This approach helps in keeping image definitions organized.
    BACKGROUND_IMG
    parts {
+      // The 'clip' part is an invisible rectangle that does not handle mouse events.
+      // Its sole purpose is to serve as a clipping mask for the 'bg' part, ensuring
+      // the background image stays within the layout's boundaries.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
          }
       }
+      // The 'bg' part displays the actual background image.
       part { name: "bg";
+         // It is clipped by the 'clip' part, ensuring it doesn't draw outside
+         // the designated area.
          clip_to: "clip";
          description { state: "default" 0.0;
             image.normal: "background";
+            // 'STATIC' is an optimization hint for Edje to not cache scaled versions of
+            // the image. This is essential for large images like wallpapers, as it
+            // reduces memory usage, with scaling being managed by the application.
             image.scale_hint: STATIC;
+            // The ASPECT_FILL macro ensures the image fills the part while preserving
+            // its aspect ratio (16:9 from 7680/4320). If the container has a different
+            // aspect ratio, the image is cropped to avoid distortion.
             ASPECT_FILL((7680/4320))
          }
       }

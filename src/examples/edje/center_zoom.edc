@@ -1,8 +1,12 @@
 collections {
+// This group defines the layout for the "center_zoom_example" interface.
+// It demonstrates how to use the 'map.zoom.center' property to create a zoom
+// effect around a specific part. The group has a fixed size.
 group { name: "center_zoom_example";
       min: 360 360;
       max: 360 360;
       parts {
+         // A black background rectangle (#000000) that fills the entire group area.
          part {
             name: "bg";
             type: RECT;
@@ -11,6 +15,10 @@ group { name: "center_zoom_example";
                color: 0 0 0 255;
             }
          }
+         // This part is not visible but serves as a reference point for the zoom center.
+         // It is positioned in the upper half of the 'bg' part and is centered horizontally.
+         // The 'map.zoom.center' property in the 'rectangle' part will use the center
+         // of this part as the focal point for the zoom effect.
          part {
             name: "center_part";
             type: RECT;
@@ -25,10 +33,13 @@ group { name: "center_zoom_example";
                }
             }
          }
+         // This is the rectangle that will be zoomed. It's a semi-transparent blue
+         // rectangle (#0000FF with 50% alpha).
          part {
             name: "rectangle";
             type: RECT;
             description {
+               // The 'default' state of the rectangle, where it is not zoomed.
                state: "default" 0.0;
                color: 0 0 255 128;
                max: 150 150;
@@ -39,8 +50,11 @@ group { name: "center_zoom_example";
                   to: "bg";
                }
                map {
+                  // The 'map' property enables transformations like rotation and zoom.
                   on: 1;
                   zoom {
+                     // The 'zoom' property is centered on the 'center_part'.
+                     // x and y zoom levels are 0.0, meaning no zoom.
                      center: "center_part";
                      x: 0.0;
                      y: 0.0;
@@ -48,11 +62,16 @@ group { name: "center_zoom_example";
                }
             }
             description {
+               // The 'zoom' state, triggered by a program. It inherits properties from the
+               // 'default' state, so only changes are specified.
                state: "zoom" 0.0;
-               inherit: "default" 0.0;  
+               inherit: "default" 0.0;
                map {
                   on: 1;
                   zoom {
+                     // Here, the zoom level is set to 1 for both x and y axes, which
+                     // corresponds to a 2x magnification (scale = 2^zoom_level).
+                     // The zoom remains centered on 'center_part'.
                      center: "center_part";
                      x: 1;
                      y: 1;
@@ -60,12 +79,15 @@ group { name: "center_zoom_example";
                }
             }
          }
+         // A text part to display the title of the example.
          part {
             name: "title";
             type: TEXT;
             description {
                state: "default" 0.0;
+               // Light gray color (#C8C8C8) for the text.
                color: 200 200 200 255;
+               // Aligns the text to be centered horizontally and at the top vertically.
                align: 0.5 0.0;
                rel1.to:"bg";
                rel2 {
@@ -80,17 +102,24 @@ group { name: "center_zoom_example";
                }
             }
          }
+         // An invisible rectangle that covers the entire group area to capture mouse events.
+         // This is a common technique to create a clickable area without a visible element.
          part {
             name: "event";
             type: RECT;
             mouse_events: 1;
             description {
                state: "default" 0.0;
-               color: 0 0 0 0;  
+               // Transparent color.
+               color: 0 0 0 0;
             }
          }
       }
+      // The 'programs' block defines dynamic behaviors that respond to signals.
       programs {
+         // This program triggers when the left mouse button is released over the 'event' part.
+         // It changes the state of the 'rectangle' part to "zoom" over 1.0 second,
+         // causing the zoom-in animation.
          program {
             name: "move,bottom";
             signal: "mouse,up,1";

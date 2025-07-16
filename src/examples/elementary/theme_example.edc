@@ -1,34 +1,55 @@
 collections {
+   // Defines a custom theme for a button, named "chucknorris".
+   // This group will be used as the default button style in Elementary
+   // because it aliases "elm/button/base/default".
    group { name: "elm/button/base/chucknorris";
       alias: "elm/button/base/default";
+      // The 'parts' block defines the visual and functional components of the button.
       parts {
+         // The 'border' part is a rectangle that forms the outer edge of the button.
          part { name: "border";
             type: RECT;
+            // Default state of the border.
             description { state: "default" 0.0;
+               // Color: black (#000000).
                color: 0 0 0 255;
             }
+            // State when the mouse is over the button.
             description { state: "in" 0.0;
+               // Color: a shade of cyan (#32B4B4), used for hover highlight.
                color: 50 180 180 255;
             }
          }
+         // The 'base' part is the main clickable area of the button, sitting inside the border.
          part { name: "base";
             type: RECT;
+            // This part receives mouse events, making the button interactive.
             mouse_events: 1;
             description { state: "default" 0.0;
+               // Positions this part relative to the 'border' part.
                rel1.to: "border";
+               // An offset of (1, 1) for the top-left corner and (-2, -2) for the
+               // bottom-right creates a 1-pixel padding inside the border.
                rel1.offset: 1 1;
                rel2.to: "border";
                rel2.offset: -2 -2;
             }
+            // State when the button is disabled.
             description { state: "disabled" 0.0;
+               // It inherits properties from the "default" state.
                inherit: "default" 0.0;
+               // Color: light gray (#E6E6E6), indicating a disabled state.
                color: 230 230 230 255;
             }
          }
+         // This part is a SWALLOW container, which can hold an external object, typically an icon.
+         // Standard Elementary part names like "elm.swallow.content" are used for interoperability.
          part { name: "elm.swallow.content";
             type: SWALLOW;
+            // It does not receive mouse events; events are handled by the 'base' part.
             mouse_events: 0;
             description { state: "default" 0.0;
+               // By default, the icon is not visible.
                fixed: 1 0;
                visible: 0;
                align: 0.0 0.5;
@@ -36,51 +57,68 @@ collections {
                rel2.offset: 3 -5;
                rel2.relative: 0.0 1.0;
             }
+            // State when both icon and text are visible.
             description { state: "visible" 0.0;
                inherit: "default" 0.0;
                visible: 1;
+               // 'aspect' maintains the icon's width-to-height ratio.
                aspect: 1.0 1.0;
                aspect_preference: VERTICAL;
                rel2.offset: 4 -5;
             }
+            // State when only the icon is visible (no text).
             description { state: "icononly" 0.0;
                inherit: "default" 0.0;
                fixed: 0 0;
                visible: 1;
+               // Centers the icon within the button area.
                align: 0.5 0.5;
                aspect: 1.0 1.0;
                aspect_preference: VERTICAL;
+               // The icon fills most of the button, with a 5-pixel margin.
                rel2.offset: -5 -5;
                rel2.relative: 1.0 1.0;
             }
          }
+         // This part displays the button's label. "elm.text" is a standard name.
          part { name: "elm.text";
             type: TEXT;
             mouse_events: 0;
+            // 'scale: 1' allows the text size to be adjusted by Elementary's scaling factor.
             scale: 1;
             description { state: "default" 0.0;
+               // By default, the text is not visible.
                visible: 0;
+               // Positions the text to the right of the icon container.
                rel1.to_x: "elm.swallow.content";
                rel1.relative: 1.0 0.0;
                rel1.offset: 0 4;
                rel2.offset: -5 -5;
+               // Text color: black (#000000).
                color: 0 0 0 255;
                text {
                   font: "Sans";
                   size: 10;
+                  // 'min: 0 0' means the text can shrink to zero size if needed.
                   min: 0 0;
+                  // 'text_class' is used for theming and font selection.
                   text_class: "button";
                }
             }
+            // State when the text is visible.
             description { state: "visible" 0.0;
                inherit: "default" 0.0;
                visible: 1;
+               // 'text.min: 1 1' ensures the text is at least 1x1 pixels, making it visible.
                text.min: 1 1;
+               // 'text.ellipsis: -1' enables automatic ellipsis (...) if the text overflows.
                text.ellipsis: -1;
             }
+            // State for disabled, but not visible text.
             description { state: "disabled" 0.0;
                inherit: "default" 0.0;
             }
+            // State for disabled and visible text.
             description { state: "disabled_visible" 0.0;
                inherit: "default" 0.0;
                visible: 1;
@@ -88,40 +126,61 @@ collections {
                text.ellipsis: -1;
          }
       }
+      // The 'programs' block contains the logic that connects signals (like mouse clicks)
+      // to actions (like changing a part's state).
       programs {
+         // This program handles the mouse entering the 'base' part.
          program { name: "button_mouse_in";
             signal: "mouse,in";
             source: "base";
+            // It sets the state of the 'border' part to "in", changing its color for feedback.
             action: STATE_SET "in" 0.0;
             target: "border";
          }
+         // This program handles the mouse leaving the 'base' part.
          program { name: "button_mouse_out";
             signal: "mouse,out";
             source: "base";
+            // It resets the 'border' part to its "default" state.
             action: STATE_SET "default" 0.0;
             target: "border";
          }
+         // This program is triggered on mouse button 1 release.
          program { name: "button_unclick";
             signal: "mouse,up,1";
             source: "base";
+            // It emits the "elm,action,click" signal, which is the standard way for
+            // Elementary widgets to notify application code that they have been clicked.
             action: SIGNAL_EMIT "elm,action,click" "";
          }
+         // This program is triggered on mouse button 1 press. It has no action,
+         // but it serves to "catch" the mousedown signal. This can be used
+         // to create a "pressed" visual state.
          program { name: "button_click";
             signal: "mouse,down,1";
             source: "base";
          }
+         // The following programs manage the layout when text or icon visibility changes.
+         // They use scripts for conditional logic, which is more powerful than simple actions.
+         // This program is triggered when Elementary wants to show the text.
          program { name: "text_show";
             signal: "elm,state,text,visible";
             source: "elm";
+            // This script handles the transition.
             script {
                new st[31];
                new Float:vl;
+               // It checks the current state of the icon container.
                get_state(PART:"elm.swallow.content", st, 30, vl);
+               // If only the icon was visible ("icononly"), it changes the state to "visible"
+               // which arranges the layout for both icon and text.
                if (!strcmp(st, "icononly"))
                  set_state(PART:"elm.swallow.content", "visible", 0.0);
+               // Finally, it makes the text part visible.
                set_state(PART:"elm.text", "visible", 0.0);
             }
          }
+         // This program is triggered when Elementary wants to hide the text.
          program { name: "text_hide";
             signal: "elm,state,text,hidden";
             source: "elm";
@@ -129,60 +188,85 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"elm.swallow.content", st, 30, vl);
+               // If the icon was in the "visible" state (icon + text),
+               // it transitions to "icononly" to fill the space.
                if (!strcmp(st, "visible"))
                  set_state(PART:"elm.swallow.content", "icononly", 0.0);
+               // Hides the text by setting its state to "default".
                set_state(PART:"elm.text", "default", 0.0);
             }
          }
+         // This program is triggered when Elementary wants to show the icon.
          program { name: "icon_show";
             signal: "elm,state,icon,visible";
             source: "elm";
             script {
                new st[31];
                new Float:vl;
+               // Checks if the text part is currently visible.
                get_state(PART:"elm.text", st, 30, vl);
+               // If text is visible, set icon container to "visible" (icon + text layout).
                if (!strcmp(st, "visible"))
                  set_state(PART:"elm.swallow.content", "visible", 0.0);
+               // Otherwise, use the "icononly" layout.
                else
                  set_state(PART:"elm.swallow.content", "icononly", 0.0);
             }
          }
+         // This program is triggered when Elementary wants to hide the icon.
          program { name: "icon_hide";
             signal: "elm,state,icon,hidden";
             source: "elm";
+            // It simply sets the icon container state to "default", which makes it invisible.
             action: STATE_SET "default" 0.0;
             target: "elm.swallow.content";
          }
+         // This program handles disabling the button.
          program { name: "disable";
             signal: "elm,state,disabled";
             source: "elm";
+            // Sets the 'base' part to its "disabled" state (e.g., grayed out).
             action: STATE_SET "disabled" 0.0;
             target: "base";
+            // After this action, it triggers the "disable_text" program.
+            // This chaining allows for more complex state transitions.
             after: "disable_text";
          }
+         // This program ensures the text part correctly reflects the disabled state.
          program { name: "disable_text";
             script {
                new st[31];
                new Float:vl;
+               // It checks the text's current visibility state.
                get_state(PART:"elm.text", st, 30, vl);
+               // If the text was visible, it switches to "disabled_visible".
                if (!strcmp(st, "visible"))
                  set_state(PART:"elm.text", "disabled_visible", 0.0);
+               // If it was hidden ("default"), it switches to the "disabled" (and hidden) state.
+               // This preserves the visibility status while applying the disabled look.
                else if (!strcmp(st, "default"))
                  set_state(PART:"elm.text", "disabled", 0.0);
             }
          }
+         // This program handles re-enabling the button.
          program { name: "enable";
             signal: "elm,state,enabled";
             source: "elm";
+            // Resets the 'base' part to its "default" state.
             action: STATE_SET "default" 0.0;
             target: "base";
+            // Triggers the corresponding script to update the text part.
             after: "enable_text";
          }
+         // This program updates the text part when the button is enabled.
          program { name: "enable_text";
             script {
                new st[31];
                new Float:vl;
+               // Checks the current disabled state of the text.
                get_state(PART:"elm.text", st, 30, vl);
+               // It reverses the logic from "disable_text", restoring the text to its
+               // appropriate visible or hidden state.
                if (!strcmp(st, "disabled_visible"))
                  set_state(PART:"elm.text", "visible", 0.0);
                else if (!strcmp(st, "disabled"))

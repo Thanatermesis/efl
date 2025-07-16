@@ -1,8 +1,16 @@
+// This EDC file defines the layout for a single tweet view.
+// It is structured as a collection containing one group.
 collections {
+    // The "tweet" group represents the main container for all UI elements
+    // that constitute a tweet, such as user icon, name, and the tweet text itself.
     group {
         name: "tweet";
         parts
         {
+            // The "user_icon" part is a SWALLOW type, which acts as a placeholder.
+            // In the application, an Evas object (like an icon from a file) will be
+            // "swallowed" into this part to display the user's avatar.
+            // It is positioned at the top-left corner with a small offset.
             part {
                 name: "user_icon";
                 type: SWALLOW;
@@ -17,18 +25,28 @@ collections {
                     }
                 }
             }
+            // The "user_name" part displays the user's full name.
+            // It's a TEXT part with a soft shadow effect for better readability.
             part {
                 name: "user_name";
                 type: TEXT;
                 effect: SOFT_SHADOW;
                 description {
+                    // Color is a light blue (R:0, G:190, B:255, A:255) (#00BEFFFF).
                     color: 0 190 255 255;
+                    // Positions the text block to the right of the user icon.
+                    // Using to_x allows horizontal positioning relative to another part ("user_icon"),
+                    // while vertical positioning remains relative to the parent container.
                     rel1 {
+                          // rel1 defines the top-left corner.
+                          // It is placed to the right of "user_icon" (relative: 1.0) with an offset.
                           relative: 1.0 0.0;
                           to_x: "user_icon";
                           offset: 7 4;
                     }
                     rel2 {
+                          // rel2 defines the bottom-right corner, creating a bounding box for the text.
+                          // It's also relative to the right of "user_icon", but with a larger offset to set the width and height.
                           relative: 1.0 0.0;
                           to_x: "user_icon";
                           offset: 120 30;
@@ -37,22 +55,31 @@ collections {
                         text: "User Name";
                         size: 12;
                         font: "sans:style=Bold";
+                        // min: 1 1; ensures the part is never smaller than 1 character wide and 1 line high.
                         min: 1 1;
+                        // ellipsis: -1; adds "..." at the end of the text if it exceeds the part's width.
                         ellipsis: -1;
+                        // align: 0.0 0.0; aligns text to top-left.
                         align: 0.0 0.0;
                     }
                 }
             }
+            // The "screen_name" part displays the user's handle (e.g., @username).
+            // It is positioned to the right of the "user_name" part.
             part {
                 name: "screen_name";
                 type: TEXT;
                 description {
+                    // Aligns this part relative to the "user_name" part.
                     rel1 {
+                        // The top-left corner is positioned relative to the top-right of "user_name".
                         relative: 1.0 0.0;
                         to: "user_name";
                         offset: 15 4;
                     }
                     rel2 {
+                        // The bottom-right corner is relative to the bottom-right of "user_name",
+                        // creating a box for the screen name.
                         relative: 1.0 1.0;
                         to: "user_name";
                         offset: 75 10;
@@ -67,16 +94,24 @@ collections {
                     }
                 }
             }
+           // "tweet_text" is another SWALLOW part, intended to hold the main content of the tweet.
+           // Using SWALLOW allows for more complex text objects, like a textblock that supports
+           // rich text and line wrapping, to be embedded from the application logic.
            part {
                 name: "tweet_text";
                 type: SWALLOW;
                 description {
+                            // This part is positioned below the "user_name" part.
                             rel1 {
+                                 // The top-left corner of "tweet_text" is aligned with the bottom-left of "user_name".
                                  relative: 0.0 1.0;
                                  to: "user_name";
                                  offset: 0 0;
                                  }
+                            // The bottom-right corner defines the area of the tweet text.
                             rel2 {
+                                 // It's also relative to user_name's bottom-left, but with an offset,
+                                 // effectively defining the width and height of the tweet text area.
                                  relative: 0.0 1.0;
                                  to: "user_name";
                                  offset: 250 80;

@@ -1,6 +1,6 @@
 /*
  * Standard FreeDesktop icons:
- * 
+ *
  * WARNING: When you add new icons you MUST ensure to use standard names as per:
  * http://standards.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
  *
@@ -10,7 +10,7 @@
  * IF you really cannot find anything try at least to be consistent with other
  * existing names.
  *
- * NOTE: icons marked with an empty comment are names that are not in the 
+ * NOTE: icons marked with an empty comment are names that are not in the
  *       FDO spec, so they are not really standard, but seems widly used.
  *
  * NOTE: when you add a new icon you MUST add to:
@@ -21,10 +21,13 @@
  *   - data/elementary/themes/fdo/index.theme (only for new dirs)
  *   - elm_icon documentation   ?????  really?
  *   - don't forget to run "make distcheck"
- * 
+ *
  */
 
-// Single FDO icon
+// Defines a standard FDO icon using a single image source.
+// This macro creates an Edje group with a 'base' part that displays a single icon image.
+// The aspect ratio is fixed to 1.0 (square), which is standard for most icons.
+// It is suitable for icons that have only one size variant.
 #define ICO1(Cat, Name, Size)                                     \
    group { name: "elm/icon/"##Name##"/default";                   \
       min: 16 16;                                                 \
@@ -36,7 +39,11 @@
                aspect: 1.0 1.0; aspect_preference: BOTH;          \
    }  }  }  }
 
-// FDO icon with small and normal source (16 and 128px)
+// Defines an FDO icon using an image set with two different sizes.
+// This allows Edje to automatically select the most appropriate image resolution
+// based on the icon's display size, improving rendering quality and performance.
+// A small 16px image is used for sizes up to 22px, and a larger 128px image for bigger sizes.
+// This technique avoids blurry upscaling or wasteful downscaling.
 #define ICO2(Cat, Name)                                         \
    group { name: "elm/icon/"##Name##"/default";                 \
       min: 16 16;                                               \
@@ -59,7 +66,10 @@
                aspect: 1.0 1.0; aspect_preference: BOTH;        \
    }  }  }  }
 
-// Flag icon
+// Defines a flag icon, which typically has a non-square aspect ratio.
+// 'aspect_preference: SOURCE' ensures that the flag's original proportions are
+// maintained when it's resized, preventing distortion. This is crucial for non-square
+// images like national flags.
 #define FLAG(Cat, Name)                                     \
    group { name: "elm/icon/"##Name##"/default";             \
       min: 16 16;                                           \
@@ -72,6 +82,9 @@
    }  }  }  }
 
 ////  status  /////////////////////////////////////////////////////////////
+// The CTX macro defines the current category context, corresponding to the
+// subdirectory where icon images are located (e.g., "status", "apps").
+// This simplifies icon definitions by avoiding repetition of the category name.
 #define CTX "status"
 
 // TODO image-loading

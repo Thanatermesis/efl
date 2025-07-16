@@ -1,11 +1,17 @@
+// Message identifiers used for communication between EDC and the C application.
 #define MSG_COLOR 1
 #define MSG_TEXT 2
 
+// Collections are the top-level blocks in an EDC file, containing groups of UI elements.
 collections {
+   // A group defines a single UI layout or component.
    group {
       name: "example_group";
 
+      // The 'parts' block contains all the visual elements of the group.
       parts {
+         // A blue rectangle on the right side of the container.
+         // Its visibility is controlled by 'part_right_clipper'.
          part {
             name: "part_right";
             type: RECT;
@@ -14,17 +20,22 @@ collections {
                min: 50 50;
                max: 50 50;
                state: "default" 0.0;
+               // Opaque blue color (#0000FFFF).
                color: 0 0 255 255; /* blue */
+               // Positioned at the right edge, vertically centered.
                rel1.relative: 1.0 0.5;
                rel1.offset: -49 0;
                rel2.relative: 1.0 0.5;
             }
          }
 
+         // A rectangle on the left, used as a clickable area to change text.
+         // Its color can be dynamically changed from the C code via a color_class.
          part {
             name: "part_left";
             type: RECT;
             description {
+               // This color_class allows this part's color to be controlled externally.
                color_class: "cc";
                min: 50 50;
                max: 50 50;
@@ -35,6 +46,7 @@ collections {
             }
          }
 
+         // A text part, centered in the container, to display dynamic strings.
          part {
             name: "text";
             type: TEXT;
@@ -42,8 +54,10 @@ collections {
                min: 150 50;
                max: 150 50;
                fixed: 1 1;
+               // Opaque black color (#000000FF).
                color: 0 0 0 255;
                state: "default" 0.0;
+               // Positioned in the center of the container.
                rel1.relative: 0.5 0.5;
                rel2.relative: 0.5 0.5;
                text {
@@ -55,6 +69,9 @@ collections {
             }
          }
 
+         // A clipper part used to control the visibility of 'part_right'.
+         // It is a common technique to show/hide parts without affecting layout.
+         // 'repeat_events' allows mouse events to pass through to parts below it.
          part {
             name: "part_right_clipper";
             type: RECT;
@@ -71,6 +88,8 @@ collections {
             }
 
             description {
+               // A 'hidden' state that makes the clipper invisible.
+               // Since 'part_right' is clipped to it, it will also be hidden.
                state: "hidden" 0.0;
                inherit: "default" 0.0;
                visible: 0;
@@ -78,12 +97,18 @@ collections {
          }
       }
 
+      // The script block contains Embryo script code for dynamic UI logic.
+      // This is useful for interactions that don't require C-level application logic.
       script {
+        // Public variables accessible from programs and C code.
         public global_str0;
         public global_str1;
         public global_str2;
         public str_idx;
 
+        // This function sets the text of the 'text' part based on the current
+        // value of str_idx, cycling through the global strings.
+        // It also sends a message to the C application with the new string.
         public set_text_string() {
            new tmp[1024];
            new idx;
@@ -101,7 +126,11 @@ collections {
            send_message(MSG_STRING, MSG_TEXT, tmp);
         }
 
+        // The message handler for this Edje object. It receives messages sent
+        // from the C application.
         public message(Msg_Type:type, id, ...) {
+           // Handles integer messages with ID MSG_COLOR to change the color
+           // of the color class 'cc', which affects 'part_left'.
            if ((type == MSG_INT_SET) && (id == MSG_COLOR)) {
                new r, g, b, a;
 
@@ -115,11 +144,15 @@ collections {
         }
       }
 
+      // Programs define reactions to signals (events).
+      // They can change part states, run scripts, or emit other signals.
       programs {
+         // This program runs once when the object is loaded.
          program {
             name: "bootstrap";
             signal: "load";
             source: "";
+            // It initializes the global strings and sets the initial text.
             script {
                set_str(global_str0, "String one");
                set_str(global_str1, "String two");
@@ -129,14 +162,20 @@ collections {
             }
          }
 
-         program { /* custom signal */
+         // This program listens for the "mouse,move" signal on "part_right"
+         // and emits a new custom signal "mouse,over". This is a common pattern
+         // for creating a hover signal, as Edje does not have a built-in one.
+         program {
             name: "part_right,hovered";
             signal: "mouse,move";
             source: "part_right";
             action: SIGNAL_EMIT "mouse,over" "part_right";
          }
 
-         program { /* hide right rectangle */
+         // This program is triggered by the "part_right,hide" signal. It sets
+         // the state of 'part_right_clipper' to "hidden", which in turn hides
+         // 'part_right' as it is clipped by it.
+         program {
             name: "part_right,hide";
             signal: "part_right,hide";
             source: "";
@@ -144,6 +183,9 @@ collections {
             target: "part_right_clipper";
          }
 
+         // This program is triggered by the "part_right,show" signal.
+         // It reverts 'part_right_clipper' to its "default" state, making
+         // 'part_right' visible again.
          program {
             name: "part_right,show";
             signal: "part_right,show";
@@ -152,10 +194,14 @@ collections {
             target: "part_right_clipper";
          }
 
-         program { /* change text part's string value */
+         // When the left mouse button is clicked on 'part_left', this program
+         // executes a script to cycle through the available strings and update the text.
+         program {
             name: "text,change";
             signal: "mouse,clicked,1";
             source: "part_left";
+            // The script increments the string index, wrapping around if necessary,
+            // and then calls set_text_string() to update the display.
             script {
                new idx;
                idx = get_int(str_idx);

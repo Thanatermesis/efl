@@ -1,11 +1,18 @@
 collections {
 
+// This group defines the main layout for a multiseat example.
+// It sets a minimum size for the window and enables custom seat names.
+// 'use_custom_seat_names: 1;' is crucial for multiseat functionality,
+// allowing the interface to distinguish between different input devices
+// (seats) by using unique names in signals, such as "seat,secondary,mouse,in",
+// instead of relying on default system-generated identifiers.
    group {
       name: "example/main";
       min: 400 400;
       use_custom_seat_names: 1;
 
       parts {
+         // A simple background rectangle that does not react to mouse events.
          part {
             name: "bg";
             type: RECT;
@@ -15,12 +22,14 @@ collections {
             }
          }
 
+         // A non-interactive text part for the title, positioned at the top of the "bg" part.
          part {
             name: "title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -41,6 +50,8 @@ collections {
             }
          }
 
+         // The background for the first button, which is interactive and changes color
+         // based on which seat's mouse pointer is hovering over it.
          part {
             name: "button_bg,1";
             type: RECT;
@@ -49,20 +60,26 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.1 0.25;
                rel2.relative: 0.45 0.8;
+               // Color: Light gray (#C8C8C8)
                color: 200 200 200 255;
             }
+            // State for when the 'default' seat's mouse is over the button.
             description {
                state: "over,default" 0.0;
                inherit: "default" 0.0;
+               // Color: Light red (#C87878)
                color: 200 120 120 255;
             }
+            // State for when the 'secondary' seat's mouse is over the button.
             description {
                state: "over,secondary" 0.0;
                inherit: "default" 0.0;
+               // Color: Light blue (#7878C8)
                color: 120 120 200 255;
             }
          }
 
+         // A non-interactive rectangle inside "button_bg,1", creating a border effect.
          part {
             name: "button,1";
             type: RECT;
@@ -81,6 +98,8 @@ collections {
             }
          }
 
+         // The second button, structured identically to the first,
+         // but positioned on the right side of the layout.
          part {
             name: "button_bg,2";
             type: RECT;
@@ -123,6 +142,8 @@ collections {
       }
 
       programs {
+         // This program changes the state of "button_bg,1" to "over,default"
+         // when the mouse from the "default" seat enters the button area.
          program {
             name: "button,1,over,default";
             signal: "seat,default,mouse,in";
@@ -131,6 +152,8 @@ collections {
             target: "button_bg,1";
          }
 
+         // This program changes the state of "button_bg,1" to "over,secondary"
+         // when the mouse from the "secondary" seat enters the button area.
          program {
             name: "button,1,over,secondary";
             signal: "seat,secondary,mouse,in";
@@ -139,6 +162,9 @@ collections {
             target: "button_bg,1";
          }
 
+         // This program resets the button's state to "default" when any
+         // mouse pointer leaves the button area. The "mouse,out" signal is
+         // seat-agnostic.
          program {
             name: "button,1,out";
             signal: "mouse,out";
@@ -147,6 +173,8 @@ collections {
             target: "button_bg,1";
          }
 
+         // The following programs provide the same hover and out functionality for "button_bg,2",
+         // responding to both "default" and "secondary" seats.
          program {
             name: "button,2,over,default";
             signal: "seat,default,mouse,in";

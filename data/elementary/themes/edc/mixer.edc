@@ -1,4 +1,10 @@
+// This group defines the main interface for the mixer module. It's designed to
+// be a compact visual representation of audio volume and mute status, with
+// dynamic updates handled via an embedded script.
 group { name: "e/modules/mixer/main";
+   // This set defines a collection of images for the speaker icon. Edje will
+   // automatically select the most appropriate image based on the object's size,
+   // optimizing performance by avoiding runtime scaling of large images.
    set { name: "speaker_clip";
       image { image: "speaker-clip-160.png"  COMP; size: 81 81 99999 99999; }
       image { image: "speaker-clip-080.png"  COMP; size: 41 41 80 80 99999; }
@@ -6,21 +12,38 @@ group { name: "e/modules/mixer/main";
    }
    max: 160 160;
    min: 16 16;
+   // The script block allows for dynamic control of the widget's parts from
+   // the application logic. It listens for messages and updates the UI
+   // accordingly, enabling complex behaviors that are not possible with static
+   // descriptions alone.
    script {
+      // This message handler is triggered when the C code sends a message. It's
+      // the entry point for all dynamic UI updates.
       public message(Msg_Type:type, id, ...) {
+         // We only act on messages of type MSG_INT_SET with an ID of 0. This
+         // provides a simple filtering mechanism for incoming events.
          if ((type == MSG_INT_SET) && (id == 0)) {
             new m, l, r;
 
+            // Arguments from the message are extracted: mute status (m), left
+            // channel volume (l), and right channel volume (r).
             m = getarg(2);
             l = getarg(3);
             r = getarg(4);
 
+            // Depending on the mute status, it runs the "mute" or "unmute"
+            // program to change the visual state.
             if (m) {
                run_program(PROGRAM:"mute");
             } else {
                run_program(PROGRAM:"unmute");
             }
 
+            // The following block dynamically updates the position of the "vol-l"
+            // part to visually represent the left channel volume.
+            // A custom state is defined and then applied. The calculations
+            // create a clipping effect where the part's visible area corresponds
+            // to the volume level.
             custom_state(PART:"vol-l", "default", 0.0);
             set_state_val(PART:"vol-l", STATE_REL1,
                           (float(100 - l) * 0.5) / 100.0,
@@ -30,6 +53,7 @@ group { name: "e/modules/mixer/main";
                           1.0);
             set_state(PART:"vol-l", "custom", 0.0);
 
+            // This does the same as the block above, but for the right channel volume.
             custom_state(PART:"vol-r", "default", 0.0);
             set_state_val(PART:"vol-r", STATE_REL1,
                           (float(100 - r) * 0.5) / 100.0,
@@ -41,7 +65,11 @@ group { name: "e/modules/mixer/main";
          }
       }
    }
+   // The parts block defines all the visual components of the gadget. Their
+   // properties and relationships determine the final appearance and behavior.
    parts {
+      // The "base" part serves as the background of the widget. It uses a
+      // color class to allow theming.
       part { name: "base";
          description { state: "default" 0.0;
             image.normal: "clock_base";
@@ -49,6 +77,8 @@ group { name: "e/modules/mixer/main";
             color_class: "/bg/normal/gadgets/mixer/base";
          }
       }
+      // The "middle" part is a decorative element layered on top of the base,
+      // creating a concentric design. It's smaller and centered within the base.
       part { name: "middle";
          description { state: "default" 0.0;
             rel.to: "base";
@@ -58,15 +88,22 @@ group { name: "e/modules/mixer/main";
             color_class: "/bg/normal/gadgets/mixer/middle";
          }
       }
+      // This RECT part acts as a state indicator. It changes color based on the
+      // mute status by switching between "default" and "mute" states. It also
+      // serves as a clipping parent for the channel-specific state parts.
       part { name: "state"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/fg/normal/gadgets/mixer/volume/normal";
          }
          description { state: "mute" 0.0;
             inherit: "default" 0.0;
+            // In the "mute" state, it uses a different color for visual feedback.
             color_class: "/fg/normal/gadgets/mixer/volume/mute";
          }
       }
+      // This part is a rectangular area for the left channel, covering the
+      // left half of the "state" part. It has no visual content but acts as a
+      // clipping mask for the "vclip-l" part.
       part { name: "state-l"; type: RECT;
          clip_to: "state";
          description { state: "default" 0.0;
@@ -74,6 +111,7 @@ group { name: "e/modules/mixer/main";
             rel2.relative: 0.5 1.0;
          }
       }
+      // This part does the same for the right channel, covering the right half.
       part { name: "state-r"; type: RECT;
          clip_to: "state";
          description { state: "default" 0.0;
@@ -81,6 +119,8 @@ group { name: "e/modules/mixer/main";
             rel2.relative: 1.0 1.0;
          }
       }
+      // The "vclip-l" part displays the speaker image, clipped by the "state-l"
+      // part. It serves as a visual container for the volume level indicator.
       part { name: "vclip-l";
          clip_to: "state-l";
          description { state: "default" 0.0;
@@ -88,6 +128,7 @@ group { name: "e/modules/mixer/main";
             image.normal: "speaker_clip";
          }
       }
+      // Same as "vclip-l", but for the right channel.
       part { name: "vclip-r";
          clip_to: "state-r";
          description { state: "default" 0.0;
@@ -95,6 +136,10 @@ group { name: "e/modules/mixer/main";
             image.normal: "speaker_clip";
          }
       }
+      // This part is the actual volume level indicator for the left channel. It
+      // is clipped by "vclip-l". Its position is dynamically updated by the
+      // script to show the current volume. The "clock_base" image is likely
+      // used as a solid fill.
       part { name: "vol-l";
          clip_to: "vclip-l";
          description { state: "default" 0.0;
@@ -102,6 +147,7 @@ group { name: "e/modules/mixer/main";
             image.normal: "clock_base";
          }
       }
+      // This is the volume indicator for the right channel.
       part { name: "vol-r";
          clip_to: "vclip-r";
          description { state: "default" 0.0;
@@ -109,18 +155,28 @@ group { name: "e/modules/mixer/main";
             image.normal: "clock_base";
          }
       }
+      // This is a transparent rectangle layered on top of all other parts. Its
+      // purpose is to capture all mouse events over the widget, preventing
+      // individual parts from receiving them.
       part { name: "over"; type: RECT;
          description { state: "default" 0.0;
+            // The color is fully transparent black (RGBA: 0, 0, 0, 0).
             color: 0 0 0 0; // no cc
          }
       }
    }
+   // The programs block defines named actions or animations that can be triggered
+   // by scripts or events.
    programs {
+      // This program defines the "mute" action. When run, it smoothly transitions
+      // the "state" part to its "mute" state over 0.3 seconds.
       program { name: "mute";
          action: STATE_SET "mute" 0.0;
          transition: LINEAR 0.3 USE_DURATION_FACTOR 1;
          target: "state";
       }
+      // The "unmute" program transitions the "state" part back to its "default"
+      // state over 0.2 seconds.
       program { name: "unmute";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 0.2 USE_DURATION_FACTOR 1;

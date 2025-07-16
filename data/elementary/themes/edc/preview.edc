@@ -1,22 +1,44 @@
+// This group defines the layout for a generic preview widget, designed to
+// display content within a padded and styled background.
 group { name: "e/widgets/preview";
    parts {
+      // The "bg" part is a RECT serving as the visual background. Its geometry
+      // is tied to "e.swallow.content", effectively framing it.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
+            // Uses a theme-defined color for the background, making it adaptable
+            // to different visual styles.
             color_class: "/bg/normal/preview";
          }
       }
+      // The "clipper" RECT defines the visible area for the swallowed content.
+      // It is not visible itself, but anything outside its bounds in the
+      // clipped part will not be rendered. This is often used to create
+      // effects like rounded corners by using an image with an alpha mask
+      // as the clipper.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
          }
       }
+      // This is the main content area. As a SWALLOW part, it acts as a
+      // placeholder for any Evas object provided from the application code.
       part { name: "e.swallow.content"; type: SWALLOW;
+         // The content is clipped by the "clipper" part.
          clip_to: "clipper";
+         // Enables scaling of the swallowed content.
          scale: 1;
          description { state: "default" 0.0;
+            // These offsets create a 4-pixel padding around the content.
+            // The rel2 offset is inclusive, so -5 results in a 4-pixel margin
+            // from the bottom and right edges.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // 'offscale' prevents this part's scaling from being directly
+            // applied to the swallowed object. The object scales based on the
+            // final size of this part, which is key for maintaining aspect
+            // ratio and preventing visual distortion.
             offscale;
          }
       }

@@ -1,32 +1,47 @@
 collections {
+   // This group defines a custom theme for an Efl.Ui.Button widget.
+   // The name "efl/button:custom" provides a unique identifier for this theme.
+   // The alias "efl/button" makes this theme the default for all Efl.Ui.Button instances
+   // unless a more specific theme is requested.
    group { "efl/button:custom";
       alias: "efl/button";
       parts {
          rect { "border";
+            // This part defines the button's outer border.
             desc { "default";
+               // Default state: black border (#000000).
                color: 0 0 0 255;
             }
             desc { "in";
+               // "in" state (on mouse hover): cyan border (#32B4B4).
                color: 50 180 180 255;
             }
          }
+         // This part is the main clickable area of the button.
          rect { "base";
+            // It receives mouse events to trigger hover and click effects.
             mouse_events: 1;
             desc { "default";
+               // The base is positioned inside the "border" part, creating a 1px border.
                rel1.to: "border";
                rel1.offset: 1 1;
                rel2.to: "border";
                rel2.offset: -2 -2;
             }
             desc { "disabled";
+               // When disabled, the button background turns light gray (#E6E6E6).
                inherit: "default";
                color: 230 230 230 255;
             }
          }
+         // This "swallow" part is a container for the button's icon.
+         // "efl.swallow.content" is the standard name EFL widgets look for to place an icon.
          swallow { "efl.swallow.content";
+            // Mouse events are disabled for the icon area to let the "base" part handle them.
             mouse_events: 0;
             desc { "default";
                fixed: 1 0;
+               // Initially hidden and positioned for when text is also visible.
                hid;
                align: 0.0 0.5;
                rel1.offset: 4 4;
@@ -34,6 +49,7 @@ collections {
                rel2.relative: 0.0 1.0;
             }
             desc { "visible";
+               // State when both icon and text are visible.
                inherit: "default";
                vis;
                aspect: 1.0 1.0;
@@ -41,6 +57,7 @@ collections {
                rel2.offset: 4 -5;
             }
             desc { "icononly";
+               // State for when only the icon is visible, centering it.
                inherit: "default";
                fixed: 0 0;
                vis;
@@ -51,15 +68,19 @@ collections {
                rel2.relative: 1.0 1.0;
             }
          }
+         // This part displays the button's text label.
+         // "efl.text" is the standard name for the text part.
          text { "efl.text";
             mouse_events: 0;
             scale: 1;
             desc { "default";
+               // The text is positioned to the right of the icon ("efl.swallow.content").
                vis;
                rel1.to_x: "efl.swallow.content";
                rel1.relative: 1.0 0.0;
                rel1.offset: 0 4;
                rel2.offset: -5 -5;
+               // Default text color is black (#000000).
                color: 0 0 0 255;
                text {
                   font: "Sans";
@@ -69,6 +90,8 @@ collections {
                }
             }
             desc { "visible";
+               // When visible, the text part ensures it has a minimum size and enables ellipsis
+               // if the text is too long to fit.
                inherit: "default";
                vis;
                text.min: 1 1;
@@ -84,7 +107,10 @@ collections {
                text.ellipsis: -1;
          }
       }
+      // Programs define the dynamic behavior of the widget.
+      // They listen for signals (like mouse events or state changes) and execute actions in response.
       programs {
+         // Changes border color on mouse hover.
          program { "button_mouse_in";
             signal: "mouse,in";
             source: "base";
@@ -97,15 +123,20 @@ collections {
             action: STATE_SET "default" 0.0;
             target: "border";
          }
+         // Emits the public "efl,action,click" signal when the button is clicked.
+         // This is what applications listen for to react to button clicks.
          program { "button_unclick";
             signal: "mouse,up,1";
             source: "base";
             action: SIGNAL_EMIT "efl,action,click" "";
          }
+         // This program captures the mouse down event. It's often used for a "pressed" visual state.
          program { "button_click";
             signal: "mouse,down,1";
             source: "base";
          }
+         // This program is triggered when the text label should become visible.
+         // It uses a script to handle layout adjustments based on the icon's state.
          program { "text_show";
             signal: "efl,state,text,visible";
             source: "efl";
@@ -113,11 +144,15 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"efl.swallow.content", st, 30, vl);
+               // If the icon was in "icononly" state, it's changed to "visible"
+               // to make room for the text.
                if (!strcmp(st, "icononly"))
                  set_state(PART:"efl.swallow.content", "visible", 0.0);
                set_state(PART:"efl.text", "visible", 0.0);
             }
          }
+         // This program is triggered when the text label is hidden.
+         // It updates the icon state to fill the button if no text is visible.
          program { "text_hide";
             signal: "efl,state,text,hidden";
             source: "efl";
@@ -125,11 +160,15 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"efl.swallow.content", st, 30, vl);
+               // If the icon is visible, it's switched to "icononly" mode
+               // to recenter it, now that the text is gone.
                if (!strcmp(st, "visible"))
                  set_state(PART:"efl.swallow.content", "icononly", 0.0);
                set_state(PART:"efl.text", "default", 0.0);
             }
          }
+         // This program runs when the icon should become visible.
+         // A script is used to decide the layout based on whether text is also present.
          program { "icon_show";
             signal: "efl,state,icon,visible";
             source: "efl";
@@ -137,23 +176,29 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"efl.text", st, 30, vl);
+               // If text is visible, the icon is set to "visible" state (side-by-side layout).
                if (!strcmp(st, "visible"))
                  set_state(PART:"efl.swallow.content", "visible", 0.0);
                else
+                 // Otherwise, it's set to "icononly" to be centered.
                  set_state(PART:"efl.swallow.content", "icononly", 0.0);
             }
          }
+         // Hides the icon by resetting its state.
          program { "icon_hide";
             signal: "efl,state,icon,hidden";
             source: "efl";
             action: STATE_SET "default" 0.0;
             target: "efl.swallow.content";
          }
+         // This program disables the button visually.
+         // It triggers the "disable_text" program to handle the text part's state.
          program { "disable";
             signal: "efl,state,disabled";
             source: "efl";
             action: STATE_SET "disabled" 0.0;
             target: "base";
+            // The `after` keyword chains this program with "disable_text".
             after: "disable_text";
          }
          program { "disable_text";
@@ -161,12 +206,16 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"efl.text", st, 30, vl);
+               // This script checks if the text is currently visible and sets the
+               // appropriate disabled state, preserving its visibility.
                if (!strcmp(st, "visible"))
                  set_state(PART:"efl.text", "disabled_visible", 0.0);
                else if (!strcmp(st, "default"))
                  set_state(PART:"efl.text", "disabled", 0.0);
             }
          }
+         // This program re-enables the button, running "enable_text" afterwards
+         // to restore the text part's state.
          program { "enable";
             signal: "efl,state,enabled";
             source: "efl";
@@ -179,6 +228,8 @@ collections {
                new st[31];
                new Float:vl;
                get_state(PART:"efl.text", st, 30, vl);
+               // This script correctly re-enables the text, switching from a disabled
+               // state back to a visible or default (hidden) one.
                if (!strcmp(st, "disabled_visible"))
                  set_state(PART:"efl.text", "visible", 0.0);
                else if (!strcmp(st, "disabled"))

@@ -8,11 +8,17 @@
 #define BLUR_TITLE_AMOUNT     "32"
 #define BLUR_BEHIND_AMOUNT    "32"
 
+// This group defines the appearance and behavior of a volume control widget
+// that can be embedded in a window border. It's designed to expand when the
+// user hovers over it, revealing the full volume control.
 group { name: "e/widgets/border/volume";
    images.image: "shadow_circle_vert.png" COMP;
    parts {
+      // "base" is a transparent rectangle that acts as the main container
+      // for the volume widget, defining its boundaries.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // Transparent color (#00000000). No color class used.
             color: 0 0 0 0; // no cc
          }
       }
@@ -24,20 +30,27 @@ group { name: "e/widgets/border/volume";
             rel2.to_x: "clip";
          }
       }
+      // "clip" is a rectangle used as a clipping mask to create the expand/collapse
+      // effect. In the "default" state, it has zero width, hiding the volume slider.
+      // In the "show" state, it expands to reveal the slider.
       part { name: "clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "e.swallow.volume";
             align: 0.0 0.5;
+            // Initially has zero width to hide the content.
             max: 0 999999;
          }
          description { state: "show" 0.0;
             rel.to: "e.swallow.volume";
+            // Expands to full width, revealing the content.
             max: 999999 999999;
             rel2.offset: 3 -1;
             offscale;
          }
       }
+      // This is a SWALLOW part, which is a placeholder for external content.
+      // It's intended to hold the volume icon. It is centered within the "base" part.
       part { name: "e.swallow.volume_icon"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -45,10 +58,13 @@ group { name: "e/widgets/border/volume";
             rel2.relative: 0.85 0.85;
          }
       }
+      // Another SWALLOW part, this one holds the actual volume control (like a slider).
+      // It's clipped by the "clip" part, so it's only visible when "clip" is expanded.
       part { name: "e.swallow.volume"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
             fixed: 1 0;
+            // Positioned to the right of the volume icon.
             rel1.to_x: "e.swallow.volume_icon";
             rel1.relative: 1.0 0.0;
             rel1.offset: 1 0;
@@ -56,6 +72,8 @@ group { name: "e/widgets/border/volume";
             align: 0.0 0.5;
          }
       }
+      // This part creates a shadow effect on the right side of the widget.
+      // It is also clipped by "clip" to appear with the slider.
       part { name: "sh_right"; mouse_events: 0;
          scale: 1;
          clip_to: "clip";
@@ -70,11 +88,15 @@ group { name: "e/widgets/border/volume";
             image.normal: "shadow_circle_vert.png";
             offscale;
          }
+         // The shadow changes color when the parent window is focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             color_class: "/shadow/selected/border/volume";
          }
       }
+      // A transparent rectangle used to capture mouse events. It covers the icon area
+      // by default ("default" state) and expands to cover the slider when visible
+      // ("large" state), ensuring mouse-out events are not triggered prematurely.
       part { name: "event"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -82,48 +104,60 @@ group { name: "e/widgets/border/volume";
          }
          description { state: "large" 0.0;
             inherit: "default" 0.0;
+            // Expands to cover the volume slider area.
             rel2.to: "e.swallow.volume";
             rel2.offset: 0 0;
          }
       }
       programs {
+         // When the window gets focus, change the shadow to its "focused" state.
          program { signal: "e,state,focused"; source: "e";
             action: STATE_SET "focused" 0.0;
             target: "sh_right";
          }
+         // When the window loses focus, revert the shadow to its "default" state.
          program { signal: "e,state,unfocused"; source: "e";
             action: STATE_SET "default" 0.0;
             target: "sh_right";
          }
+         // When the mouse enters the "event" area, it initiates the show animation.
          program { signal: "mouse,in"; source: "event";
+            // Stop any ongoing hide animations to prevent conflicts.
             action: ACTION_STOP;
             target: "hide_volume1";
             target: "hide_volume2";
+            // Start the show animation sequence.
             after: "show_volume1";
          }
+         // First step of showing: expand the event area to prevent mouse-out.
          program { name: "show_volume1";
             action: STATE_SET "large" 0.0;
             target: "event";
             after: "show_volume2";
          }
+         // Second step: expand the clipping mask to reveal the slider.
          program { name: "show_volume2";
             action: STATE_SET "show" 0.0;
             transition: SINUSOIDAL 0.3 USE_DURATION_FACTOR 1;
             target: "clip";
          }
 
+         // When the mouse leaves the "event" area, it initiates the hide animation.
          program { signal: "mouse,out"; source: "event";
+            // Stop any ongoing show animations.
             action: ACTION_STOP;
             target: "show_volume1";
             target: "show_volume2";
             after: "hide_volume1";
          }
+         // First step of hiding: collapse the clipping mask.
          program { name: "hide_volume1";
             action: STATE_SET "default" 0.0;
             transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
             target: "clip";
             after: "hide_volume2";
          }
+         // Second step: shrink the event area back to its original size.
          program { name: "hide_volume2";
             action: STATE_SET "default" 0.0;
             target: "event";
@@ -134,20 +168,32 @@ group { name: "e/widgets/border/volume";
 
 
 
+// This is the main group for the default window border. It defines the visual
+// elements like the title bar, buttons (close, maximize, minimize), shadows,
+// and resizable edges. It also handles window states like focused, shaded,
+// and urgent.
 group { name: "e/widgets/border/default/border";
    alias: "e/widgets/border/shaped/border";
 
+   // These macros are likely used for creating animated rings, possibly for a
+   // busy or loading indicator. They define image sets and animations.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
 
    images.image: "win_shad_flat.png" COMP;
+   // data.item allows storing arbitrary key-value string pairs in the theme.
+   // Here, it's used to indicate that this border provides a shadow.
    data.item: "shadow" "1";
    parts {
+      // The "shadow_clip" and "shadow_clip2" parts work together to control the
+      // visibility of the window shadow. "shadow_clip" is the shadow itself,
+      // and it's clipped by "shadow_clip2". By making "shadow_clip2" invisible,
+      // the entire shadow can be hidden. This is used to toggle shadows on/off.
       part { name: "shadow_clip"; type: RECT; mouse_events: 0;
          clip_to: "shadow_clip2";
          description { state: "default";
-            rel.to: "_sh1";
+            rel.to: "_sh1"; // _sh1 is defined by WIN_SHAD macro
             color_class: "/shadow/normal/border";
          }
          description { state: "focused";
@@ -163,6 +209,9 @@ group { name: "e/widgets/border/default/border";
             visible: 0;
          }
       }
+      // "shadow_base" is a spacer that defines the vertical extent of the shadow.
+      // When the window is shaded (rolled up), the shadow should only extend to the
+      // bottom of the title bar, not the full window height.
       part { name: "shadow_base"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "top";
@@ -170,19 +219,31 @@ group { name: "e/widgets/border/default/border";
          }
          description { state: "shaded";
             inherit: "default";
+            // When shaded, the shadow base's bottom is tied to the client area,
+            // which will have been collapsed to the title bar height.
             rel2.to: "e.swallow.client";
          }
       }
+      // This macro generates the parts that form the window shadow. It uses
+      // "shadow_base" to determine its size and "shadow_clip" for visibility control.
       WIN_SHAD("shadow_base", "shadow_clip", "win_shad_flat.png", 21, 21, 14, 28, 0.5)
 #ifdef BLUR_BEHIND
+      // A snapshot part can capture the content behind it and apply filters.
+      // If BLUR_BEHIND is defined, this part captures the desktop content behind
+      // the entire window and applies a blur effect, creating a frosted glass look.
       snapshot { name: "title-blur"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.to: "top";
             rel2.to: "bottom";
+            // The filter applies padding and then a blur. The color '#ffff'
+            // is white with full alpha, but it's often used as a tint.
             filter.code: "padding_set { 0 } blur { "BLUR_BEHIND_AMOUNT", color = '#ffff' }";
          }
       }
 #endif
+      // "client_clip" is a clipping rectangle for the main client area.
+      // This is essential for the "shading" (roll-up) animation, allowing the
+      // client area to appear to slide smoothly into the title bar.
       part { name: "client_clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.to_y: "e.swallow.client";
@@ -193,19 +254,24 @@ group { name: "e/widgets/border/default/border";
             visible: 0;
          }
       }
+      // This is the SWALLOW part where the actual application window content is displayed.
       part { name: "e.swallow.client"; type: SWALLOW;
          clip_to: "client_clip";
          description { state: "default" 0.0;
+            // It is positioned between the "top" (title bar) and "bottom" parts.
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
             rel2.to_y: "bottom";
             rel2.relative: 1.0 0.0;
          }
+         // In the "shaded" state, the client area's bottom is aligned with its
+         // top, effectively collapsing it to zero height.
          description { state: "shaded" 0.0;
             inherit: "default" 0.0;
             rel2.relative: 1.0 1.0;
             rel2.offset: -1 -1;
          }
+         // When maximized, the client area also expands to fill the available space.
          description { state: "max" 0.0;
             inherit: "default" 0.0;
             rel2.relative: 1.0 1.0;
@@ -213,6 +279,8 @@ group { name: "e/widgets/border/default/border";
          }
       }
 #ifdef BLUR_TITLE
+      // This snapshot part blurs the content behind the title bar specifically.
+      // This is an alternative to BLUR_BEHIND and they might conflict visually.
       snapshot { name: "title-blur"; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "top";
@@ -220,6 +288,8 @@ group { name: "e/widgets/border/default/border";
          }
       }
 #endif
+      // The "top" part is the title bar background. Its height is determined by
+      // the height of the title text part "e.text.title".
       part { name: "top"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -227,6 +297,9 @@ group { name: "e/widgets/border/default/border";
             rel2.offset: -1 2;
             color_class: "/bg/normal/titlebar";
 #if defined(BLUR_TITLE) || defined(BLUR_BEHIND)
+            // If any blur effect is enabled, the title bar is made semi-transparent
+            // to allow the blurred background to show through. The color is white
+            // (#FFFFFF) with an alpha value defined by BLUR_FORCE_ALPHA.
             color: 255 255 255 BLUR_FORCE_ALPHA;
 #endif
             offscale;
@@ -236,9 +309,12 @@ group { name: "e/widgets/border/default/border";
             color_class: "/bg/selected/titlebar";
          }
       }
+      // This part displays the window title text.
       part { name: "e.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // It's positioned between the volume/icon area on the left and the
+            // window control buttons on the right.
             rel1.relative: 1.0 0.0;
             rel1.offset: 1 4;
             rel1.to_x: "e.swallow.volume";
@@ -261,21 +337,27 @@ group { name: "e/widgets/border/default/border";
             color_class: "/fg/selected/titlebar";
          }
       }
+      // "icon" is a spacer that controls the position and animation of the window icon.
+      // It has "bounce" states used for the "urgent" animation.
       part { name: "icon"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "e.event.icon";
          }
+         // The "bounce" states are used to create a visual effect when the window
+         // is marked as urgent. The icon will appear to shrink and grow.
          description { state: "bounce1" 0.0;
             inherit: "default" 0.0;
-            rel1.relative: 0.5 0.5;
+            rel1.relative: 0.5 0.5; // Shrink to a point
             rel2.relative: 0.5 0.5;
          }
          description { state: "bounce2" 0.0;
             inherit: "default" 0.0;
-            rel1.relative: -0.5 -0.5;
+            rel1.relative: -0.5 -0.5; // Grow larger than normal
             rel2.relative: 1.2 1.2;
          }
       }
+      // This swallows the actual window icon content. It's tied to the "icon"
+      // spacer, so it will move and resize along with it during animations.
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -284,10 +366,13 @@ group { name: "e/widgets/border/default/border";
             rel2.offset: 0 0;
          }
       }
+      // This spacer defines the area for the busy/loading animation, which is
+      // typically shown when an application becomes unresponsive.
       part { name: "busy_area"; type: SPACER;
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: VERTICAL;
             max: 160 160;
+            // It's positioned around the window icon area.
             rel1.relative: -0.2 -0.2;
             rel1.to: "e.event.icon";
             rel2.relative: 1.2 1.2;
@@ -295,7 +380,14 @@ group { name: "e/widgets/border/default/border";
             fixed: 1 1;
          }
       }
+      // This macro generates the parts and programs for the busy animation. It uses
+      // the IMAGE_RING macros defined earlier. The animation starts on the
+      // "e,state,hung" signal and stops on "e,state,unhung".
       BUSY("busy_area", "e,state,hung", "e", "e,state,unhung", "e")
+      // These two clipping rectangles, "clip1" and "clip2", are used to switch
+      // between two different sets of button visuals: one for the normal
+      // (unfocused) state and one for the focused state. "clip1" is visible
+      // by default, and "clip2" becomes visible when the window is focused.
       part { name: "clip1"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "top";
@@ -315,6 +407,8 @@ group { name: "e/widgets/border/default/border";
             visible: 1;
          }
       }
+      // This is the visual part for the close button in the unfocused state.
+      // It is clipped by "clip1" and positioned by the "e.event.close" event area.
       part { name: "close1";  mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -324,6 +418,7 @@ group { name: "e/widgets/border/default/border";
             fixed: 1 1;
             color_class: "/fg/normal/titlebar/buttons/close";
          }
+         // The "selected" state is used when the button is pressed.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/titlebar/buttons/close";
@@ -404,11 +499,15 @@ group { name: "e/widgets/border/default/border";
             color_class: "/fg/selected-pressed/titlebar/buttons/minimize";
           }
       }
+      // This transparent rectangle covers the title bar area to capture mouse events
+      // like clicks for moving the window.
       part { name: "e.event.titlebar"; type: RECT;
          description { rel.to: "top";
             color: 0 0 0 0; // no cc
          }
       }
+      // Event area for the window icon. A click here typically opens the window menu.
+      // Its size is determined by the height of the title bar ("top").
       part { name: "e.event.icon"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 0;
@@ -420,6 +519,7 @@ group { name: "e/widgets/border/default/border";
             color: 0 0 0 0; // no cc
          }
       }
+      // Event-capturing rectangle for the close button, positioned at the top-right.
       part { name: "e.event.close"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 0;
@@ -457,6 +557,9 @@ group { name: "e/widgets/border/default/border";
             color: 0 0 0 0; // no cc
          }
       }
+      // These parts define the resize handles (event areas) around the window border.
+      // They are transparent rectangles that capture mouse drags for resizing.
+      // "e.event.resize.tl" is the top-left corner handle.
       part { name: "e.event.resize.tl"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -470,6 +573,8 @@ group { name: "e/widgets/border/default/border";
             offscale;
          }
       }
+      // The top edge resize handle. It spans the space between the top-left
+      // and top-right corner handles.
       part { name: "e.event.resize.t"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -498,6 +603,7 @@ group { name: "e/widgets/border/default/border";
             offscale;
          }
       }
+      // This part defines the area for the bottom border of the window.
       part { name: "bottom"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -508,6 +614,7 @@ group { name: "e/widgets/border/default/border";
             fixed: 0 1;
             offscale;
          }
+         // When shaded or maximized, the bottom border is hidden.
          description { state: "shaded" 0.0;
             inherit: "default" 0.0;
             min: 0 0;
@@ -519,12 +626,14 @@ group { name: "e/widgets/border/default/border";
             visible: 0;
          }
       }
+      // This is the visible part of the bottom border, which is clipped by "bottom".
       part { name: "bottom_bar"; type: RECT; mouse_events: 0;
          clip_to: "bottom";
          description { state: "default" 0.0;
             color_class: "/bg/normal/border";
             rel.to: "bottom";
 #if defined(BLUR_BEHIND)
+            // Similar to the title bar, it becomes semi-transparent if blur is enabled.
             color: 255 255 255 BLUR_FORCE_ALPHA;
 #endif
          }
@@ -603,6 +712,8 @@ group { name: "e/widgets/border/default/border";
             visible: 0;
          }
       }
+      // The "procstats" parts are for displaying process statistics (like CPU usage)
+      // in the title bar. They are hidden by default.
       part { name: "procstats"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -618,11 +729,13 @@ group { name: "e/widgets/border/default/border";
             visible: 1;
          }
       }
+      // This swallows the actual process statistics widget.
       part { name: "e.procstats.swallow"; type: SWALLOW;
          scale: 1;
          repeat_events: 1;
          description { state: "default" 0.0;
             fixed: 1 0;
+            // Positioned to the right of the icon.
             rel.to: "e.event.icon";
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
@@ -635,6 +748,8 @@ group { name: "e/widgets/border/default/border";
             visible: 1;
          }
       }
+      // This swallows the volume control widget defined in the
+      // "e/widgets/border/volume" group.
       part { name: "e.swallow.volume"; type: SWALLOW;
          source: "e/widgets/border/volume";
          description { state: "default" 0.0;
@@ -649,6 +764,7 @@ group { name: "e/widgets/border/default/border";
             align: 0.0 0.5;
             aspect: 1.0 1.0; aspect_preference: VERTICAL;
          }
+         // When procstats is visible, the volume widget is pushed to the right of it.
          description { state: "visible";
             inherit: "default" 0.0;
             rel.to_x: "e.procstats.swallow";
@@ -656,8 +772,14 @@ group { name: "e/widgets/border/default/border";
       }
    }
    programs {
+      // This program runs a script when it receives the "e,version,22" signal.
+      // This is a mechanism for backward compatibility, allowing newer themes
+      // to use features not available in older versions of Enlightenment.
       program { signal: "e,version,22"; source: "e";
          script {
+            // set_pointer_mode controls how mouse events are handled by a part.
+            // Mode 1 (AUTOGRAB) makes the part automatically grab the pointer when
+            // a drag starts, which is useful for resize and move operations.
             set_pointer_mode(PART:"e.event.titlebar", 1);
             set_pointer_mode(PART:"e.event.resize.tl", 1);
             set_pointer_mode(PART:"e.event.resize.t", 1);
@@ -667,37 +789,46 @@ group { name: "e/widgets/border/default/border";
             set_pointer_mode(PART:"e.event.resize.br", 1);
          }
       }
+      // These programs toggle the visibility of the window shadow by changing the
+      // state of "shadow_clip2".
       program { signal: "e,state,shadow,on"; source: "e";
-         action: STATE_SET "default" 0.0;
+         action: STATE_SET "default" 0.0; // "default" state is visible
          target: "shadow_clip2";
       }
       program { signal: "e,state,shadow,off"; source: "e";
-         action: STATE_SET "hidden" 0.0;
+         action: STATE_SET "hidden" 0.0; // "hidden" state is invisible
          target: "shadow_clip2";
       }
+      // When the window gains focus, set various parts to their "focused" state.
+      // This typically changes colors to indicate the active window.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "top";
          target: "bottom_bar";
          target: "shadow_clip";
          target: "e.text.title";
-         target: "clip1";
-         target: "clip2";
+         target: "clip1"; // hide unfocused buttons
+         target: "clip2"; // show focused buttons
       }
+      // When the window loses focus, revert parts to their "default" state.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "top";
          target: "bottom_bar";
          target: "shadow_clip";
          target: "e.text.title";
-         target: "clip1";
-         target: "clip2";
+         target: "clip1"; // show unfocused buttons
+         target: "clip2"; // hide focused buttons
       }
+      // This set of programs creates a bouncing animation for the window icon
+      // when the window is marked as "urgent".
       program { signal: "e,state,urgent"; source: "e";
          action: STATE_SET "bounce1" 0.0;
          target: "icon";
          after: "urg1";
       }
+      // The animation chain: bounce1 -> urg1 (bounce2) -> urg2 (bounce1) -> urg1 ...
+      // This creates a continuous bouncing effect until stopped.
       program { name: "urg1";
          action: STATE_SET "bounce2" 0.0;
          transition: DECELERATE 0.4 USE_DURATION_FACTOR 1;
@@ -710,15 +841,20 @@ group { name: "e/widgets/border/default/border";
          target: "icon";
          after: "urg1";
       }
+      // When the urgent state is cleared, stop the animation and reset the icon.
       program { signal: "e,state,not_urgent"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "icon";
       }
+      // Programs for the "shading" (roll-up) and "unshading" (roll-down) animations.
+      // When shading starts, first adjust the shadow base.
       program { signal: "e,state,shaded"; source: "e";
          action: STATE_SET "shaded" 0.0;
          target: "shadow_base";
          after: "shading";
       }
+      // Then, collapse the client area and bottom border. The "e,state,shading"
+      // signal is emitted by EFL during the animation.
       program { name: "shading";
          signal: "e,state,shading"; source: "e";
          action: STATE_SET "shaded" 0.0;
@@ -728,6 +864,7 @@ group { name: "e/widgets/border/default/border";
          target: "e.event.resize.b";
          target: "e.event.resize.br";
       }
+      // When unshaded, restore the bottom border and resize handles first.
       program { signal: "e,state,unshaded"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "bottom";
@@ -737,6 +874,7 @@ group { name: "e/widgets/border/default/border";
          target: "client_clip";
          after: "unshading";
       }
+      // Then, expand the client area and shadow base back to their default states.
       program { name: "unshading";
          signal: "e,state,unshading"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -744,10 +882,11 @@ group { name: "e/widgets/border/default/border";
          target: "shadow_base";
          target: "client_clip";
       }
+      // These programs toggle the visibility of the process statistics widget.
       program { signal: "e,state,procstats,on"; source: "e";
          action: STATE_SET "visible" 0.0;
          target: "e.procstats.swallow";
-         target: "e.swallow.volume";
+         target: "e.swallow.volume"; // Also targets volume to reposition it
          target: "procstats";
       }
       program { signal: "e,state,procstats,off"; source: "e";
@@ -768,6 +907,9 @@ group { name: "e/widgets/border/default/border";
 //      program {
 //         signal: "e,action,unmaximize,fullscreen"; source: "e";
 //      }
+      // These programs handle window maximization. The signal "e,action,maximize*"
+      // is a wildcard that matches signals like "e,action,maximize",
+      // "e,action,maximize,fullscreen", etc.
       program { signal: "e,action,maximize*"; source: "e";
          action: STATE_SET "max" 0.0;
          target: "e.swallow.client";
@@ -776,6 +918,7 @@ group { name: "e/widgets/border/default/border";
          target: "e.event.resize.b";
          target: "e.event.resize.br";
       }
+      // Revert to the default state when unmaximized.
       program { signal: "e,action,unmaximize*"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.swallow.client";
@@ -784,11 +927,14 @@ group { name: "e/widgets/border/default/border";
          target: "e.event.resize.b";
          target: "e.event.resize.br";
       }
+      // These programs change the visual state of the title bar buttons when clicked.
+      // On mouse down, set the button parts to the "selected" state.
       program { signal: "mouse,down,*"; source: "e.event.close";
          action: STATE_SET "selected" 0.0;
          target: "close1";
          target: "close2";
       }
+      // On mouse up, revert them to the "default" state.
       program { signal: "mouse,up,*"; source: "e.event.close";
          action: STATE_SET "default" 0.0;
          target: "close1";
@@ -817,10 +963,16 @@ group { name: "e/widgets/border/default/border";
    }
 }
 
+// This group defines a border for dialog windows. It inherits all properties
+// from "e/widgets/border/default/border" and then modifies some parts to
+// suit dialogs (e.g., by removing maximize and minimize buttons).
 group { name: "e/widgets/border/dialog/border";
    alias: "e/widgets/border/modal/border";
    inherit: "e/widgets/border/default/border";
    parts {
+      // Override the inherited "max1" part (the maximize button visual).
+      // By setting its min and max size to zero and making it invisible,
+      // it is effectively removed from the layout.
       part { name: "max1";
          description { state: "default" 0.0;
             min: 0 0;
@@ -869,11 +1021,14 @@ group { name: "e/widgets/border/dialog/border";
             visible: 0;
          }
       }
+      // The title bar event area is adjusted to extend all the way to the close
+      // button, since the maximize and minimize buttons are gone.
       part { name: "e.event.titlebar";
          description { state: "default" 0.0;
             rel2.to_x: "e.event.close";
          }
       }
+      // The event area for the maximize button is also hidden.
       part { name: "e.event.maximize";
          description { state: "default" 0.0;
             max: 0 0;
@@ -893,6 +1048,8 @@ group { name: "e/widgets/border/dialog/border";
    }
 }
 
+// This group is for non-resizable windows. It inherits from the default border
+// and removes the resize handles and bottom border.
 group { name: "e/widgets/border/noresize/border";
    inherit: "e/widgets/border/default/border";
    parts {
@@ -902,6 +1059,8 @@ group { name: "e/widgets/border/noresize/border";
          }
       }
       part { name: "bottom"; type: RECT;
+         // The bottom border is hidden by setting its minimum height to 0
+         // and making it invisible.
          description { state: "default" 0.0;
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 -1;
@@ -911,6 +1070,8 @@ group { name: "e/widgets/border/noresize/border";
             visible: 0;
          }
       }
+      // The resize handles are removed by setting their size to zero and making
+      // them invisible.
       part { name: "e.event.resize.bl";
          description { state: "default" 0.0;
             min: 0 0;
@@ -932,6 +1093,8 @@ group { name: "e/widgets/border/noresize/border";
    }
 }
 
+// For non-resizable dialog windows. It inherits from the dialog border and
+// removes the resize functionality, just like the "noresize" border.
 group { name: "e/widgets/border/noresize_dialog/border";
    inherit: "e/widgets/border/dialog/border";
    parts {
@@ -971,6 +1134,9 @@ group { name: "e/widgets/border/noresize_dialog/border";
    }
 }
 
+// This group defines a very simple, 1-pixel wide border. It doesn't have a
+// title bar or buttons, just a thin frame around the client area. This is
+// often used for menus, tooltips, or other transient windows.
 group { name: "e/widgets/border/pixel/border";
    parts {
       part { name: "client_clip"; type: RECT; mouse_events: 0;
@@ -986,12 +1152,16 @@ group { name: "e/widgets/border/pixel/border";
             rel2.offset: -2 -2;
          }
       }
+      // These four RECT parts create the 1-pixel frame. Each one is a side
+      // of the rectangle. "top" is the top line.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/border/outline";
             align: 0.0 0.0;
+            // Maximum height of 1 pixel.
             max: 99999 1;
          }
+         // The border color changes when the window is focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/border/outline";
@@ -1092,6 +1262,7 @@ group { name: "e/widgets/border/pixel/border";
       }
    }
    programs {
+      // These programs handle changing the border color on focus change.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "top";
@@ -1109,6 +1280,8 @@ group { name: "e/widgets/border/pixel/border";
    }
 }
 
+// A border style for tiled windows. It's very minimal, often just an outline
+// that changes color to indicate focus. It has no title bar but retains a shadow.
 group { name: "e/widgets/border/tiling/border";
    images.image: "win_shad_flat.png" COMP;
    data.item: "shadow" "1";
@@ -1154,15 +1327,18 @@ group { name: "e/widgets/border/tiling/border";
          description { state: "default" 0.0;
          }
       }
+      // The frame parts ("top", "bottom", "left", "right") are invisible by default.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/selected/border/outline";
+            // Invisible in default state (transparent black #00000000).
             color: 0 0 0 0; // no cc
             align: 0.0 0.0;
             rel1.offset: -1 -1;
             rel2.offset: 0 0;
             max: 99999 1;
          }
+         // The border becomes visible (solid white #FFFFFFFF) only when focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             color: 255 255 255 255; // no cc
@@ -1311,8 +1487,11 @@ group { name: "e/widgets/border/tiling/border";
    }
 }
 
+// This group defines the popup that appears when moving a window, which
+// typically displays the window's current position.
 group { name: "e/widgets/border/default/move";
    parts {
+      // The background of the move popup.
       part { name: "bg"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -1320,6 +1499,7 @@ group { name: "e/widgets/border/default/move";
             min: 120 38;
          }
       }
+      // An icon indicating a move operation.
       part { name: "icon";
          scale: 1;
          description { state: "default" 0.0;
@@ -1334,6 +1514,7 @@ group { name: "e/widgets/border/default/move";
             offscale;
          }
       }
+      // The text part that will display the window's coordinates.
       part { name: "e.text.label"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -1353,6 +1534,8 @@ group { name: "e/widgets/border/default/move";
    }
 }
 
+// This group defines the popup for resizing, which shows the window's dimensions.
+// It inherits from the move popup and just changes the colors and icon.
 group { name: "e/widgets/border/default/resize";
    inherit: "e/widgets/border/default/move";
    parts {

@@ -46,21 +46,30 @@ Group: efl/list_view (@since 1.23)
 	 Signal: efl,vertical_bar,visible,off
 	 Signal: efl,vertical_bar,visible,on
 */
+// The efl/list group serves as a base for list widgets, inheriting scrolling
+// functionality from efl/scroller.
 group { "efl/list";
    inherit: "efl/scroller";
    data.item: "version" "123";
 }
 
+// The efl/list_view group is an extension of efl/list.
 group { "efl/list_view";
    inherit: "efl/list";
    data.item: "version" "123";
 }
 
+// The efl/list_item group defines the visual appearance and behavior of a single
+// item in a list. It handles states like selection, press, and disabled.
 group { "efl/list_item";
    data.item: "version" "124";
+   // "selectraise" and "focusraise" bring the item to the top of its layer
+   // when it's selected or focused, useful to ensure it's not obscured.
    data.item: "selectraise" "on";
    data.item: "focusraise" "on";
    parts {
+      // "base" is a background rectangle. "nomouse" prevents it from receiving
+      // mouse events. It has "default" and "odd" states for striped list styling.
       rect { "base"; nomouse;
          desc { "default";
             color_class: "/bg/normal/list/item";
@@ -69,6 +78,8 @@ group { "efl/list_item";
             color_class: "/bg-alt/normal/list/item";
          }
       }
+      // "sel_base" is a rectangle to indicate selection. It's hidden by default
+      // and becomes visible when the item enters the "selected" state.
       rect { "sel_base"; nomouse;
          desc { "default";
             color_class: "/bg/selected/list/item";
@@ -79,6 +90,8 @@ group { "efl/list_item";
             vis;
          }
       }
+      // "efl.background" allows custom content to be set as the item's background
+      // from code. It's tied to the "base" rectangle's geometry.
       swallow { "efl.background";
          desc { "default";
             rel.to: "base";
@@ -86,6 +99,8 @@ group { "efl/list_item";
          }
       }
       //##//
+      // "efl.text" displays the item's text. "nomouse" lets clicks pass through.
+      // It's positioned between "efl.icon" and "efl.extra" for a flexible layout.
       text { "efl.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -98,6 +113,7 @@ group { "efl/list_item";
             color_class: "/fg/normal/list/item";
             text { font: FN; size: 10;
                min: 1 1;
+               // An ellipsis is shown at the end if the text is too long to fit.
                ellipsis: -1;
                align: 0.0 0.5;
                text_class: "list_item";
@@ -113,6 +129,9 @@ group { "efl/list_item";
             color_class: "/fg/disabled/list/item";
          }
       }
+      // The "event" rectangle is an invisible layer (#00000000) that captures
+      // all mouse events for the item, simplifying event handling. It's hidden
+      // when the item is disabled.
       rect { "event";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -123,6 +142,8 @@ group { "efl/list_item";
          }
       }
       //##//
+      // "efl.icon" is a swallow area on the left for an icon. "fixed: 1 0"
+      // gives it a fixed width and flexible height.
       swallow { "efl.icon";
          scale: 1;
          desc { "default";
@@ -135,6 +156,8 @@ group { "efl/list_item";
             offscale;
          }
       }
+      // "efl.extra" is a swallow area on the right for additional content like
+      // badges. It also has a fixed width.
       swallow { "efl.extra";
          scale: 1;
          desc { "default";
@@ -147,6 +170,8 @@ group { "efl/list_item";
             offscale;
          }
       }
+      // "event_block" is a transparent layer that becomes visible when disabled,
+      // blocking mouse events to disable interaction.
       rect { "event_block";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -159,40 +184,50 @@ group { "efl/list_item";
       }
    }
    programs {
+      // This macro handles standard clickable behavior, binding mouse events on
+      // the "event" part to emit "pressed" and "unpressed" state signals.
       EFL_UI_CLICKABLE_PART_BIND("event")
+      // On "efl,state,odd", set "base" to "odd" state for striped list effect.
       program { signal: "efl,state,odd"; source: "efl";
          action: STATE_SET "odd";
          target: "base";
       }
+      // On "efl,state,even", revert "base" to "default" state.
       program { signal: "efl,state,even"; source: "efl";
          action: STATE_SET "default";
          target: "base";
       }
+      // On "pressed", show selection highlight and update text color.
       program { signal: "efl,state,pressed"; source: "efl";
          action: STATE_SET "selected";
          target: "sel_base";
          target: "efl.text";
       }
+      // On "unpressed", revert selection highlight and text color.
       program { signal: "efl,state,unpressed"; source: "efl";
          action: STATE_SET "default";
          target: "sel_base";
          target: "efl.text";
       }
+      // The "selected" signal permanently marks the item as selected.
       program { signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected";
          target: "sel_base";
          target: "efl.text";
       }
+      // The "unselected" signal returns the item to its default appearance.
       program { signal: "efl,state,unselected"; source: "efl";
          action: STATE_SET "default";
          target: "sel_base";
          target: "efl.text";
       }
+      // When disabled, hide the "event" part and update the text color.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled";
          target: "event";
          target: "efl.text";
       }
+      // When re-enabled, restore the default state for "event" and "efl.text".
       program { signal: "efl,state,enabled"; source: "efl";
          action: STATE_SET "default";
          target: "event";
@@ -201,6 +236,8 @@ group { "efl/list_item";
    }
 }
 
+// The efl/list_item:placeholder group is a variant of efl/list_item for list
+// placeholders. It uses a generic "efl.content" swallow part.
 group { "efl/list_item:placeholder";
    data.item: "version" "124";
    data.item: "selectraise" "on";
@@ -241,6 +278,7 @@ group { "efl/list_item:placeholder";
          }
       }
       //##//
+      // "efl.content" is a generic swallow area for any placeholder content.
       swallow { "efl.content";
          scale: 1;
          desc { "default";
@@ -261,6 +299,8 @@ group { "efl/list_item:placeholder";
          }
       }
    }
+   // The programs here function similarly to those in "efl/list_item",
+   // managing states for press, selection, and disabled status.
    programs {
       EFL_UI_CLICKABLE_PART_BIND("event")
       program { signal: "efl,state,odd"; source: "efl";

@@ -1,17 +1,32 @@
+// The 'collections' block is the top-level container for all UI definitions in an EDC file.
 collections {
+   // A 'group' is a fundamental building block in EDC, representing a distinct UI component or layout.
+   // It encapsulates a set of parts, images, and programs that work together.
    group { name: "point";
+      // The 'images' block preloads all the necessary image resources for this group.
+      // This is an optimization to avoid loading images on-demand during runtime.
       images {
+	 // Defines an image resource named "cross.png" and compresses it in memory to save space.
 	 image: "cross.png" COMP;
       }
+      // The 'parts' block contains all the visual elements (parts) that constitute this group's interface.
       parts {
+	 // A 'part' is a single visual element within the UI, such as an image, text, or rectangle.
 	 part { name: "sky";
+            // Disables mouse events for this part. This is an important optimization for static elements
+            // that do not need to be interactive, as it reduces the workload on the event handling system.
             mouse_events: 0;
+	    // A 'description' defines the state of a part. A part can have multiple descriptions
+            // to represent different states (e.g., "default", "clicked", "disabled").
 	    description { state: "default" 0.0;
+               // Sets the minimum size of this part to 301x301 pixels.
+               // This ensures the layout maintains a minimum dimension for this element.
                min: 301 301;
+	       // Assigns the preloaded "cross.png" image to this part for its "default" state.
 	       image.normal: "cross.png";
 	    }
 	 }
       }
    }
 }
-	 
+

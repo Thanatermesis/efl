@@ -1,38 +1,58 @@
+// This is the root of the Edje file, containing all resources and layouts.
 collections {
+   // Defines images to be preloaded. "COMP" hints to use a compressed format.
    images {
       image: "roundedrect.png" COMP;
    }
+   // Defines reusable filters that can be applied to parts.
    filters {
+      // The "aura" filter creates a glowing effect.
       filter { name: "aura";
          script {
+            // Expands the buffer by 5 pixels on all sides to make room for the blur.
             padding_set { 5 }
+            // Fills the original object area with a semi-transparent black (#2228).
             fill { color = '#2228' }
+            // Applies a 5-pixel red blur.
             blur { 5, color = 'red' }
+            // Applies a 2-pixel orange blur on top of the red one.
             blur { 2, color = 'orange' }
+            // Blends the blurred result with the original object content.
             blend {}
          }
       }
    }
+   // A simple group to display a rounded rectangle image.
+   // This demonstrates a basic image part with a border, which allows it to be scaled correctly.
    group { "image";
      parts {
          image { "mask";
             desc { "default";
                image {
                   normal: "roundedrect.png";
+                  // The border property defines how the image is scaled.
+                  // The 22-pixel border on each side will not be scaled, while the center part will be stretched.
                   border: 22 22 22 22;
                }
             }
          }
      }
    }
+   // This group demonstrates various clipping and masking techniques.
+   // It uses several non-rendering parts as masks for a visible content part.
    group { "masking";
+         // Styles define reusable sets of properties for parts, here for a textblock.
          styles {
            style { name: "textblock_style";
               base: "font=Sans-Bold font_size=24 wrap=word color=#ffffffff";
            }
          }
       parts {
+         // A rectangle that is not rendered. It's used as a clipper, but since it covers the whole area,
+         // it effectively removes clipping when used with 'clip_to'.
          rect { "clip"; norender; }
+         // An image part used as a mask. 'norender' means it's not drawn directly,
+         // but its alpha channel is used for clipping other parts.
          image { "mask";
             norender;
             desc { "default";
@@ -42,6 +62,7 @@ collections {
                }
             }
          }
+         // A textblock part, also not rendered, used to clip content in the shape of the text.
          textblock { "textmask";
             norender;
             desc {
@@ -59,43 +80,62 @@ collections {
                }
             }
          }
+         // A swallow part, not rendered, intended to hold an external object that will serve as a mask.
+         // 'clip' will use this part's clipper, which is useful when the swallowed object itself has one.
          swallow { "mask2";
             norender;
          }
+         // This is the main content part that will be clipped. It's a swallow,
+         // so it can host any Evas object from the application code.
          swallow { "content";
+            // The "default" state clips the content to the "mask" image part.
+            // 'clip_to' uses the geometry of the target part for clipping.
             desc { "default";
                clip_to: "mask";
             }
+            // The "smartclip" state clips the content using the "mask2" part.
+            // 'clip' is more advanced and uses the clipper of the target part, not just its geometry.
             desc { "smartclip";
                clip: "mask2";
             }
+            // The "textclip" state clips the content to the "textmask" textblock.
             desc { "textclip";
                clip: "textmask";
             }
+            // The "unclipped" state clips the content to the "clip" rectangle.
+            // Since "clip" is a simple rectangle spanning the whole area, this effectively removes clipping.
             desc { "unclipped";
                clip_to: "clip";
             }
          }
       }
+      // Programs define the dynamic behavior of the group, reacting to signals.
       programs {
+         // When the "unclip" signal is received from any source ("*"),
+         // it sets the state of the "content" part to "unclipped".
          program {
             signal: "unclip";
             source: "*";
             action: STATE_SET "unclipped";
             target: "content";
          }
+         // When the "clip" signal is received, it sets the "content" part to its "default" state,
+         // applying the rounded rectangle mask.
          program {
             signal: "clip";
             source: "*";
             action: STATE_SET "default";
             target: "content";
          }
+         // When the "smartclip" signal is received, it sets the "content" part to the "smartclip" state.
          program {
             signal: "smartclip";
             source: "*";
             action: STATE_SET "smartclip";
             target: "content";
          }
+         // When the "textclip" signal is received, it sets the "content" part to the "textclip" state,
+         // clipping it with the shape of the text.
          program {
             signal: "textclip";
             source: "*";
@@ -104,6 +144,7 @@ collections {
          }
       }
    }
+   // This group demonstrates how to apply a filter to a text part.
    group { "text";
       parts {
          text { "text";
@@ -112,10 +153,16 @@ collections {
                   font: "Sans";
                   size: 32;
                   text: "HELLO";
+                  // ellipsis of -1 disables ellipsizing and lets the text overflow.
                   ellipsis: -1;
                }
+               // fixed: 1 1; ensures the text part does not resize with its container.
                fixed: 1 1;
+               // Applies the "aura" filter defined in the filters block at the top.
                filter.code: "aura";
+               // These offsets adjust the part's position relative to its container.
+               // It's moved 5 pixels left and up, and the bottom-right corner is pulled in by 4 pixels.
+               // This is done to give the filter's blur effect enough space to render without being cut off.
                rel1.offset: -5 -5;
                rel2.offset: 4 4;
             }

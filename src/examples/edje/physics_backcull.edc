@@ -25,6 +25,7 @@
  *                              for "linear" or "angular.
  */
 
+// Defines message IDs for the script to identify different actions.
 #define ID_IMPULSE (1)
 #define ID_TORQUE_IMPULSE (2)
 #define ID_LIN_SET (3)
@@ -33,11 +34,17 @@
 
 collections {
 
+   // A group is a self-contained unit of an interface, with its own parts,
+   // scripts, and programs.
    group {
       name: "example_group";
 
+      // The script block contains Embryo script code that allows for dynamic
+      // behavior and interaction with the application. This script handles
+      // messages to control the physics of the "red_box" part.
       script {
          public message(Msg_Type:type, id, ...) {
+            // Checks for an impulse message to apply a linear force to the "red_box" part.
             if ((id == ID_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -47,6 +54,7 @@ collections {
                z = getfarg(4);
                physics_impulse(PART:"red_box", x, y, z);
             }
+            // Checks for a torque impulse message to apply a rotational force to the "red_box".
             else if ((id == ID_TORQUE_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -56,6 +64,8 @@ collections {
                z = getfarg(4);
                physics_torque_impulse(PART:"red_box", x, y, z);
             }
+            // Sets the linear movement freedom on x, y, and z axes for the "red_box".
+            // This determines which axes the box can move along.
             else if ((id == ID_LIN_SET) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -68,6 +78,8 @@ collections {
                   x, y, z);
                set_state(PART:"red_box", "custom", 0.0);
             }
+            // Sets the angular movement freedom on x, y, and z axes for the "red_box".
+            // This determines which axes the box can rotate around.
             else if ((id == ID_ANG_SET) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -80,6 +92,8 @@ collections {
                   x, y, z);
                set_state(PART:"red_box", "custom", 0.0);
             }
+            // Retrieves the current movement freedom values and sends them back as a message.
+            // This is useful for querying the current state from an application.
             else if ((id == ID_GET) && (type == MSG_STRING)) {
                new Float:x, Float:y, Float:z;
                new name[1024];
@@ -100,38 +114,50 @@ collections {
          }
       }
 
+      // The 'parts' block defines all the visual and physical elements of the group.
       parts {
+         // This part serves as the background of the scene. It's a non-physical
+         // rectangle that covers the entire area.
          part {
             name: "background";
             type: RECT;
             physics_body: NONE;
             description {
                state: "default" 0.0;
-               color: 255 255 255 255; /* white */
+               // Opaque white color (#FFFFFFFF).
+               color: 255 255 255 255;
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }
          }
 
+         // This part is a red box with rigid body physics. It is the main object
+         // for physics interaction in this example.
          part {
             name: "red_box";
             type: RECT;
             physics_body: RIGID_BOX;
             description {
                state: "default" 0.0;
-               color: 255 0 0 255; /* light red */
+               // Opaque light red color (#FF0000FF).
+               color: 255 0 0 255;
                rel1.relative: 0.45 0.1;
                rel2.relative: 0.55 0.2;
                aspect: 1 1;
+               // Physics properties define the behavior of the object in the simulation.
                physics {
                   mass: 30;
                   restitution: 0.85;
+                  // movement_freedom allows specifying which axes the body can move or rotate on.
+                  // Here, it's enabled for all axes, allowing 3D movement.
                   movement_freedom {
                      linear: 1 1 1;
                      angular: 1 1 1;
                   }
                }
             }
+            // This description is used to enable backface culling. When this state is
+            // active, the object will not be rendered if its back face is towards the camera.
             description {
                state: "backface_culled" 0.0;
                inherit: "default" 0.0;
@@ -139,6 +165,9 @@ collections {
             }
          }
 
+         // The following parts define the invisible boundaries of the physics world,
+         // creating a container for the 'red_box'. They are set to be invisible
+         // but have physics properties to interact with other physical objects.
          part {
             name: "floor";
             type: RECT;
@@ -205,7 +234,11 @@ collections {
          }
       }
 
+      // The 'programs' block defines responses to signals. These can be used to
+      // change the state of parts, run scripts, or emit other signals.
       programs {
+         // This program is triggered by the "on" signal from the "backcull" source.
+         // It sets the state of "red_box" to "backface_culled", enabling the culling.
          program {
             name: "backcull,on";
             signal: "on";
@@ -214,6 +247,8 @@ collections {
             target: "red_box";
          }
 
+         // This program is triggered by the "off" signal from the "backcull" source.
+         // It reverts the "red_box" to its "default" state, disabling backface culling.
          program {
             name: "backcull,off";
             signal: "off";

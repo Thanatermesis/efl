@@ -1,5 +1,12 @@
+// This group serves as a basic container for graph content, providing a swallow
+// part to host other UI components.
 group { name: "e/graph/default/base";
    parts {
+      // "e.swallow.content" is a placeholder (SWALLOW part) for external UI elements.
+      // This allows for dynamic interface composition.
+      // - scale: The swallowed content will scale with this part.
+      // - offscale: This part's scale does not affect the object's global scale,
+      //   which can be an optimization.
       part { name: "e.swallow.content"; type: SWALLOW; scale;
          description { state: "default" 0.0; offscale;
          }
@@ -7,9 +14,15 @@ group { name: "e/graph/default/base";
    }
 }
 
+// Defines a single vertical bar for a graph, which can be dynamically colored.
+// The bar's height is controlled by the vertical position of the "e.dragable.value" part.
+// An alias "e/graph/default/bar" is provided for easier access.
 group { name: "e/fileman/default/graph/bar";
   alias: "e/graph/default/bar";
+  // The script block allows for dynamic control of the part's properties through messages.
   script {
+   // This function converts a hexadecimal string segment of a given length into an integer.
+   // It is used to parse color values like #FF00FF.
    hex(str[], len) {
      new i, val = 0;
 
@@ -25,73 +38,97 @@ group { name: "e/fileman/default/graph/bar";
      }
      return val;
    }
+   // This message handler allows changing the bar's color dynamically by listening
+   // for string messages (MSG_STRING) with an ID of 1.
    public message(Msg_Type:type, id, ...) {
      if ((type == MSG_STRING) && (id == 1)) {
        new cc[256];
 
+       // Get the string argument from the message.
        getsarg(2, cc, 255);
+       // Create a new custom state for the "base" part, based on the "default"
+       // state, which allows us to override its properties.
        custom_state(PART:"base", "default", 0.0);
+       // The message can be a color class (e.g., "cc:my_color_class") or a hex color value.
        if (!strncmp(cc, "cc:", 3)) {
+         // If using a color class, extract the class name and apply it.
          strcpy(cc, cc[3]);
+         // Reset explicit color to white (#FFFFFFFF) to ensure the color class is used.
          set_state_val(PART:"base", STATE_COLOR, 255, 255, 255, 255);
          set_state_val(PART:"base", STATE_COLOR_CLASS, cc);
        } else if (!strncmp(cc, "#", 1)) {
+         // If using a hex color value, parse it.
          new r = 255, g = 255, b = 255, a = 255;
 
          strcpy(cc, cc[1]);
-         if        (strlen(cc) == 3) { // #35a
+         // The parser handles different hex color formats.
+         if        (strlen(cc) == 3) { // #RGB (e.g. #35A -> r=3, g=5, b=10)
            r = hex(cc[0], 1);
            g = hex(cc[1], 1);
            b = hex(cc[2], 1);
-         } else if (strlen(cc) == 4) { // #35af
+         } else if (strlen(cc) == 4) { // #RGBA (e.g. #35AF -> r=3, g=5, b=10, a=15)
            r = hex(cc[0], 1);
            g = hex(cc[1], 1);
            b = hex(cc[2], 1);
            a = hex(cc[3], 1);
-         } else if (strlen(cc) == 6) { // #3355aa
+         } else if (strlen(cc) == 6) { // #RRGGBB (e.g. #3355AA)
            r = hex(cc[0], 2);
            g = hex(cc[2], 2);
            b = hex(cc[4], 2);
-         } else if (strlen(cc) == 8) { // #3355aaff
+         } else if (strlen(cc) == 8) { // #RRGGBBAA (e.g. #3355AAFF)
            r = hex(cc[0], 2);
            g = hex(cc[2], 2);
            b = hex(cc[4], 2);
            a = hex(cc[6], 2);
          }
+         // Apply the parsed color and clear any existing color class.
          set_state_val(PART:"base", STATE_COLOR, r, g, b, a);
          set_state_val(PART:"base", STATE_COLOR_CLASS, "");
        }
+       // Apply the new "custom" state to the "base" part.
        set_state(PART:"base", "custom", 0.0);
      }
    }
   }
    parts {
+      // "drag_base" is an invisible spacer that defines the area within which
+      // the value dragger can move. It has a 1px margin.
       part { name: "drag_base"; type: SPACER; scale;
          description { state: "default" 0.0; offscale;
             rel1 { offset:  1  1; }
             rel2 { offset: -2 -2; }
          }
       }
+      // "e.dragable.value" is a vertically draggable, invisible spacer.
+      // Its Y position determines the height of the bar.
       part { name: "e.dragable.value"; type: SPACER;
-         dragable.x: 0 0 0;
-         dragable.y: 1 1 0;
-         dragable.confine: "drag_base";
+         dragable.x: 0 0 0; // Not draggable on X axis
+         dragable.y: 1 1 0; // Draggable on Y axis
+         dragable.confine: "drag_base"; // Confined within the "drag_base" part
          description { state: "default" 0.0;
-            min: 0 1;
-            max: 99999 1;
+            min: 0 1; // Minimum size, 1 pixel high
+            max: 99999 1; // Maximum size, 1 pixel high
             fixed: 1 1;
          }
       }
+      // "base" is the main rectangle that represents the graph bar.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The top of the bar's Y position is linked to the "e.dragable.value" part's Y position.
             rel1.to_y: "e.dragable.value";
+            // The bottom-right of the bar is attached to the bottom-right of "drag_base".
+            // As "e.dragable.value" moves, the bar's height changes.
             rel2.to: "drag_base";
             color_class: "/fg/normal/filegraph/bar";
          }
       }
+      // "top" is a 1-pixel high rectangle that acts as a top border for the bar.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
+            // It is positioned relative to the "base" part.
             rel.to: "base";
+            // Its bottom-right corner is positioned at the top-right of the "base" part,
+            // creating a 1-pixel high line.
             rel2.relative: 1.0 0.0;
             rel2.offset: -1 0;
             color_class: "/fg/normal/filegraph/bartop";
@@ -100,8 +137,14 @@ group { name: "e/fileman/default/graph/bar";
    }
 }
 
+// This group defines a more complex bar that can extend both upwards and
+// downwards from a central zero-point, for representing values that can be
+// positive or negative. It uses two draggable spacers: one for the zero line
+// and one for the value.
 group { name: "e/fileman/default/graph/barupdown";
   alias: "e/graph/default/barupdown";
+  // The script here is similar to the simple bar, but it handles two message IDs
+  // to color the 'up' and 'down' parts of the bar independently.
   script {
    hex(str[], len) {
      new i, val = 0;
@@ -118,6 +161,8 @@ group { name: "e/fileman/default/graph/barupdown";
      }
      return val;
    }
+   // This message handler allows dynamic coloring of both the 'up' and 'down' bars.
+   // It listens for string messages with ID 1 (for the 'up' bar, "base") or ID 2 (for the 'down' bar, "base2").
    public message(Msg_Type:type, id, ...) {
      if ((type == MSG_STRING) && ((id == 1) || (id == 2))) {
        new cc[256];
@@ -125,12 +170,12 @@ group { name: "e/fileman/default/graph/barupdown";
        getsarg(2, cc, 255);
        if (!strncmp(cc, "cc:", 3)) {
          strcpy(cc, cc[3]);
-         if (id == 1) {
+         if (id == 1) { // Color for the 'up' bar (part "base")
            custom_state(PART:"base", "default", 0.0);
            set_state_val(PART:"base", STATE_COLOR, 255, 255, 255, 255);
            set_state_val(PART:"base", STATE_COLOR_CLASS, cc);
            set_state(PART:"base", "custom", 0.0);
-         } else {
+         } else { // Color for the 'down' bar (part "base2")
            custom_state(PART:"base2", "default", 0.0);
            set_state_val(PART:"base2", STATE_COLOR, 255, 255, 255, 255);
            set_state_val(PART:"base2", STATE_COLOR_CLASS, cc);
@@ -140,6 +185,7 @@ group { name: "e/fileman/default/graph/barupdown";
          new r = 255, g = 255, b = 255, a = 255;
 
          strcpy(cc, cc[1]);
+         // The hex color string is parsed here. The logic is the same as the simple bar.
          if        (strlen(cc) == 3) { // #35a
            r = hex(cc[0], 1);
            g = hex(cc[1], 1);
@@ -159,6 +205,7 @@ group { name: "e/fileman/default/graph/barupdown";
            b = hex(cc[4], 2);
            a = hex(cc[6], 2);
          }
+         // The parsed color is applied to either "base" or "base2" depending on the message ID.
          if (id == 1) {
            set_state_val(PART:"base", STATE_COLOR, r, g, b, a);
            set_state_val(PART:"base", STATE_COLOR_CLASS, "");
@@ -173,12 +220,14 @@ group { name: "e/fileman/default/graph/barupdown";
    }
   }
    parts {
+      // "drag_base" defines the confinement area for the draggers.
       part { name: "drag_base"; type: SPACER; scale;
          description { state: "default" 0.0; offscale;
             rel1 { offset:  1  1; }
             rel2 { offset: -2 -2; }
          }
       }
+      // "e.dragable.zero" is a draggable spacer that represents the zero-line of the graph.
       part { name: "e.dragable.zero"; type: SPACER;
          dragable.x: 0 0 0;
          dragable.y: 1 1 0;
@@ -189,6 +238,7 @@ group { name: "e/fileman/default/graph/barupdown";
             fixed: 1 1;
          }
       }
+      // "e.dragable.value" is a draggable spacer that represents the current value.
       part { name: "e.dragable.value"; type: SPACER;
          dragable.x: 0 0 0;
          dragable.y: 1 1 0;
@@ -199,14 +249,19 @@ group { name: "e/fileman/default/graph/barupdown";
             fixed: 1 1;
          }
       }
+      // "base" is the rectangle for the "up" bar (value is above the zero-line).
+      // It is drawn between the 'value' dragger and the 'zero' dragger.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "drag_base";
+            // The top of the bar follows the 'value' dragger's y-position.
             rel1.to_y: "e.dragable.value";
+            // The bottom of the bar follows the 'zero' dragger's y-position.
             rel2.to_y: "e.dragable.zero";
             color_class: "/fg/normal/filegraph/bar";
          }
       }
+      // "top" is a 1-pixel high border for the "up" bar.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -215,28 +270,38 @@ group { name: "e/fileman/default/graph/barupdown";
             color_class: "/fg/normal/filegraph/bartop";
          }
       }
+      // "base2clip" is an invisible rectangle used to clip the "down" bar,
+      // ensuring it only draws below the zero-line.
       part { name: "base2clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "drag_base";
+            // The clipping area starts from the bottom of the 'zero' dragger.
             rel1.to: "e.dragable.zero";
             rel1.relative: 0.0 1.0;
          }
       }
+      // "base2" is the rectangle for the "down" bar (value is below the zero-line).
       part { name: "base2"; type: RECT;
          clip_to: "base2clip";
          description { state: "default" 0.0;
             rel.to: "drag_base";
+            // The top of this bar is positioned just below the 'zero' dragger.
             rel1.to_y: "e.dragable.zero";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 -1;
+            // The bottom of this bar follows the 'value' dragger's y-position.
             rel2.to_y: "e.dragable.value";
             color_class: "/fg/normal/filegraph/bar2"; // XXXX: add to cdc
          }
       }
+      // "top2" is a border element for the "down" bar ("base2").
       part { name: "top2"; type: RECT;
          clip_to: "base2clip";
          description { state: "default" 0.0;
             rel.to: "base2";
+            // Its top-left is positioned on the last pixel row of "base2".
+            // Without a 'rel2' definition, this part will be a 1x1 pixel square
+            // at the bottom-left of "base2".
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 -1;
             color_class: "/fg/normal/filegraph/bartop2"; // XXXX: add to cdc
@@ -245,10 +310,15 @@ group { name: "e/fileman/default/graph/barupdown";
    }
 }
 
+// This group is another container, similar to "e/graph/default/base",
+// but it adds padding around the swallowed content.
 group { name: "e/fileman/default/graph/base";
    parts {
       part { name: "e.swallow.content"; type: SWALLOW; scale;
          description { state: "default" 0.0; offscale;
+            // These offsets create a 2-pixel padding around the swallowed content.
+            // rel1 offset (2, 2) pushes the top-left corner in.
+            // rel2 offset (-3, -3) pulls the bottom-right corner in (2px from edge).
             rel1 { offset:  2  2; }
             rel2 { offset: -3 -3; }
          }

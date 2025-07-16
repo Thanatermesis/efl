@@ -1,13 +1,24 @@
+// This group defines the main UI for the temperature module gadget.
+// It displays a thermometer that visually represents the temperature
+// and shows the exact reading on mouse-over.
 group { name: "e/modules/temperature/main";
    images.image: "therm_content.png" COMP;
    min: 16 16;
    max: 128 128;
+   // The script block allows for dynamic interaction with the C module logic.
+   // It receives messages and updates the UI accordingly.
    script {
+    // This message handler is called from the C code to update the temperature.
+    // It expects a MSG_FLOAT message with ID 1.
     public message(Msg_Type:type, id, ...) {
        if ((type == MSG_FLOAT) && (id == 1)) {
           new Float:val;
+          // val is a normalized value (0.0 to 1.0) representing temperature.
           val = getfarg(2);
+          // set_drag moves the 'temp_top' part, which in turn adjusts the
+          // 'temp_clip' to reveal the temperature level.
           set_drag(PART:"temp_top", 0.0, val);
+          // Change the color of the temperature indicator based on the value.
           if (val <= 0.6) set_state(PART:"temp", "default", 0.0);
           else if (val <= 0.8) set_state(PART:"temp", "warm", 0.0);
           else if (val <= 1.0) set_state(PART:"temp", "hot", 0.0);
@@ -15,6 +26,8 @@ group { name: "e/modules/temperature/main";
     }
    }
    parts {
+      // The "base" part serves as the background of the thermometer.
+      // It is sized relative to the "temp" part to ensure they align correctly.
       part { name: "base";
          description { state: "default" 0.0;
             rel.to: "temp";
@@ -22,8 +35,12 @@ group { name: "e/modules/temperature/main";
             color_class: "/bg-dark/normal/gadgets/temperature";
          }
       }
+      // The "temp" part is the visual indicator of the temperature level (the "mercury").
+      // It's clipped by "temp_clip" to show a variable level.
       part { name: "temp";
          clip_to: "temp_clip";
+         // The different states ("default", "warm", "hot") are used to change the
+         // color of the indicator via color_class, representing different temperature ranges.
          description { state: "default" 0.0;
             aspect: 0.5 0.5; aspect_preference: BOTH;
             align: 0.5 0.5;
@@ -40,39 +57,54 @@ group { name: "e/modules/temperature/main";
             color_class: "/fg/normal/gadgets/temperature/hi";
          }
       }
+      // A text part to display the numerical temperature reading.
+      // It is named with the "e.text." prefix, a convention allowing the C code
+      // to easily find and update its text content.
       part { name: "e.text.reading"; type: TEXT;
          scale: 1;
          clip_to: "fade_clip";
          description { state: "default" 0.0;
+            // Initially hidden (visible: 0) and transparent (alpha=0).
+            // It becomes visible on mouse-over.
             visible: 0;
             color_class: "/fg/normal/gadgets/temperature/text";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00 (fully transparent white)
             text { font: FN; size: 10;
                min: 1 1;
                ellipsis: -1;
                text_class: "module_small";
             }
          }
+         // The state used to show the text.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             visible: 1;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF (fully opaque white)
          }
       }
+      // This RECT part acts as a clipper for other parts. Its color alpha value
+      // is used to fade out the entire widget when the sensor state is unknown.
       part { name: "fade_clip"; type: RECT;
          description { state: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF (opaque)
          }
+         // This state is used when the sensor is not available.
          description { state: "faded" 0.0;
-            color: 255 255 255 64; // no cc
+            color: 255 255 255 64; // #FFFFFF40 (semi-transparent)
          }
       }
+      // The "temp_clip" RECT is used to clip the "temp" part, creating the
+      // illusion of a rising/falling liquid level in the thermometer. Its top
+      // edge is aligned with the "temp_top" part's y-position.
       part { name: "temp_clip"; type: RECT;
          clip_to: "fade_clip";
          description { state: "default" 0.0;
             rel1.to_y: "temp_top";
          }
       }
+      // "temp_top" is an invisible, draggable SPACER controlled by the script.
+      // Its vertical movement, confined by "temp_limit", dictates the clipping
+      // of the "temp" part, effectively setting the temperature level.
       part { name: "temp_top"; type: SPACER;
          dragable.x: 0 0 0;
          dragable.y: -1 1 0;
@@ -80,6 +112,9 @@ group { name: "e/modules/temperature/main";
          description { state: "default" 0.0;
          }
       }
+      // "temp_limit" is another invisible SPACER that defines the draggable
+      // area for "temp_top". It is slightly smaller than the "temp" part
+      // to provide some padding at the top and bottom of the scale.
       part { name: "temp_limit"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "temp";
@@ -87,27 +122,35 @@ group { name: "e/modules/temperature/main";
             rel2.relative: 1.0 0.9;
          }
       }
+      // A transparent RECT that covers the entire widget area. Its purpose
+      // is to capture mouse events ("mouse,in", "mouse,out") for the whole widget.
       part { name: "over"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000 (fully transparent)
          }
       }
    }
    programs {
+      // When the mouse enters the gadget area, fade in the temperature reading.
       program { signal: "mouse,in"; source: "over";
          action: STATE_SET "visible" 0.0;
          transition: LINEAR 0.3;
          target: "e.text.reading";
       }
+      // When the mouse leaves, fade out the temperature reading.
       program { signal: "mouse,out"; source: "over";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 1.0;
          target: "e.text.reading";
       }
+      // When the module signals that the sensor state is "known" (i.e., working),
+      // ensure the widget is fully visible.
       program { signal: "e,state,known"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "fade_clip";
       }
+      // When the module signals that the sensor state is "unknown" (e.g., error),
+      // fade out the widget to indicate a problem.
       program { signal: "e,state,unknown"; source: "e";
          action: STATE_SET "faded" 0.0;
          target: "fade_clip";

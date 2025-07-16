@@ -1,24 +1,49 @@
+// Maximum length for the text in the flip selector, including null terminator.
 #define FLIP_PICKER_MAX_LEN (50 + 1)
+// String version of the max length for use in data items.
 #define FLIP_PICKER_MAX_LEN_STR "50"
 
+// This group defines the main look and behavior of the flip selector widget.
+// It creates a visual effect of flipping pages to change values, commonly
+// seen in old-style clocks or date pickers.
 group { name: "elm/flipselector/base/default";
-   images.image: "flip_shad.png" COMP;
-   images.image: "win_shadow.png" COMP;
+   // Images used in this theme. COMP indicates compression.
+   images.image: "flip_shad.png" COMP; // Shadow for the flipping page.
+   images.image: "win_shadow.png" COMP; // Shadow for the entire widget window.
 
+   // Data item to expose the max length to the C code.
    data.item: "max_len" FLIP_PICKER_MAX_LEN_STR;
 
-   //FIXME: quick successive clicks on, say, up, lead to nastiness
+   // FIXME: quick successive clicks on, say, up, lead to nastiness
+   // The script orchestrates the complex animations for the flip effect.
+   // It manages the state of the animation, handles text updates for the
+   // different "pages" (current, previous, next), and ensures that
+   // animations don't overlap or break when triggered in quick succession.
    script {
+      // Public variables accessible from other parts of the EDC.
+      // cur: Stores the current value's string.
+      // prev: Stores the previous value's string.
+      // next: Buffers the next value if a flip is requested during an animation.
+      // lock: A semaphore (0 or 1) to prevent starting a new animation while
+      //       one is already in progress.
       public cur, prev, next, lock;
 
+      // This function initiates the "flip up" animation, transitioning to a
+      // new value 'str'. It's like flipping a page upwards.
       flip_up(str[]) {
          new tmp[FLIP_PICKER_MAX_LEN];
+         // If an animation is locked, buffer the requested value and exit.
+         // It will be picked up when the current animation finishes.
          if (get_int(lock) == 1) {
             replace_str(next, 0, str);
             return;
          }
+         // Store the current value in 'tmp' and then into 'prev'.
          fetch_str(cur, 0, tmp, FLIP_PICKER_MAX_LEN);
 
+         // Prepare the part states for the animation. This is a setup phase
+         // before the animated transition begins.
+         // The current value ('tmp') moves to the "previous" text holders.
          set_text(PART:"bottom_text_prev", tmp);
          set_state(PART:"elm.top", "shrink", 0.0);
          set_text(PART:"elm.top", tmp);
@@ -27,21 +52,26 @@ group { name: "elm/flipselector/base/default";
 
          replace_str(prev, 0, tmp);
 
+         // The new value ('str') is placed in the "current" text holders.
          set_state(PART:"elm.bottom", "default", 0.0);
          set_text(PART:"elm.bottom", str);
          set_state(PART:"elm.bottom", "shrink", 0.0);
          set_text(PART:"elm.bottom", str);
          set_text(PART:"top_text_prev", str);
 
+         // Update the 'cur' variable to the new value.
          replace_str(cur, 0, str);
 
+         // Set initial states for the animated parts.
          set_state(PART:"bottom_cur", "shrink", 0.0);
          set_state(PART:"top_cur", "default", 0.0);
 
+         // Lock the animation, reset shadow and start the animation chain.
          set_int(lock, 1);
          set_state(PART:"bottom_shadow", "default", 0.0);
          anim(0.2, "animator_top_down", 1);
       }
+      // This function initiates the "flip down" animation, the reverse of flip_up.
       flip_dn(str[]) {
          new tmp[FLIP_PICKER_MAX_LEN];
          if (get_int(lock) == 1) {
@@ -51,6 +81,7 @@ group { name: "elm/flipselector/base/default";
 
          fetch_str(cur, 0, tmp, FLIP_PICKER_MAX_LEN);
 
+         // The setup logic here is symmetrical to flip_up().
          set_text(PART:"top_text_prev", tmp);
          set_state(PART:"elm.bottom", "shrink", 0.0);
          set_text(PART:"elm.bottom", tmp);
@@ -74,40 +105,53 @@ group { name: "elm/flipselector/base/default";
          set_state(PART:"bottom_shadow", "full", 0.0);
          anim(0.2, "animator_bottom_up", 1);
       }
+      // This is the second half of the "flip up" animation chain. 'pos' is the
+      // animation position from 0.0 to 1.0.
       public animator_bottom_down(val, Float:pos) {
          new tmp[FLIP_PICKER_MAX_LEN];
 
+         // Interpolate part states over the animation's duration.
+         // This creates the smooth visual transition.
          set_tween_state(PART:"elm.bottom", pos, "shrink", 0.0, "default", 0.0);
          set_tween_state(PART:"bottom_cur", pos, "shrink", 0.0, "default", 0.0);
          set_tween_state(PART:"bottom_shadow", pos, "half", 0.0, "full", 0.0);
 
+         // When the animation completes (pos >= 1.0).
          if (pos >= 1.0) {
+            // Reset shadow, release the animation lock.
             set_state(PART:"bottom_shadow", "default", 0.0);
             set_int(lock, 0);
+            // Check if another flip was requested during this animation.
             fetch_str(next, 0, tmp, FLIP_PICKER_MAX_LEN);
             if (strncmp(tmp, "", FLIP_PICKER_MAX_LEN) != 0) {
+               // If so, clear the 'next' buffer and start the queued flip.
                replace_str(next, 0, "");
                flip_up(tmp);
             }
          }
       }
+      // First half of the "flip up" animation.
       public animator_top_down(val, Float:pos) {
          set_tween_state(PART:"elm.top", pos, "default", 0.0, "shrink", 0.0);
          set_tween_state(PART:"top_cur", pos, "default", 0.0, "shrink", 0.0);
          set_tween_state(PART:"bottom_shadow", pos, "default", 0.0, "half",
                          0.0);
+         // When this half finishes, it triggers the second half.
          if (pos >= 1.0)
            {
               anim(0.2, "animator_bottom_down", val);
            }
       }
+      // First half of the "flip down" animation.
       public animator_bottom_up(val, Float:pos) {
          set_tween_state(PART:"elm.bottom", pos, "default", 0.0, "shrink", 0.0);
          set_tween_state(PART:"bottom_cur", pos, "default", 0.0, "shrink", 0.0);
          set_tween_state(PART:"bottom_shadow", pos, "full", 0.0, "half", 0.0);
 
+         // Triggers the second half on completion.
          if (pos >= 1.0) anim(0.2, "animator_top_up", val);
       }
+      // Second half of the "flip down" animation.
       public animator_top_up(val, Float:pos) {
          new tmp[FLIP_PICKER_MAX_LEN];
 
@@ -115,6 +159,7 @@ group { name: "elm/flipselector/base/default";
          set_tween_state(PART:"top_cur", pos, "shrink", 0.0, "default", 0.0);
          set_tween_state(PART:"bottom_shadow", pos, "half", 0.0, "default", 0.0);
 
+         // On completion, unlocks and checks for a queued "flip down".
          if (pos >= 1.0) {
             set_state(PART:"bottom_shadow", "default", 0.0);
             set_int(lock, 0);
@@ -126,13 +171,17 @@ group { name: "elm/flipselector/base/default";
             }
          }
       }
+      // This function serves as the entry point for C code to interact with the
+      // script. It listens for messages and triggers actions accordingly.
       public message(Msg_Type:type, id, ...) {
-         /* flip down */
+         // A message with ID 1 triggers a "flip up" action.
+         // Note: The original comment "flip down" appears to be incorrect.
          if ((type == MSG_STRING) && (id == 1)) {
             new value[FLIP_PICKER_MAX_LEN];
             snprintf(value, FLIP_PICKER_MAX_LEN, "%s", getarg(2));
             flip_up(value);
-         /* flip up */
+         // A message with ID 2 triggers a "flip down" action.
+         // Note: The original comment "flip up" appears to be incorrect.
          } else  if ((type == MSG_STRING) && (id == 2)) {
             new value[FLIP_PICKER_MAX_LEN];
             snprintf(value, FLIP_PICKER_MAX_LEN, "%s", getarg(2));
@@ -140,11 +189,14 @@ group { name: "elm/flipselector/base/default";
          }
       }
    }
+   // The 'parts' block defines all the visual components of the widget.
    parts {
+      // This part creates a shadow effect for the entire widget.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // A macro for styling the window shadow.
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal/flipselector";
          }
@@ -152,18 +204,25 @@ group { name: "elm/flipselector/base/default";
             color_class: "/shadow/disabled/flipselector";
          }
       }
+      // The main container part, acting as a background and reference for others.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets provide padding inside the widget's area.
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // 'offscale' ensures scaling does not affect border offsets.
             offscale;
          }
       }
+      // The bottom half of the widget area. It's a transparent rectangle
+      // used for layout and to capture mouse events for the "flip down" action.
       part { name: "bottom"; type: RECT;
          description { state: "default" 0.0;
+            // Occupies the bottom 50% of the 'base' part.
             rel1 { to: "base"; relative: 0.0 0.5; }
             rel2.to: "base";
+            // Transparent color (#00000000).
             color: 0 0 0 0; // no cc
          }
          description { state: "hidden" 0.0;
@@ -171,10 +230,14 @@ group { name: "elm/flipselector/base/default";
             visible: 0;
          }
       }
+      // The top half of the widget area, symmetrical to the 'bottom' part.
+      // Used for layout and to capture mouse events for the "flip up" action.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
+            // Occupies the top 50% of the 'base' part.
             rel1.to: "base";
             rel2 { to: "base"; relative: 1.0 0.5; }
+            // Transparent color (#00000000).
             color: 0 0 0 0; // no cc
          }
          description { state: "hidden" 0.0;
@@ -182,6 +245,8 @@ group { name: "elm/flipselector/base/default";
             visible: 0;
          }
       }
+      // Background for the static bottom half of the *previous* value during an
+      // upward flip. It's the part that is revealed as the top half flips up.
       part { name: "bottom_prev"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -189,6 +254,7 @@ group { name: "elm/flipselector/base/default";
             color_class: "/bg/normal/flipselector/down";
          }
       }
+      // Text part for the static bottom half of the previous value.
       part { name: "bottom_text_prev"; type: TEXT; mouse_events: 0;
          clip_to: "bottom_clipper";
          scale: 1;
@@ -216,6 +282,8 @@ group { name: "elm/flipselector/base/default";
       }
       part { name: "bottom_shadow"; mouse_events: 0;
          clip_to: "bottom_clipper";
+         // This part renders a shadow that gives the flipping page a 3D effect.
+         // Its size and position are animated by the script.
          description { state: "default" 0.0;
             fixed: 0 1;
             rel1.to: "bottom";
@@ -235,17 +303,22 @@ group { name: "elm/flipselector/base/default";
             rel2.relative: 1.0 2.0;
          }
       }
+      // Background for the bottom half of the *current* value, which animates.
       part { name: "bottom_cur"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bottom";
             color_class: "/bg/normal/flipselector/down";
          }
+         // The 'shrink' state makes the part disappear by reducing its height to zero.
          description { state: "shrink" 0.0;
             inherit: "default" 0.0;
-            fixed: 0 1;
-            rel2.relative: 1.0 0.0;
+            fixed: 0 1; // Height is fixed, width is scalable.
+            rel2.relative: 1.0 0.0; // Bottom-right y is same as top-left y.
          }
       }
+      // Text for the bottom half of the *current* value.
+      // The "elm." prefix is a convention for parts that are externally controlled,
+      // though here it's just a standard TEXT part.
       part { name: "elm.bottom"; type: TEXT; mouse_events: 0;
          clip_to: "bottom_clipper";
          scale: 1;
@@ -269,8 +342,10 @@ group { name: "elm/flipselector/base/default";
          description { state: "shrink" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/flipselector/down";
+            // Semi-transparent white (#FFFFFF80).
             color: 255 255 255 128; // no cc
             visible: 0;
+            // The 'shrink' state for text is more about hiding and fading than resizing.
             rel2.relative: 1.0 0.5; /* FIXME: same visual effect? --> MAP! */
          }
          description { state: "disabled" 0.0;
@@ -278,12 +353,15 @@ group { name: "elm/flipselector/base/default";
             color_class: "/fg/disabled/flipselector/down";
          }
       }
+      // Background for the static top half of the *previous* value during a
+      // downward flip. Symmetrical to 'bottom_prev'.
       part { name: "top_prev"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "top";
             color_class: "/bg/normal/flipselector/up";
          }
       }
+      // Text part for the static top half of the previous value.
       part { name: "top_text_prev"; type: TEXT; mouse_events: 0;
          clip_to: "top_clipper";
          scale: 1;
@@ -310,6 +388,7 @@ group { name: "elm/flipselector/base/default";
             color_class: "/fg/disabled/flipselector/up";
          }
       }
+      // Background for the top half of the *current* value, which animates.
       part { name: "top_cur"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "top";
@@ -318,10 +397,13 @@ group { name: "elm/flipselector/base/default";
          description { state: "shrink" 0.0;
             inherit: "default" 0.0;
             fixed: 0 1;
+            // Top-left y is same as bottom-right y, effectively zero height.
             rel1.relative: 0.0 1.0;
+            // Gray color (#808080FF).
             color: 128 128 128 255; // no cc
          }
       }
+      // Text for the top half of the *current* value.
       part { name: "elm.top"; type: TEXT; mouse_events: 0;
          clip_to: "top_clipper";
          scale: 1;
@@ -346,6 +428,7 @@ group { name: "elm/flipselector/base/default";
             inherit: "default" 0.0;
             visible: 0;
             rel1.relative: 0.0 0.5;
+            // Semi-transparent white (#FFFFFF80).
             color: 255 255 255 128; // no cc
         }
          description { state: "disabled" 0.0;
@@ -353,6 +436,7 @@ group { name: "elm/flipselector/base/default";
             color_class: "/fg/disabled/flipselector/up";
          }
       }
+      // The up arrow indicator.
       part { name: "arrow_top"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -378,6 +462,7 @@ group { name: "elm/flipselector/base/default";
             color_class: "/fg/pressed/flipselector/up";
          }
       }
+      // The down arrow indicator.
       part { name: "arrow_bottom"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -403,16 +488,21 @@ group { name: "elm/flipselector/base/default";
             color_class: "/fg/pressed/flipselector/down";
          }
       }
+      // A clipping rectangle for the top half. Any part clipped to this will
+      // only be visible within the bounds of the 'top' part.
       part { name: "top_clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "top";
          }
       }
+      // A clipping rectangle for the bottom half.
       part { name: "bottom_clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bottom";
          }
       }
+      // A transparent rectangle that becomes visible when the widget is disabled,
+      // effectively blocking all mouse events from reaching other parts.
       part { name: "event_blocker"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -424,8 +514,11 @@ group { name: "elm/flipselector/base/default";
          }
       }
    }
+   // Programs define the dynamic behavior, responding to signals (events).
    programs {
+      // This program runs once when the widget is loaded.
       program { signal: "load"; source: "";
+         // It initializes the script variables.
          script {
             append_str(cur, "");
             append_str(prev, "");
@@ -433,6 +526,8 @@ group { name: "elm/flipselector/base/default";
             set_int(lock, 0);
          }
       }
+      // Hides the arrows and the main top/bottom event areas. This is likely
+      // used when the flipselector is configured to be non-interactive.
       program { signal: "elm,state,button,hidden"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "arrow_top";
@@ -440,6 +535,7 @@ group { name: "elm/flipselector/base/default";
          target: "top";
          target: "bottom";
       }
+      // Shows the arrows and main top/bottom event areas.
       program { signal: "elm,state,button,visible"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "arrow_top";
@@ -447,20 +543,26 @@ group { name: "elm/flipselector/base/default";
          target: "top";
          target: "bottom";
       }
+      // When the top part is clicked (mouse down), emit a signal to the C code
+      // indicating the user wants to start flipping up.
       program { signal: "mouse,down,1"; source: "top";
          action: SIGNAL_EMIT "elm,action,up,start" "elm";
       }
+      // Also, change the top arrow's state to "pressed" for visual feedback.
       program { signal: "mouse,down,1"; source: "top";
          action: STATE_SET "pressed" 0.0;
          target: "arrow_top";
       }
+      // When the mouse button is released over the top part.
       program { signal: "mouse,up,1"; source: "top";
          action: SIGNAL_EMIT "elm,action,up,stop" "elm";
       }
+      // Revert the top arrow's state to "default".
       program { signal: "mouse,up,1"; source: "top";
          action: STATE_SET "default" 0.0;
          target: "arrow_top";
       }
+      // Symmetrical logic for the bottom part to handle "flip down".
       program { signal: "mouse,down,1"; source: "bottom";
          action: SIGNAL_EMIT "elm,action,down,start" "elm";
       }
@@ -475,10 +577,13 @@ group { name: "elm/flipselector/base/default";
          action: STATE_SET "default" 0.0;
          target: "arrow_bottom";
       }
+      // When the widget is set to a disabled state.
       program { signal: "elm,state,disabled"; source: "elm";
+         // A script is used here to conditionally apply states.
          script {
             new st[31];
             new Float:vl;
+            // Set all relevant parts to their "disabled" visual state.
             set_state(PART:"event_blocker", "disabled", 0.0);
             set_state(PART:"elm.bottom", "disabled", 0.0);
             set_state(PART:"elm.top", "disabled", 0.0);
@@ -486,6 +591,8 @@ group { name: "elm/flipselector/base/default";
             set_state(PART:"top_text_prev", "disabled", 0.0);
             set_state(PART:"shadow", "disabled", 0.0);
 
+            // The arrows should only be disabled if they are not hidden.
+            // This prevents visual state conflicts.
             get_state(PART:"arrow_bottom", st, 30, vl);
             if (strcmp(st, "hidden"))
               set_state(PART:"arrow_bottom", "disabled", 0.0);
@@ -497,7 +604,9 @@ group { name: "elm/flipselector/base/default";
             get_state(PART:"top_cur", st, 30, vl);
          }
       }
+      // When the widget is re-enabled.
       program { signal: "elm,state,enabled"; source: "elm";
+         // This script reverts all parts to their "default" state.
          script {
             new st[31];
             new Float:vl;
@@ -508,6 +617,8 @@ group { name: "elm/flipselector/base/default";
             set_state(PART:"top_text_prev", "default", 0.0);
             set_state(PART:"shadow", "default", 0.0);
 
+            // Similar to the disabled program, only change arrow state if
+            // they are not hidden.
             get_state(PART:"arrow_bottom", st, 30, vl);
             if (strcmp(st, "hidden"))
               set_state(PART:"arrow_bottom", "default", 0.0);

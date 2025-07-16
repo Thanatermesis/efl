@@ -1,7 +1,13 @@
+// This group defines the base mouse pointer. It includes the visual
+// representation of the pointer and defines a hotspot for click events.
 group { name: "efl/pointer";
    data.item: "version" "123";
    images.image: "pointer.png" COMP;
    parts {
+      // This part is the visual representation of the pointer.
+      // It uses "pointer.png" as its image and is not interactive
+      // with mouse events itself (mouse_events: 0;), as the hotspot
+      // part handles the pointer's logical position.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             aspect: 1.0 1.0;
@@ -14,19 +20,27 @@ group { name: "efl/pointer";
              * will be WITHIN the bounds the axes
              * of thre part describe */
             image.normal: "pointer.png";
+            // Sets the color of the pointer. The color is defined in the
+            // color class "/fg/normal/pointer/base" and can be themed.
+            // For example, it might be white (#FFFFFF).
             color_class: "/fg/normal/pointer/base";
          }
+         // Defines the "clicked" state for the pointer.
          description { state: "clicked" 0.0;
             inherit: "default" 0.0;
+            // When clicked, the pointer will use a different color,
+            // likely to provide visual feedback. This color is also
+            // themeable via "/fg/pressed/pointer/base".
             color_class: "/fg/pressed/pointer/base";
          }
       }
       part { name: "efl.hotspot"; type: SWALLOW;
-         /* this is a "fake" swallow part
-          * that is used by e to determine
-          * the pointer hotspot - or where
-          * the actual mouse events get
-          * reported from on the cursor */
+         // This special part, named "efl.hotspot", defines the active point of
+         // the cursor, also known as the hotspot. It is an invisible SWALLOW part
+         // used by EFL to determine where mouse events are reported from. The hotspot's
+         // position is relative to the "base" part, ensuring that it scales
+         // correctly with the cursor. Here, it is positioned at 5/32 of the
+         // width and height of the base part, which is the tip of the pointer.
          description { state: "default" 0.0;
             visible: 0;
             fixed: 1 1;
@@ -45,64 +59,93 @@ group { name: "efl/pointer";
       }
    }
    programs {
+      // This program is triggered by a mouse down event.
       program { signal: "efl,action,mouse,down"; source: "efl";
+         // It changes the state of the "base" part to "clicked",
+         // which typically alters its appearance (e.g., color).
          action: STATE_SET "clicked" 0.0;
          target: "base";
+         // After this action, it triggers the "fade" program.
          after: "fade";
       }
+      // This program is responsible for fading the pointer back to its default state.
       program { name: "fade";
+         // It sets the "base" part's state back to "default".
          action: STATE_SET "default" 0.0;
+         // The transition is a 0.5-second sine wave, creating a smooth visual effect.
          transition: SINUSOIDAL 0.5;
          target: "base";
       }
    }
 }
 
+// This group defines the cursor for resizing from the bottom-right corner.
+// It inherits the base pointer properties and adds an animated box to indicate
+// the resize direction.
 group { name: "efl/pointer:bottom_right_corner";
    inherit: "efl/pointer";
    data.item: "version" "123";
    parts {
+      // This part is a rectangle that provides a visual cue for resizing.
       part { name: "box"; type: RECT;
+         // It is inserted after the "base" part in the stacking order.
          insert_after: "base";
          description { state: "default" 0.0;
+            // The color is themeable via "/fg/normal/pointer/manipulator",
+            // likely a semi-transparent color to act as an overlay.
             color_class: "/fg/normal/pointer/manipulator";
+            // In the default state, the box is a centered square.
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 0.7;
          }
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
+            // In the "p1" state, the box expands towards the bottom-right corner.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }
       }
    }
    programs {
+      // These programs create a continuous animation loop for the "box" part,
+      // creating a pulsating effect that indicates the resize direction.
+      // "box1" is triggered on "load" (when the cursor is displayed).
       program { name: "box1";
          signal: "load"; source: "";
+         // It sets the state to "p1" with a smooth transition, expanding the box.
          action: STATE_SET "p1" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
+         // Then it chains to "box2" to reverse the animation.
          after: "box2";
       }
+      // "box2" transitions the box back to the "default" state.
       program { name: "box2";
+         // This action shrinks the box back to its initial state.
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
+         // And then chains back to "box1", creating an infinite loop.
          after: "box1";
       }
    }
 }
 
+// Defines the cursor for resizing from the bottom-left corner.
+// It inherits the animation logic from "efl/pointer:bottom_right_corner"
+// but redefines the start and end positions of the manipulator box.
 group { name: "efl/pointer:bottom_left_corner";
    inherit: "efl/pointer:bottom_right_corner";
    data.item: "version" "123";
    parts {
       part { name: "box";
          description { state: "default" 0.0;
+            // The "default" state positions the box on the right side of the cursor.
             rel1.relative: 0.7 0.3;
             rel2.relative: 1.0 0.7;
          }
          description { state: "p1" 0.0;
+            // The "p1" state expands the box towards the bottom-right.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }
@@ -111,16 +154,19 @@ group { name: "efl/pointer:bottom_left_corner";
 }
 
 
+// Defines the cursor for resizing from the bottom side.
 group { name: "efl/pointer:bottom_side";
    inherit: "efl/pointer:bottom_right_corner";
    data.item: "version" "123";
    parts {
       part { name: "box";
          description { state: "default" 0.0;
+            // The box is a wide rectangle on the right half of the cursor area.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 0.7;
          }
          description { state: "p1" 0.0;
+            // In state "p1", the box expands to fill the bottom-right area.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }
@@ -128,16 +174,20 @@ group { name: "efl/pointer:bottom_side";
    }
 }
 
+// Defines the cursor for resizing from the top-right corner.
 group { name: "efl/pointer:top_right_corner";
    inherit: "efl/pointer:bottom_right_corner";
    data.item: "version" "123";
    parts {
       part { name: "box";
          description { state: "default" 0.0;
+            // Starts as a centered box, same as the bottom-right cursor.
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 0.7;
          }
          description { state: "p1" 0.0;
+            // The box expands towards the top-right, providing a visual cue
+            // for the resize direction.
             rel1.relative: 0.3 0.0;
             rel2.relative: 1.0 0.7;
          }
@@ -145,16 +195,19 @@ group { name: "efl/pointer:top_right_corner";
    }
 }
 
+// Defines the cursor for resizing from the top-left corner.
 group { name: "efl/pointer:top_left_corner";
    inherit: "efl/pointer:bottom_right_corner";
    data.item: "version" "123";
    parts {
       part { name: "box";
          description { state: "default" 0.0;
+            // The box is initially in the bottom-right quadrant.
             rel1.relative: 0.6 0.6;
             rel2.relative: 1.0 1.0;
          }
          description { state: "p1" 0.0;
+            // The box then expands to cover a larger bottom-right area.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }
@@ -162,16 +215,19 @@ group { name: "efl/pointer:top_left_corner";
    }
 }
 
+// Defines the cursor for resizing from the top side.
 group { name: "efl/pointer:top_side";
    inherit: "efl/pointer:bottom_right_corner";
    data.item: "version" "123";
    parts {
       part { name: "box";
          description { state: "default" 0.0;
+            // The box is positioned in the bottom half of the cursor area.
             rel1.relative: 0.3 0.6;
             rel2.relative: 1.0 1.0;
          }
          description { state: "p1" 0.0;
+            // The box expands to fill most of the bottom-right area.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }

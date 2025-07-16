@@ -1,6 +1,10 @@
+// This group defines the visual style and behavior of a standard check widget.
+// It consists of a check box, a label, and an indicator for the checked state.
 group { name: "e/widgets/check";
    parts {
       part { name: "base"; type: RECT;
+         // The 'base' part is the background rectangle for the check box itself.
+         // It's a fixed-size square.
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/bg/normal/check/base";
@@ -19,15 +23,22 @@ group { name: "e/widgets/check";
          }
       }
       part { name: "clip"; type: RECT;
+         // 'clip' is an invisible rectangle that shares the same geometry as 'base'.
+         // Its purpose is to clip other parts, like the 'indicator', ensuring they
+         // don't draw outside the check box area.
          description { state: "default" 0.0;
             rel.to: "base";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // The color is white with 60% opacity (#FFFFFF99).
             color: 255 255 255 153; // no cc
          }
       }
       part { name: "indicator"; mouse_events: 0;
+         // The 'indicator' is the check mark image that appears when the box is checked.
+         // It is not directly interactive (mouse_events: 0) and is clipped by the 'clip' part.
+         // The 'event' part handles user interactions for the whole widget.
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
@@ -37,6 +48,7 @@ group { name: "e/widgets/check";
             max: 15 15;
             visible: 0;
             color_class: "/fg/normal/check/check";
+            // By default, the indicator is hidden, representing an unchecked state.
             fixed: 1 1;
          }
          description { state: "pressed" 0.0;
@@ -45,12 +57,15 @@ group { name: "e/widgets/check";
             visible: 1;
          }
          description { state: "selected" 0.0;
+            // In the 'selected' state (when the check box is checked), the indicator becomes visible.
             inherit: "default" 0.0;
             color_class: "/fg/selected/check/check";
             visible: 1;
          }
       }
       part { name: "e.text.label"; type: TEXT;
+         // This part displays the label text associated with the check box.
+         // It is positioned to the right of the 'base' part.
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: 4 4;
@@ -77,38 +92,57 @@ group { name: "e/widgets/check";
          }
       }
       part { name: "event"; type: RECT;
+         // 'event' is a transparent rectangle covering the entire widget area.
+         // It captures all mouse events, acting as the main interaction handler.
+         // This design simplifies event management by providing a single source for clicks.
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
+            // color is transparent black (#00000000).
             color: 0 0 0 0; // no cc
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // When disabled, this part becomes invisible and non-interactive.
             visible: 0;
          }
       }
    }
    programs {
+      // The 'programs' section defines how the widget reacts to signals,
+      // such as user input or state changes from the application code.
+
+      // This program is triggered by the 'e,state,checked' signal from the application.
+      // It changes the 'indicator' part's state to 'selected', making the check mark visible.
       program { signal: "e,state,checked"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "indicator";
       }
+      // This program is triggered by the 'e,state,unchecked' signal.
+      // It resets the 'indicator' to its 'default' state, hiding the check mark.
       program { signal: "e,state,unchecked"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "indicator";
       }
+      // When the user presses the mouse button over the 'event' area,
+      // the 'e.text.label' state is set to 'pressed', usually for visual feedback.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "pressed" 0.0;
 //         target: "indicator";
          target: "e.text.label";
       }
+      // When the mouse button is released, the label's state returns to 'default'.
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
 //         target: "indicator";
          target: "e.text.label";
       }
+      // A complete click on the 'event' part emits a signal to the C code,
+      // requesting to toggle the check box's state. The C code then sends back
+      // either 'e,state,checked' or 'e,state,unchecked' to update the visual state.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "e,action,toggle" "";
       }
+      // When the widget is disabled, this program sets the relevant parts to their 'disabled' state.
       program { signal: "e,state,disabled"; source: "e";
          action: STATE_SET "disabled" 0.0;
          target: "base";
@@ -116,6 +150,7 @@ group { name: "e/widgets/check";
          target: "e.text.label";
          target: "event";
       }
+      // This program re-enables the widget, setting parts back to their 'default' state.
       program { signal: "e,state,enabled"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -126,10 +161,14 @@ group { name: "e/widgets/check";
    }
 }
 
+// This group defines a check widget with an icon. It inherits all properties
+// from the 'e/widgets/check' group and adds a swallow part for an icon.
 group { name: "e/widgets/check_icon";
    inherit: "e/widgets/check";
    parts {
       part { name: "e.swallow.icon"; type: SWALLOW;
+         // The 'e.swallow.icon' part is a container that can hold an Evas object (an icon)
+         // provided from the C code. It is placed between the check box and the label.
          scale: 1;
          insert_before: "event";
          clip_to: "clip";
@@ -146,6 +185,7 @@ group { name: "e/widgets/check_icon";
          }
       }
       part { name: "e.text.label";
+         // The label is redefined to be positioned to the right of the new 'e.swallow.icon' part.
          description { state: "default" 0.0;
             rel1.to_x: "e.swallow.icon";
          }

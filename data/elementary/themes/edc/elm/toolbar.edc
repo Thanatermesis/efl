@@ -1,21 +1,30 @@
 // === toolbar default base with scrolling arrows etc.
+// This group defines the main toolbar container. It includes a background, a content
+// area, and scroll arrows that appear when the content overflows.
 group { name: "elm/toolbar/base/default";
    parts {
+      // "base" is a simple rectangle that serves as the background for the toolbar.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/toolbar";
          }
       }
+      // "clipper" ensures that any content placed within "elm.swallow.content"
+      // does not draw outside the toolbar's boundaries. It is sized to match the "base" part.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
          }
       }
+      // "elm.swallow.content" is the container for the toolbar items.
+      // The actual toolbar items (buttons, separators, etc.) are "swallowed" into this part from the C code.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
          }
       }
+      // "arrow_clipper_l" is a clipping rectangle for the left scroll arrow.
+      // Its visibility is controlled by the "visible" state, effectively showing or hiding the arrow.
       part { name: "arrow_clipper_l"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -25,6 +34,9 @@ group { name: "elm/toolbar/base/default";
             visible: 1;
          }
       }
+      // "arrow_l_ev" is the event-handling rectangle for the left arrow.
+      // It's intentionally larger than the visible arrow icon to provide a more user-friendly click target.
+      // It changes color on click to provide visual feedback.
       part { name: "arrow_l_ev"; type: RECT;
          scale: 1;
          clip_to: "arrow_clipper_l";
@@ -40,6 +52,9 @@ group { name: "elm/toolbar/base/default";
             color_class: "/dim/pressed/toolbar/arrow";
          }
       }
+      // "arrow_l" is the visual representation of the left arrow.
+      // `mouse_events: 0` ensures that it doesn't capture mouse events, which are handled by "arrow_l_ev".
+      // It is positioned relative to "arrow_l_ev".
       part { name: "arrow_l"; mouse_events: 0;
          scale: 1;
          clip_to: "arrow_clipper_l";
@@ -56,6 +71,8 @@ group { name: "elm/toolbar/base/default";
          }
       }
 
+      // The right, up, and down arrows ("arrow_r", "arrow_u", "arrow_d") follow the same
+      // pattern as the left arrow, with corresponding event handlers and clippers.
       part { name: "arrow_clipper_r"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -176,6 +193,8 @@ group { name: "elm/toolbar/base/default";
          }
       }
    }
+   // The programs are identical to those in the default item, handling states,
+   // clicks, and animations.
    programs {
 //      program {
 //         signal: "elm,orient,horizontal"; source: "elm";
@@ -183,36 +202,51 @@ group { name: "elm/toolbar/base/default";
 //      program {
 //         signal: "elm,orient,vertical"; source: "elm";
 //      }
+      // This program is triggered by the "elm,action,show,left" signal from the C code,
+      // making the left arrow visible by changing the state of its clipper.
       program { signal: "elm,action,show,left"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "arrow_clipper_l";
       }
+      // Hides the left arrow.
       program { signal: "elm,action,hide,left"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "arrow_clipper_l";
       }
+      // When the left mouse button is pressed on the left arrow's event area:
+      // 1. It emits an "elm,action,left" signal, causing an immediate scroll.
+      // 2. It starts the "arrow_l_repeat" program for continuous scrolling.
       program { signal: "mouse,down,1*"; source: "arrow_l_ev";
          action: SIGNAL_EMIT "elm,action,left" "elm";
          after: "arrow_l_repeat";
       }
+      // This program continuously emits "elm,action,left" every 0.3 seconds
+      // as long as the mouse button is held down.
       program { name: "arrow_l_repeat";
          action: SIGNAL_EMIT "elm,action,left" "elm";
          in: 0.3 0.0;
          after: "arrow_l_repeat";
       }
+      // When the mouse button is released, this stops the repeating scroll action.
       program { signal: "mouse,up,1"; source: "arrow_l_ev";
          action: ACTION_STOP;
          target: "arrow_l_repeat";
       }
+      // These programs handle the visual feedback for clicking the arrow.
+      // On mouse down, the arrow icon and its event area background change to the "clicked" state.
       program { signal: "mouse,down,1*"; source: "arrow_l_ev";
          action: STATE_SET "clicked" 0.0;
          target: "arrow_l";
+         target: "arrow_l_ev";
       }
+      // On mouse up, they revert to the "default" state.
       program { signal: "mouse,up,1"; source: "arrow_l_ev";
          action: STATE_SET "default" 0.0;
          target: "arrow_l";
+         target: "arrow_l_ev";
       }
 
+      // The programs for the right, up, and down arrows are analogous to the left arrow programs.
       program { signal: "elm,action,show,right"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "arrow_clipper_r";
@@ -306,15 +340,26 @@ group { name: "elm/toolbar/base/default";
 }
 
 // === item: standard default item
+// This group defines a standard toolbar item, which can contain an icon, a label, or both.
+// It supports different states like "selected" and "disabled" and includes animations
+// for changing the icon or label. This is aliased as "item_centered", indicating
+// it's used for items with centered content (icon above label).
 group { name: "elm/toolbar/item/default";
    alias: "elm/toolbar/item/item_centered";
+   // "transition_animation_on" enables animations for state changes.
    data.item: "transition_animation_on" "1";
+   // "focusraise" "on" will raise a focus signal when the item is clicked.
    data.item: "focusraise" "on";
+   // This Embryo script manages the item's visual state based on its content (icon/label) and disabled status.
+   // This offloads complex state logic from the C code into the theme itself.
    script {
-      public btmode;
+      public btmode; // A bitmask storing the current mode (ICON, LABEL, DISABLE).
+      // eval_mode updates the visibility and state of the icon and text parts
+      // based on the mode bitmask `m`. It's called whenever the item's state changes.
       public eval_mode(m) {
          new m1 = m & MASK;
          new d = m & DISABLE;
+         // State handling for both icon and label visible.
          if (m1 == (ICON | LABEL)) {
             if (!d) {
                set_state(PART:"elm.swallow.icon", "default", 0.0);
@@ -329,6 +374,7 @@ group { name: "elm/toolbar/item/default";
                set_state(PART:"elm.text", "disabled", 0.0);
                set_state(PART:"event", "disabled", 0.0);
             }
+         // State handling for icon only.
          } else if (m1 == (ICON)) {
             if (!d) {
                set_state(PART:"elm.swallow.icon", "icononly", 0.0);
@@ -343,6 +389,7 @@ group { name: "elm/toolbar/item/default";
                set_state(PART:"elm.text", "icononly", 0.0);
                set_state(PART:"event", "disabled", 0.0);
             }
+         // State handling for label only.
          } else if (m1 == (LABEL)) {
             if (!d) {
                set_state(PART:"elm.swallow.icon", "noicon", 0.0);
@@ -357,6 +404,7 @@ group { name: "elm/toolbar/item/default";
                set_state(PART:"elm.text", "noicon_disabled", 0.0);
                set_state(PART:"event", "disabled", 0.0);
             }
+         // Fallback state (should ideally not be reached with ICON or LABEL).
          } else {
             if (!d) {
                set_state(PART:"elm.swallow.icon", "noicon", 0.0);
@@ -375,6 +423,8 @@ group { name: "elm/toolbar/item/default";
       }
    }
    parts {
+      // "base" is the background of the item, normally transparent (#FFFFFF00).
+      // It becomes visible and uses a color class when the item is in the "selected" state.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/toolbar/base";
@@ -389,6 +439,8 @@ group { name: "elm/toolbar/item/default";
          }
       }
 
+      // "icon_clip" is a clipper for the icon. When the item is disabled,
+      // it adds a semi-transparent white overlay (RGBA: 255, 255, 255, 64 or #FFFFFF40).
       part { name: "icon_clip"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -397,6 +449,8 @@ group { name: "elm/toolbar/item/default";
             color: 255 255 255 64; // no cc
          }
       }
+      // "icon_clip1" and "icon_clip2" are used to create a cross-fade animation when the icon changes.
+      // "icon_clip1" holds the old icon and fades out (alpha from 255 to 0).
       part { name: "icon_clip1"; type: RECT;
          clip_to: "icon_clip";
          description { state: "default" 0.0;
@@ -410,6 +464,8 @@ group { name: "elm/toolbar/item/default";
          }
       }
 
+      // "elm.swallow.icon" is the container for the current icon.
+      // It's clipped by "icon_clip1" and is positioned above the text part.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          clip_to: "icon_clip1";
          scale: 1;
@@ -440,6 +496,7 @@ group { name: "elm/toolbar/item/default";
             min: ICMIN ICMIN;
          }
       }
+      // "icon_clip2" holds the new icon and fades in (alpha from 0 to 255).
       part { name: "icon_clip2"; type: RECT;
          clip_to: "icon_clip";
          description { state: "default" 0.0;
@@ -452,6 +509,7 @@ group { name: "elm/toolbar/item/default";
             visible: 1;
          }
       }
+      // "elm.swallow.icon_new" is the container for the new icon during the animation.
       part { name: "elm.swallow.icon_new"; type: SWALLOW;
          clip_to: "icon_clip2";
          scale: 1;
@@ -483,6 +541,8 @@ group { name: "elm/toolbar/item/default";
          }
       }
 
+      // The text parts ("elm.text", "elm.text_new") and their clippers ("text_clip1", "text_clip2")
+      // follow the same cross-fade animation logic as the icon parts.
       part { name: "text_clip1"; type: RECT;
          description { state: "default" 0.0;
             color: 255 255 255 255; // no cc
@@ -590,6 +650,9 @@ group { name: "elm/toolbar/item/default";
          }
       }
 
+      // "bar" is a visual indicator for the selected state. It's an invisible,
+      // zero-height rectangle by default, which becomes a 5px tall, visible bar at the bottom
+      // of the item when selected.
       part { name: "bar"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -612,6 +675,11 @@ group { name: "elm/toolbar/item/default";
             visible: 1;
          }
       }
+      // "event" is a transparent rectangle that covers the entire item to capture all mouse events.
+      // This simplifies event handling, as we don't need to worry about which specific
+      // part (icon or text) was clicked.
+      // `ignore_flags: ON_HOLD` prevents the item from getting stuck in a pressed state
+      // if the mouse is held down and moved away.
       part { name: "event"; type: RECT;
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
@@ -630,39 +698,49 @@ group { name: "elm/toolbar/item/default";
 //      program { signal: "elm,orient,vertical"; source: "elm";
 //         action: STATE_SET "vert" 0.0;
 //      }
+      // On creation ("load"), this program initializes the script's `btmode` variable
+      // to indicate that the item has both a label and an icon by default.
       program { name: "st0";
          signal: "load"; source: "";
          script {
             set_int(btmode, LABEL | ICON);
          }
       }
+      // When the "elm,state,selected" signal is received, it sets the relevant parts
+      // to the "selected" state, making the selection indicator visible.
       program { signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "selected" 0.0;
          target: "elm.text";
          target: "base";
          target: "bar";
       }
+      // Reverts the item to its default state when unselected.
       program { signal: "elm,state,unselected"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.text";
          target: "base";
          target: "bar";
       }
+      // Provides immediate visual feedback on mouse down, without waiting for a click.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "selected" 0.0;
          target: "elm.text";
          target: "base";
          target: "bar";
       }
+      // On mouse up, reverts the visual state...
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
          target: "elm.text";
          target: "base";
          target: "bar";
       }
+      // ...and emits the "elm,action,click" signal to notify the C code that the item was clicked.
       program { signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // These programs handle highlight state changes, typically for keyboard navigation or hover effects,
+      // by toggling the "selected" state on the background and indicator bar.
       program { signal: "elm,highlight,on"; source: "elm";
          action: STATE_SET "selected" 0.0;
          target: "base";
@@ -673,13 +751,19 @@ group { name: "elm/toolbar/item/default";
          target: "base";
          target: "bar";
       }
+      // Forwards mouse in/out events from the event rectangle to the C code.
       program { signal:  "mouse,in"; source:  "event";
          action:  SIGNAL_EMIT "elm,mouse,in" "elm";
       }
       program { signal:  "mouse,out"; source:  "event";
          action:  SIGNAL_EMIT "elm,mouse,out" "elm";
       }
-      program { name: "st1";
+      // The "st1" through "st6" programs manage the item's state via the Embryo script.
+      // They listen for signals from the C code (e.g., "elm,text,hidden", "elm,state,disabled"),
+      // update the `btmode` script variable by setting or unsetting the appropriate bits
+      // (LABEL, ICON, DISABLE), and then call `eval_mode` to apply the visual changes.
+      // This pattern centralizes state logic within the theme.
+      program { name: "st1"; // Text hidden
          signal: "elm,text,hidden"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -687,7 +771,7 @@ group { name: "elm/toolbar/item/default";
             eval_mode(m);
          }
       }
-      program { name: "st2";
+      program { name: "st2"; // Text visible
          signal: "elm,text,visible"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -695,7 +779,7 @@ group { name: "elm/toolbar/item/default";
             eval_mode(m);
          }
       }
-      program { name: "st3";
+      program { name: "st3"; // Icon hidden
          signal: "elm,icon,hidden"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -703,7 +787,7 @@ group { name: "elm/toolbar/item/default";
             eval_mode(m);
          }
       }
-      program { name: "st4";
+      program { name: "st4"; // Icon visible
          signal: "elm,icon,visible"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -711,7 +795,7 @@ group { name: "elm/toolbar/item/default";
             eval_mode(m);
          }
       }
-      program { name: "st5";
+      program { name: "st5"; // Disabled
          signal: "elm,state,disabled"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -719,7 +803,7 @@ group { name: "elm/toolbar/item/default";
             eval_mode(m);
          }
       }
-      program { name: "st6";
+      program { name: "st6"; // Enabled
          signal: "elm,state,enabled"; source: "elm";
          script {
             new m = get_int(btmode);
@@ -730,6 +814,8 @@ group { name: "elm/toolbar/item/default";
 //      program { signal: "elm,state,moving"; source: "elm";
 //         action: STATE_SET "default" 0.0;
 //      }
+      // These programs manage the cross-fade animation when an item's icon is changed.
+      // The `forward` and `backward` signals could allow for different animations.
       program { signal: "elm,state,icon_set,forward"; source: "elm";
          after: "icon_set,animation";
       }
@@ -737,6 +823,9 @@ group { name: "elm/toolbar/item/default";
          signal: "elm,state,icon_set,backward"; source: "elm";
          after: "icon_set,animation";
       }
+      // This program runs the actual animation. It triggers on "elm,state,icon_set",
+      // sets the "animation" state on the clippers, causing one to fade out and the other to fade in
+      // over 0.2 seconds. It then chains to the "done" program.
       program { name: "icon_set,animation";
          signal: "elm,state,icon_set"; source: "elm";
          action: STATE_SET "animation" 0.0;
@@ -745,16 +834,20 @@ group { name: "elm/toolbar/item/default";
          transition: LINEAR 0.2;
          after: "icon_set,animation,done";
       }
+      // After the animation, this signals back to the C code that the transition is complete.
       program { name: "icon_set,animation,done";
          action: SIGNAL_EMIT "elm,state,icon_set,done" "elm";
       }
 
+      // Resets the animation clippers to their default state, for example,
+      // when the animation is not used.
       program { signal: "elm,state,icon,reset"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "icon_clip1";
          target: "icon_clip2";
       }
 
+      // The label change animation programs work identically to the icon animation programs.
       program { signal: "elm,state,label_set,forward"; source: "elm";
          after: "label_set,animation";
       }
@@ -782,10 +875,14 @@ group { name: "elm/toolbar/item/default";
 }
 
 // === item: style assumed to exist
+// This group defines a toolbar item with a horizontal layout (icon and label side-by-side).
+// It is functionally almost identical to "elm/toolbar/item/default", with the primary
+// difference being the relative positioning of the icon and text parts.
 group { name: "elm/toolbar/item/item_horizontal";
    data.item: "transition_animation_on" "1";
    data.item: "focusraise" "on";
 
+   // The script is identical to the one in the default item, managing state transitions.
    script {
       public btmode;
       public eval_mode(m) {
@@ -877,10 +974,15 @@ group { name: "elm/toolbar/item/item_horizontal";
             visible: 0;
          }
       }
+      // The part definitions are very similar to the default item, but the positioning
+      // logic is adjusted for a horizontal layout.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          clip_to: "icon_clip1";
          scale: 1;
          description { state: "default" 0.0;
+            // The icon is aligned to the left side (align: 0.0 0.5).
+            // Its right edge (`rel2.relative: 0.0 ...`) is relative to its own left edge,
+            // making its width depend on the swallowed object's size.
             align: 0.0 0.5;
             rel1.relative: 0.0 0.0;
             rel1.offset: 4 4;
@@ -962,6 +1064,7 @@ group { name: "elm/toolbar/item/item_horizontal";
          scale: 1;
          clip_to: "text_clip1";
          description { state: "default" 0.0;
+            // The text part is positioned to the right of the icon (`rel1.to_x: "elm.swallow.icon"`).
             rel1.offset: 4 4;
             rel1.to_x: "elm.swallow.icon";
             rel1.relative: 1.0 0.0;
@@ -1253,11 +1356,13 @@ group { name: "elm/toolbar/item/item_horizontal";
 }
 
 // === separator
+// Defines a separator item for the toolbar.
 group { name: "elm/toolbar/separator/default";
    parts {
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // In the default state (for horizontal toolbars), it's a 1-pixel wide vertical line.
             min: 1 1;
             max: 1 99999;
             rel1.offset: 4 4;
@@ -1266,12 +1371,14 @@ group { name: "elm/toolbar/separator/default";
             offscale;
          }
          description { state: "vert" 0.0;
+            // In the "vert" state (for vertical toolbars), it's a 1-pixel high horizontal line.
             inherit: "default" 0.0;
             max: 99999 1;
          }
       }
    }
    programs {
+      // These programs switch the separator's orientation based on the toolbar's orientation.
       program { signal: "elm,orient,horizontal"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -1284,21 +1391,25 @@ group { name: "elm/toolbar/separator/default";
 }
 
 // === item: just a regular object holder in the toolbar for any child
+// This group provides a generic container for swallowing any Evas object into the toolbar.
+// It's useful for adding custom widgets that are not standard toolbar items.
 group { name: "elm/toolbar/object/default";
    parts {
+      // Provides an optional background that appears on highlight, similar to standard items.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/toolbar/base";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00 (fully transparent)
             visible: 0;
          }
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/toolbar/base";
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF (fully opaque)
             visible: 1;
          }
       }
+      // The main swallow part where the custom Evas object is placed.
       part { name: "elm.swallow.object"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -1309,10 +1420,12 @@ group { name: "elm/toolbar/object/default";
       }
    }
    programs {
+      // Shows a highlight effect when the item is highlighted.
       program { signal: "elm,highlight,on"; source: "elm";
          action: STATE_SET "selected" 0.0;
          target: "base";
       }
+      // Hides the highlight effect.
       program { signal: "elm,highlight,off"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -1321,11 +1434,15 @@ group { name: "elm/toolbar/object/default";
 }
 
 // === item: the more PANEL that slides out under the toolbar
-// XXX: vert vs horiz (should emit)
+// This group defines the "More" panel, which appears when not all toolbar items
+// can be displayed. It typically slides out from the toolbar.
 group { name: "elm/toolbar/more/default";
    images.image: "win_shad_angle.png" COMP;
    parts {
+      // The WIN_SHAD macro creates a 9-patch shadow effect around the "base" part.
       WIN_SHAD("base", "shadow", "win_shad_angle.png", 21, 21, 14, 28, 0.5)
+      // "shadow" is a rectangle that likely serves as a modal background or is part of the shadow effect.
+      // It becomes visible when the panel is open, potentially to catch clicks outside the panel.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -1346,6 +1463,9 @@ group { name: "elm/toolbar/more/default";
             visible: 1;
          }
       }
+      // "base" is the main background of the "More" panel.
+      // Its height is animated by changing `rel2.relative` from 0.0 (collapsed) to 1.0 or 2.0 (expanded).
+      // The "open" and "open2" states suggest it can expand to different sizes, perhaps for one or two rows of items.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/toolbar/more";
@@ -1364,6 +1484,9 @@ group { name: "elm/toolbar/more/default";
             visible: 1;
          }
       }
+      // "clipper" and "clipper2" are used to contain and clip the swallowed content.
+      // This setup with two clippers allows for arranging items into two distinct areas
+      // within the "More" panel, like a two-row or two-column grid.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -1399,6 +1522,8 @@ group { name: "elm/toolbar/more/default";
             visible: 1;
          }
       }
+      // "elm.swallow.content" and "elm.swallow.content2" are the containers for the
+      // toolbar items that are moved into the "More" panel.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -1415,6 +1540,8 @@ group { name: "elm/toolbar/more/default";
       }
    }
   programs {
+     // This program animates the panel opening to the "open" state over 0.2 seconds
+     // with a decelerating curve, giving it a smooth "ease-out" feel.
      program { signal: "elm,state,open"; source: "elm";
         action: STATE_SET "open" 0.0;
         target: "shadow";
@@ -1423,6 +1550,7 @@ group { name: "elm/toolbar/more/default";
         target: "clipper2";
         transition: DECELERATE 0.2;
      }
+     // Animates to the larger "open2" state.
      program { signal: "elm,state,open2"; source: "elm";
         action: STATE_SET "open2" 0.0;
         target: "shadow";
@@ -1431,6 +1559,8 @@ group { name: "elm/toolbar/more/default";
         target: "clipper2";
         transition: DECELERATE 0.2;
      }
+     // Animates the panel closing over 0.3 seconds with an accelerating curve ("ease-in").
+     // Note that only the "shadow" and "base" are animated here; the clippers likely snap shut.
      program { signal: "elm,state,close"; source: "elm";
         action: STATE_SET "default" 0.0;
         target: "shadow";

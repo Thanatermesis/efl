@@ -1,33 +1,59 @@
+// This group defines the basic layout for a standard Elementary window.
+// It includes a main content area and an optional menu at the top.
+// The layout adjusts automatically when the menu is shown or hidden.
 group { name: "elm/win/base/default";
    data.item: "version" "119";
    parts {
+      // This is a clipping rectangle for all other parts in this group. It ensures
+      // that no content is drawn outside of the window's client area.
+      // 'nomouse' prevents it from interfering with mouse events.
       rect { "client_clip"; nomouse; }
-// nothing seems to use this swallow...
+      // This swallow part is a container for a menu widget. It's designed to
+      // appear at the top of the window when activated. It has two states:
+      // "default" (hidden) and "visible".
       swallow { "elm.swallow.menu";
          clip_to: "client_clip";
          desc { "default";
+            // In the default state, the menu is positioned just above the
+            // visible area of the window, making it effectively hidden.
             rel1.offset: 0 -1;
             rel2.relative: -1 -1;
             align: 0.5 0.0;
+            // The part is explicitly hidden.
             hid;
+            // This state is activated by the "elm,action,hide" signal,
+            // though it's also the default state.
             link.base: "elm,action,hide" "elm";
+            // Minimum height of 20px.
             min: 0 20;
+            // The width and height aspects are fixed, so it won't stretch.
             fixed: 1 1;
          }
          desc { "visible";
             inherit: "default";
+            // When visible, the menu is positioned at the top of the window.
             rel1.offset: 0 0;
             rel2.offset: -1 0;
+            // The part is explicitly made visible.
             vis;
+            // This state is triggered by the "elm,action,show_menu" signal.
             link.base: "elm,action,show_menu" "elm";
          }
       }
+      // This swallow part holds the main content of the window.
       swallow { "elm.swallow.contents";
          clip_to: "client_clip";
+         // In the default state, it fills the entire client area.
          desc { "default"; }
          desc { "with_menu";
+            // This state is active when the menu is visible.
+            // It positions the top of the content area just below the menu.
             rel1.to: "elm.swallow.menu";
+            // rel1.relative of 0.0 1.0 aligns the top of this part (Y=0.0) with
+            // the bottom of the "elm.swallow.menu" part (Y=1.0).
             rel1.relative: 0.0 1.0;
+            // This state is also triggered by the "elm,action,show_menu" signal,
+            // synchronizing the layout change with the menu's appearance.
             link.base: "elm,action,show_menu" "elm";
          }
       }

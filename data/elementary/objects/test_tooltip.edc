@@ -1,37 +1,62 @@
 collections {
+   // This group defines a specific style for a tooltip, named "nomin".
+   // The "nomin" suffix suggests that this style is designed to have no minimum size,
+   // allowing the tooltip to shrink to fit its content.
    group { "elm/tooltip/base/nomin";
       /* Copied from default theme */
+      // These data items configure the tooltip's behavior and appearance.
+      // pad_* values define spacing for the content.
       data.item: "pad_x" "10";
       data.item: "pad_y" "10";
       data.item: "pad_border_x" "1";
       data.item: "pad_border_y" "1";
+      // "hide_timeout" specifies the tooltip's visibility duration in seconds.
       data.item: "hide_timeout" "0.35";
+      // "transparent" allows the tooltip window to have alpha blending, which is
+      // necessary for rounded corners or semi-transparent backgrounds.
       data.item: "transparent" "enabled";
       parts {
+         // The "base" part serves as the background of the tooltip.
          rect { "base";
             desc { "";
+               // A solid dark grey color (#202020).
                color: 32 32 32 255;
             }
          }
+         // This "outside" rectangle seems to be for debugging or visualization purposes.
+         // It extends well beyond the typical tooltip boundaries.
          rect { "outside";
             desc { "";
+               // These offsets make the rectangle much larger than the "base" part,
+               // extending 60 pixels to the left and 59 to the right, and 20 pixels
+               // above and 19 below the swallowed content area.
                rel1.offset: -60 -20;
                rel2.offset: 59 19;
+               // A semi-transparent blueish-grey color (#204060 at 50% alpha).
+               // Its visibility helps in debugging the tooltip's placement and size.
                color: 32 64 96 128;
             }
          }
+         // The "info" text part also appears to be for debugging. It displays text
+         // over the "outside" rectangle.
          text { "info";
             desc { "";
                text {
                   font: "Sans";
                   size: 10;
+                  // The text explicitly mentions the purpose of this style.
                   text: "No Min Size";
                }
+               // It occupies the same large area as the "outside" rectangle.
                rel1.offset: -60 -20;
                rel2.offset: 59 19;
+               // Solid white color (#FFFFFF) for high visibility.
                color: 255 255 255 255;
             }
          }
+         // This is the container for the actual tooltip content.
+         // Elementary widgets will automatically place their tooltip content inside this part
+         // because of its standard name "elm.swallow.content".
          swallow { "elm.swallow.content";
             desc { "";
             }

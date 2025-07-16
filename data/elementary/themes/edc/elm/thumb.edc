@@ -1,6 +1,12 @@
+// This group defines the style for a thumbnail widget. It includes a
+// background, a shadow, and a content area that can display a busy animation.
 group { name: "elm/thumb/base/default";
    images.image: "win_shadow.png" COMP;
    parts {
+      // The shadow part is an image that provides a drop shadow effect for the
+      // thumbnail. It is positioned relative to the 'bg' part and does not
+      // handle mouse events. The WIN_SHADOW_SMALL macro likely defines the
+      // image properties for a small shadow.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -9,17 +15,25 @@ group { name: "elm/thumb/base/default";
             color_class: "/shadow/normal/thumb";
          }
       }
+      // The bg part is a rectangle that serves as the background for the
+      // thumbnail. It is positioned relative to the 'elm.swallow.content' part
+      // to ensure it surrounds the content.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.content";
             color_class: "/bg/normal/thumb";
          }
       }
+      // The clip part is a rectangle used to clip the content of the thumbnail.
+      // This ensures that the content does not extend beyond its designated area.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel2.to: "elm.swallow.content";
          }
       }
+      // This is a SWALLOW part, which acts as a container for external content,
+      // such as an image or another widget. It is clipped by the 'clip' part,
+      // and the offsets create a small padding around the content.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          clip_to: "clip";
@@ -29,6 +43,10 @@ group { name: "elm/thumb/base/default";
             offscale;
          }
       }
+      // The busy_clip part is a clipper for the busy indicator. It is
+      // transparent and invisible in the 'default' state (color: 255 255 255 0, #FFFF00),
+      // and becomes opaque in the 'active' state, making the busy indicator visible
+      // (color: 255 255 255 255, #FFFFFF).
       part { name: "busy_clip"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -39,6 +57,10 @@ group { name: "elm/thumb/base/default";
             color: 255 255 255 255; // no cc
          }
       }
+      // The busy part is a rectangle that serves as a busy indicator. It is
+      // clipped by 'busy_clip' and is initially positioned at the bottom-left
+      // of the 'bg' part. The 'other' state moves it to the bottom-right,
+      // creating an animation effect.
       part { name: "busy"; type: RECT; mouse_events: 0;
          clip_to: "busy_clip";
          description { state: "default" 0.0;
@@ -55,7 +77,11 @@ group { name: "elm/thumb/base/default";
          }
       }
    }
+   // The programs section defines animations and state changes.
    programs {
+      // When the "elm,state,pulse,start" signal is received, this program
+      // initiates a spinning animation by moving the 'busy' part to the 'other'
+      // state (bottom-right) and then chaining to the 'spin2' program.
       program { name: "spin";
          signal: "elm,state,pulse,start"; source: "elm";
          action: STATE_SET "other" 0.0;
@@ -63,29 +89,42 @@ group { name: "elm/thumb/base/default";
          target: "busy";
          after: "spin2";
       }
+      // This program moves the 'busy' part back to the 'default' state
+      // (bottom-left) and then chains back to 'spin', creating a continuous
+      // back-and-forth animation.
       program { name: "spin2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "busy";
          after: "spin";
       }
+      // When the "elm,state,pulse,start" signal is received, this program
+      // makes the busy animation visible by transitioning the 'busy_clip' part
+      // to its 'active' state.
       program { signal: "elm,state,pulse,start"; source: "elm";
          action: STATE_SET "active" 0.0;
          transition: SINUSOIDAL 0.25;
          target: "busy_clip";
       }
+      // When the "elm,state,pulse,stop" signal is received, this program fades
+      // out the 'busy_clip' part, hiding the busy animation, and then chains to
+      // 'spin3' to stop the animation programs.
       program { signal: "elm,state,pulse,stop"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 1.0;
          target: "busy_clip";
          after: "spin3";
       }
+      // This program stops the 'spin' and 'spin2' animations and then chains to
+      // 'spin4' to reset the busy indicator's position.
       program { name: "spin3";
          action: ACTION_STOP;
          target: "spin";
          target: "spin2";
          after: "spin4";
       }
+      // This program ensures the 'busy' part is reset to its 'default' state
+      // after the animation is stopped.
       program { name: "spin4";
          action: STATE_SET "default" 0.0;
          target: "busy";
@@ -93,14 +132,19 @@ group { name: "elm/thumb/base/default";
    }
 }
 
+// This group defines a frameless version of the thumbnail, inheriting from the
+// default style. It makes the shadow and background parts invisible,
+// effectively removing the frame and shadow from the thumbnail.
 group { name: "elm/thumb/base/noframe";
    inherit: "elm/thumb/base/default";
    parts {
+      // Hides the shadow.
       part { name: "shadow"; mouse_events: 0;
          description { state: "default" 0.0;
             visible: 0;
          }
       }
+      // Hides the background and removes its padding.
       part { name: "bg"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.offset: 0 0;

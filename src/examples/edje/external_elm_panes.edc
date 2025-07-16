@@ -1,13 +1,18 @@
 collections {
-   /* tell edje that we are going to use elementary external parts */
+   // Declares that this EDC file will use external parts from the Elementary toolkit,
+   // which is necessary for embedding Elementary widgets like buttons and panes.
    externals {
       external: "elm";
    }
-   
-   /* those groups are the buttons used as content for the panes */
+
+   // These groups serve as templates for the content of the panes. Each group
+   // defines a button with a specific label, which can then be referenced by name
+   // when setting the content of a panes widget.
    group { name: "button1";
       parts {
          part { name: "btn";
+            // This part is an external Elementary widget. 'elm/button' specifies that it is a
+            // standard Elementary button.
             type: EXTERNAL;
             source: "elm/button";
             description { state: "default" 0.0;
@@ -39,7 +44,9 @@ collections {
       }
    }
 
-   /* this is the vertical panes */
+   // This group defines a nested panes widget. It is configured to be horizontal
+   // and will be placed inside the main panes widget ('panes1'). This technique
+   // allows for complex, multi-pane layouts.
    group { name: "panes2";
       parts {
          part { name: "panes";
@@ -47,7 +54,10 @@ collections {
             source: "elm/panes";
             description { state: "default" 0.0;
                params {
+                  // Makes the panes split horizontally.
                   bool: "horizontal" 1;
+                  // Sets the content for the left and right sides of the panes,
+                  // referencing the button groups defined above.
                   string: "content left" "button2";
                   string: "content right" "button3";
                }
@@ -55,61 +65,85 @@ collections {
          }
       }
    }
-   
+
+   // This is the main group for the application window, defining its overall
+   // layout and interactive behavior.
    group { name: "main";
-      /* set a min window size */
+      // Sets a minimum size for the window to ensure the layout is not crushed.
       min: 300 400;
 
       parts {
+         // A simple white background for the window.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: Opaque White (#FFFFFFFF)
                color: 255 255 255 255;
             }
          }
 
+         // The main title text of the application.
          part { name: "title";
             type: TEXT;
+            // Adds a subtle shadow effect to the text for better readability.
             effect: SOFT_SHADOW;
             description { state: "default" 0.0;
+               // Text color: Opaque White (#FFFFFFFF)
                color: 255 255 255 255;
+               // Shadow color: Semi-transparent dark gray (#46464646)
                color3: 70 70 70 70;
                text {
                   text: "Elementary Panes";
                   font: "Sans";
                   size: 16;
+                  // Aligns the text to be horizontally centered and vertically at the top.
                   align: 0.5 0.0;
                }
             }
          }
 
-         /* first panes (horiz) */
+         // This is the main panes widget. As 'horizontal' is not set to 1, it defaults
+         // to a vertical layout. It's positioned to fill the space between the title
+         // and the swap button at the bottom.
          part { name: "panes1";
             type: EXTERNAL;
             source: "elm/panes";
+            // This is the default state of the panes.
             description { state: "default" 0.0;
+               // Offsets place this part 35px from the top and 45px from the bottom
+               // of its container, creating space for other elements.
                rel1.offset: 0 35;
                rel2.offset: 0 -45;
                params {
+                  // For vertical panes, "content left" corresponds to the top part and
+                  // "content right" to the bottom part. Here, the top contains 'button1'
+                  // and the bottom contains the nested 'panes2' group.
                   string: "content left" "button1";
                   string: "content right" "panes2";
                }
             }
+            // This 'swapped' state is triggered by a program. It reverses the content
+            // of the panes, providing a simple animation-like effect.
             description { state: "swapped" 0.0;
+               // Inherits all properties from the 'default' state, so only changes
+               // need to be specified, making the code more concise.
                inherit: "default" 0.0;
                params {
+                  // The content is now swapped.
                   string: "content left" "panes2";
                   string: "content right" "button1";
                }
             }
          }
 
-         /* button used to swap the content of the panes1 */
+         // A button at the bottom of the window to trigger the swapping of panes content.
          part { name: "swap_button";
             type: EXTERNAL;
             source: "elm/button";
             description { state: "default" 0.0;
                rel1 {
+                  // Positions the button at the bottom-left of the parent, then offsets
+                  // it upwards by 40 pixels, anchoring it near the bottom of the window.
                   relative: 0.0 1.0;
                   offset: 0 -40;
                }
@@ -120,18 +154,26 @@ collections {
          }
       }
 
+      // Programs define the dynamic behavior and logic of the interface.
+      // They respond to signals and can change the state of parts.
       programs {
-         /* when button is pressed set the 'swapped' state */
+         // This program is triggered when 'swap_button' emits the "clicked" signal. It
+         // changes the state of 'panes1' to 'swapped', which visually swaps its content.
          program { name: "swap";
             signal: "clicked";
             source: "swap_button";
             action: STATE_SET "swapped" 0.0;
             target: "panes1";
+            // The 'after' keyword chains this program to 'go_back', which will run
+            // immediately after this one completes.
             after: "go_back";
          }
-         /* after 1 second return to the 'default' state */
+         // This program resets the panes to their default state after a delay, creating
+         // a temporary swap effect.
          program { name: "go_back";
+            // The 'in' property creates a 1.0-second delay before this program runs.
             in: 1.0 0.0;
+            // It sets the state of 'panes1' back to 'default'.
             action: STATE_SET "default" 0.0;
             target: "panes1";
          }

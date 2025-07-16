@@ -1,45 +1,74 @@
+// This group defines the scrollable frame for an entry widget. It provides a
+// background, a clipping area, and a swallow part where the actual entry
+// content (like a textblock) is placed. This design decouples the frame from
+// the content, allowing different types of content to be used within the same frame.
 group { name: "e/widgets/entry/scrollframe";
    parts {
+      // "bg": A simple rectangle that serves as the visual background of the entry.
+      // The color is defined by the "/bg/normal/entry" color class, ensuring a
+      // consistent look with the rest of the theme.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/entry";
          }
       }
+      // "clipper": A rectangle used as a clipping mask, sized relative to the "bg"
+      // part. Content is clipped to its boundaries.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // "e.swallow.content": A placeholder for the actual entry content.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
+         // Ensures that the swallowed content is clipped by the "clipper" part.
          clip_to: "clipper";
          description { state: "default" 0.0;
+            // These create a small internal padding for the text.
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // Crucial for scrolling. Prevents the content from being scaled down if it's
+            // larger than the swallow area. Instead, it remains at its original size,
+            // allowing it to be panned/scrolled.
             offscale;
          }
       }
    }
 }
 
+// This group defines a standard single-line, editable text entry. It handles
+// text display, styling for different states (default, disabled), and basic
+// interactions like focusing.
 group { name: "e/widgets/entry/text";
+      // Defines text styles for the entry. Using styles allows for easy
+      // modification of the text appearance without changing the part definitions.
       styles {
+         // Style for the normal, enabled state of the entry.
+         // color=cc:/fg/normal/entry: Uses a theme-defined color for normal text.
          style { name: "entry_textblock_style";
             base: "font="FN" font_size=10 color=cc:/fg/normal/entry text_class=entry left_margin=2 right_margin=2";
          }
+         // Style for the disabled state, typically with a less prominent color.
+         // color=cc:/fg/disabled/entry: Uses a theme-defined color for disabled text.
          style { name: "entry_textblock_disabled_style";
             base: "font="FN" font_size=10 color=cc:/fg/disabled/entry text_class=entry left_margin=2 right_margin=2";
          }
       }
    parts {
+      // "e.text.text": The core TEXTBLOCK part that handles text rendering and interaction.
       part { name: "e.text.text"; type: TEXTBLOCK;
          scale: 1;
-         entry_mode: EDITABLE;
-         select_mode: DEFAULT;
-         cursor_mode: BEFORE;
-         multiline: 0;
-         source: "e/widgets/entry/selection"; // selection under
-         source4: "e/widgets/entry/cursor"; // cursorover
+         entry_mode: EDITABLE; // Allows the user to edit the text.
+         select_mode: DEFAULT; // Allows standard text selection.
+         cursor_mode: BEFORE; // The cursor is positioned before the character.
+         multiline: 0; // This is a single-line entry.
+         // Renders the "e/widgets/entry/selection" group *under* the text for selection highlight.
+         source: "e/widgets/entry/selection";
+         // Renders the "e/widgets/entry/cursor" group *over* the text.
+         // Using 'source' parts for cursor and selection is a powerful Edje feature that
+         // separates their logic and appearance from the textblock itself.
+         source4: "e/widgets/entry/cursor";
          description { state: "default" 0.0;
             align: 0.0 0.5;
             text {
@@ -56,14 +85,19 @@ group { name: "e/widgets/entry/text";
       }
    }
    programs {
+      // When the edje object is loaded, it automatically sets focus to the text part,
+      // allowing the user to start typing immediately.
       program { signal: "load"; source: "";
          action: FOCUS_SET;
          target: "e.text.text";
       }
+      // When the "e,state,disabled" signal is received from the application (source: "e"),
+      // this program changes the state of the "e.text.text" part to "disabled".
       program { signal: "e,state,disabled"; source: "e";
          action: STATE_SET "disabled" 0.0;
          target: "e.text.text";
       }
+      // When the "e,state,enabled" signal is received, it reverts the state to "default".
       program { signal: "e,state,enabled"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.text.text";
@@ -77,44 +111,69 @@ group { name: "e/widgets/entry/text";
    }
 }
 
+// This group defines a password entry field. It inherits all properties from the
+// "e/widgets/entry/text" group and overrides specific parts to mask the input.
+// This inheritance is a key feature for creating variations of a widget with
+// minimal code duplication.
 group { name: "e/widgets/entry/password";
    inherit: "e/widgets/entry/text";
    parts {
+      // This overrides the "e.text.text" part from the parent group.
       part { name: "e.text.text";
+         // This is the key change. It tells the TEXTBLOCK to behave as a password
+         // field, not displaying the actual characters typed.
          entry_mode: PASSWORD;
          description { state: "default" 0.0;
+            // Specifies that '*' should be used as the replacement character for
+            // masking the password.
             text.repch: "*";
          }
       }
    }
 }
 
+// This group defines the visual representation and blinking animation of the text
+// cursor. It's designed to be used as an overlay (source4) on a text part.
+// This separation of concerns makes the cursor logic reusable and independent.
 group { name: "e/widgets/entry/cursor";
+   // Ensures the cursor has a minimum width of 1 pixel, so it's always visible
+   // when it should be, regardless of scaling.
    min: 1 0;
    parts {
+      // "cursor": A simple rectangle that is the visual cursor.
+      // mouse_events: 0; The cursor should not block mouse events from reaching the text underneath.
       part { name: "cursor"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             min: 1 10;
             color_class: "/fg/normal/entry/cursor";
+            // In the "default" state, the cursor is invisible.
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // In the "visible" state, it becomes visible.
             visible: 1;
          }
       }
    }
    programs {
+      // The following programs create the cursor's blinking animation.
+      // This is a state machine controlled by signals and timers.
+      // Triggered by "e,action,show,cursor" signal to make the cursor appear and start blinking.
       program {
          signal: "e,action,show,cursor"; source: "e";
+         // action: ACTION_STOP; Stops any currently running animations on the targets
+         // to prevent conflicting animations.
          action: ACTION_STOP;
          target: "cursor_show";
          target: "cursor_hide";
          target: "cursor_show_timer";
          target: "cursor_hide_timer";
+         // after: "cursor_show"; Starts the blinking cycle by showing the cursor first.
          after: "cursor_show";
       }
+      // Triggered by "e,action,hide,cursor" signal to hide the cursor and stop blinking.
       program {
          name: "on_cursor_hide";
          signal: "e,action,hide,cursor";
@@ -126,25 +185,33 @@ group { name: "e/widgets/entry/cursor";
          target: "cursor_hide_timer";
          after: "cursor_hide_stop";
       }
+      // This is a simple program to ensure the cursor's state is set to default (invisible).
       program {
          name: "cursor_hide_stop";
          action: STATE_SET "default" 0.0;
          target: "cursor";
       }
+      // "cursor_show": Sets the cursor part's state to "visible".
+      // after: "cursor_show_timer"; Starts a timer to hide it after a delay.
       program { name: "cursor_show";
          action: STATE_SET "visible" 0.0;
          target: "cursor";
          after: "cursor_show_timer";
       }
+      // "cursor_hide": Sets the cursor part's state to "default" (invisible).
+      // after: "cursor_hide_timer"; Starts a timer to show it again after a delay.
       program { name: "cursor_hide";
          action: STATE_SET "default" 0.0;
          target: "cursor";
          after: "cursor_hide_timer";
       }
+      // "cursor_show_timer": After 0.5 seconds, runs the "cursor_hide" program.
       program { name: "cursor_show_timer";
          in: 0.5 0.0;
          after: "cursor_hide";
       }
+      // "cursor_hide_timer": After 0.5 seconds, runs the "cursor_show" program.
+      // These two timers work together to create the continuous blinking effect.
       program { name: "cursor_hide_timer";
          in: 0.5 0.0;
          after: "cursor_show";
@@ -152,11 +219,20 @@ group { name: "e/widgets/entry/cursor";
    }
 }
 
+// This group defines the visual for text selection. It's a simple colored
+// rectangle that is sized and positioned by the TEXTBLOCK part that uses it as a
+// source (as a layer under the text).
 group { name: "e/widgets/entry/selection";
+// The "data" item is a way to pass custom key/value data. "on_foreground" is
+// not a standard Edje keyword but could be used by custom theme engines or application
+// code to alter behavior, such as changing the rendering layer of the selection.
 //   data.item: "on_foreground" "1";
    parts {
+      // "selection": The rectangle used for highlighting selected text.
+      // mouse_events: 0; The selection highlight should not interfere with mouse events.
       part { name: "selection"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // color_class: Defines the selection color using a theme-defined value.
             color_class: "/bg/normal/entry/selection";
          }
       }

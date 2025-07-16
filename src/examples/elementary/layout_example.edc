@@ -1,20 +1,29 @@
 collections {
 
+   // This group demonstrates a basic layout with different container parts.
+   // It defines a title and four distinct areas for content: a text label,
+   // a custom swallow part, a box container, and a table container.
    group {
       name: "example/mylayout";
 
       data {
+         // Data items are key-value pairs used to store metadata about the group.
+         // This can be queried at runtime. Here, it sets a title for the layout.
          item: "title" "Layout Example 01";
       }
 
       parts {
+         // The 'title' part is a simple text element.
          part {
             name: "example/title";
             type: TEXT;
 
             description {
                state: "default" 0.0;
+               // color is black (#000000FF).
                color: 0 0 0 255;
+               // 'rel1' and 'rel2' define the part's geometry relative to its container.
+               // This part occupies the top 20% of the layout area.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 0 0;
@@ -33,12 +42,17 @@ collections {
             }
          }
 
+         // A 'SWALLOW' part acts as a placeholder for externally created objects.
+         // This is useful for integrating custom widgets or complex elements
+         // that are managed by the application's C code.
          part {
             name: "example/custom";
             type: SWALLOW;
 
             description {
                state: "default" 0.0;
+               // fixed: 1 1 indicates that the part should respect the size of the
+               // swallowed object, preventing the layout engine from resizing it.
                fixed: 1 1;
 
                rel1 {
@@ -52,6 +66,7 @@ collections {
             }
          } // example/custom
 
+         // The 'box' part is a container that arranges child elements.
          part {
             name: "example/box";
             type: BOX;
@@ -60,6 +75,8 @@ collections {
                state: "default" 0.0;
 
                box {
+                  // 'horizontal_flow' layout arranges children from left to right,
+                  // wrapping to a new line when the horizontal space is filled.
                   layout: "horizontal_flow";
                   padding: 2 2;
                   align: 0.5 0.5;
@@ -76,6 +93,7 @@ collections {
             }
          } // example/box
 
+         // The 'table' part is another container that arranges children in a grid.
          part {
             name: "example/table";
             type: TABLE;
@@ -84,6 +102,8 @@ collections {
                state: "default" 0.0;
 
                table {
+                  // 'homogeneous: NONE' allows columns and rows to have different sizes,
+                  // adapting to the size of the children they contain.
                   homogeneous: NONE;
                   padding: 2 2;
                   align: 0.5 0.5;
@@ -102,6 +122,9 @@ collections {
       }
    }
 
+   // This group demonstrates dynamic layout changes using states and programs.
+   // It features a 'SWALLOW' part that can change its size in response to signals,
+   // showcasing animations and inter-program communication.
    group {
       name: "example/mylayout3";
 
@@ -135,41 +158,59 @@ collections {
             }
          }
 
+         // This 'SWALLOW' part has two states: "default" and "big".
+         // This allows its properties (like size) to be changed dynamically.
          part {
             name: "example/custom";
             type: SWALLOW;
 
+            // The "default" state defines the initial appearance of the part.
             description {
                state: "default" 0.0;
+               // min and max are set to the same value to enforce a fixed size.
                min: 160 50;
                max: 160 50;
                align: 0.5 1.0;
             }
+            // The "big" state defines an alternative appearance.
             description {
                state: "big" 0.0;
+               // 'inherit' copies all properties from the "default" state.
+               // Properties defined below will override the inherited values.
                inherit: "default" 0.0;
+               // Here, we override min and max to make the part larger.
                min: 320 100;
                max: 320 100;
             }
          } // example/custom
 
+         // Programs define actions that are triggered by signals.
+         // They are the core of event handling and animation in Edje.
          programs {
+            // This program is triggered when the "button,enlarge" signal is received.
             program {
                name: "swallow,grow";
                signal: "button,enlarge";
+               // It changes the state of the "example/custom" part to "big".
                action: STATE_SET "big" 0.0;
+               // The transition happens smoothly over 0.5 seconds.
                transition: LINEAR 0.5;
                target: "example/custom";
+               // After the transition completes, it runs the "emit,changed" program.
                after: "emit,changed";
             }
+            // This program is triggered by the "button,reduce" signal.
             program {
                name: "swallow,shrink";
                signal: "button,reduce";
+               // It transitions the "example/custom" part back to the "default" state.
                action: STATE_SET "default" 0.0;
                transition: LINEAR 0.5;
                target: "example/custom";
                after: "emit,changed";
             }
+            // This program is not triggered by an external signal, but is called by other programs.
+            // Its purpose is to emit a signal to notify the application code that the size has changed.
             program {
                name: "emit,changed";
                action: SIGNAL_EMIT "size,changed" "";

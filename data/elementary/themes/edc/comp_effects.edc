@@ -1,8 +1,14 @@
+// Defines the standard duration for composition effects, in seconds.
 #define COMP_EFFECT_DURATION 0.2
+// Defines a faster duration for certain composition effects.
 #define COMP_EFFECT_DURATION_FAST 0.15
 
+// This group defines a "no effect" state. It is used when an effect is
+// disabled or not needed. It simply provides a SWALLOW part to hold content
+// without applying any visual transformations or animations.
 group { name: "e/comp/effects/none";
    parts {
+      // The SWALLOW part that holds the content (e.g., a window).
       part { name: "e.swallow.content"; type: SWALLOW;
         description { state: "default" 0.0;
         }
@@ -11,20 +17,30 @@ group { name: "e/comp/effects/none";
 }
 
 /* non-auto effects are assumed to be run frame by frame by an animator */
+// This group defines a manual move effect. It's designed to be controlled
+// externally, frame by frame, by an animator. This allows for precise
+// interactive control over the object's position, for example, when dragging a window.
 group { name: "e/comp/effects/move";
+   // The script handles messages sent to this Edje object. This is how external
+   // code communicates with the effect to control its behavior.
    script {
       public message(Msg_Type:type, id, ...) {
+         // Message with id 0 is used to set the animation state.
          if ((type == MSG_INT_SET) && (id == 0)) {
             /* set state */
             new st;
 
+            // A value of 1 transitions to the "custom" state (moving),
+            // while any other value goes to the "default" state (static).
             st = getarg(2);
             if (st == 1)
               set_state(PART:"mover", "custom", 0.0);
             else
               set_state(PART:"mover", "default", 0.0);
+         // Message with id 1 is for updating the target coordinates.
          } else if ((type == MSG_INT_SET) && (id == 1)) {
-            /* x,y coords to move to */
+            // It receives x and y coordinates and applies them as an offset
+            // to the "mover" part, effectively repositioning the content.
             new x, y;
 
             x = getarg(2);
@@ -37,10 +53,16 @@ group { name: "e/comp/effects/move";
       }
    }
    parts {
+      // The "mover" is an invisible SPACER part. Its sole purpose is to be a
+      // movable anchor. The actual content will be slaved to its position.
+      // This separation of concerns (content vs. position control) is a common
+      // and powerful pattern in Edje.
       part { name: "mover"; type: SPACER;
         description { state: "default" 0.0;
         }
       }
+      // This is the actual content, which is positioned relative to the "mover" part.
+      // Any changes to "mover"'s position will be mirrored by this part.
       part { name: "e.swallow.content"; type: SWALLOW;
         description { state: "default" 0.0;
            rel1.to: "mover";
@@ -49,6 +71,9 @@ group { name: "e/comp/effects/move";
       }
    }
    programs {
+      // This program is triggered by the "e,action,go" signal when the "mover"
+      // is in its "default" state. It initiates a transition to the "custom" state.
+      // Shows the tooltip by animating the mover to the "default" state (full size).
       program {
          name: "show";
          signal: "e,action,go";
@@ -59,6 +84,9 @@ group { name: "e/comp/effects/move";
          target: "mover";
          after: "done";
       }
+      // This program is triggered by the "e,action,go" signal when the "mover"
+      // is in its "custom" state. It initiates a transition back to the "default" state.
+      // Shows the content by animating the clip back to the "default" state (full height).
       program {
          name: "hide";
          signal: "e,action,go";
@@ -69,6 +97,8 @@ group { name: "e/comp/effects/move";
          target: "mover";
          after: "done";
       }
+      // Triggered by "e,action,stop", this program immediately halts any
+      // ongoing "show" or "hide" animations.
       program {
          name: "stop";
          signal: "e,action,stop";
@@ -77,6 +107,8 @@ group { name: "e/comp/effects/move";
          target: "show";
          target: "hide";
       }
+      // After an animation completes, this program emits the "e,action,done"
+      // signal, notifying external listeners that the effect has finished.
       program {
          name: "done";
          action: SIGNAL_EMIT "e,action,done" "e";
@@ -85,10 +117,14 @@ group { name: "e/comp/effects/move";
 }
 
 /* auto effects are "start and forget" */
+// This group defines an automatic "pane" (slide) effect. It's used for sliding
+// content in or out of view, typically during a desktop switch. It's an "auto"
+// effect, meaning it runs to completion once started.
 group { name: "e/comp/effects/auto/pane";
    //data.item: "noclip" "1"; //setting this prevents object from being clipped to its zone during effect
    script {
       public message(Msg_Type:type, id, ...) {
+         // Message with id 0 sets the state, similar to the "move" effect.
          if ((type == MSG_INT_SET) && (id == 0)) {
             /* set state */
             new st;
@@ -98,8 +134,11 @@ group { name: "e/comp/effects/auto/pane";
               set_state(PART:"mover", "custom", 0.0);
             else
               set_state(PART:"mover", "default", 0.0);
+         // Message with id 1 calculates the off-screen position.
          } else if ((type == MSG_INT_SET) && (id == 1)) {
-            /* border geom[4] / screen size[2] / desk change direction[2] */
+            // It uses the screen dimensions (sw, sh) and desk change direction (dx, dy)
+            // to calculate a target position that is 1.5 times the screen size away,
+            // ensuring the content is completely off-screen.
             new x, y, sw, sh, dx, dy;
 
             sw = getarg(6);
@@ -129,6 +168,7 @@ group { name: "e/comp/effects/auto/pane";
       }
    }
    programs {
+      // Hides the content by animating the clip to the "hid" state (zero height).
       program {
          name: "show";
          signal: "e,action,go";
@@ -164,6 +204,9 @@ group { name: "e/comp/effects/auto/pane";
    }
 }
 
+// This effect provides a diagonal slide, inheriting from the "pane" effect.
+// Instead of a simple horizontal or vertical slide, content moves diagonally
+// off-screen, creating a more dynamic transition.
 group { name: "e/comp/effects/auto/diagonal";
    inherit: "e/comp/effects/auto/pane";
    script {
@@ -178,8 +221,12 @@ group { name: "e/comp/effects/auto/diagonal";
               set_state(PART:"mover", "custom", 0.0);
             else
               set_state(PART:"mover", "default", 0.0);
+         // This message handler calculates a more complex diagonal path.
          } else if ((type == MSG_INT_SET) && (id == 1)) {
-            /* border geom / screen size / desk change direction */
+            // The logic determines the angle from the center of the screen to the
+            // center of the border (window). It then calculates an off-screen
+            // position along that angle, ensuring the window flies off towards
+            // the corner it's closest to.
             new x, y, w, h, sw, sh, mx, my, bx, by;
             new Float:fx, Float:fy, Float:ang, Float:len, Float:lmax, Float:rad;
 
@@ -215,6 +262,9 @@ group { name: "e/comp/effects/auto/diagonal";
    }
 }
 
+// This effect creates a zoom-in/zoom-out animation. It inherits from the "diagonal"
+// effect but overrides the script to add scaling and clipping, creating the
+// illusion of an object growing from a point or shrinking into it.
 group { name: "e/comp/effects/auto/zoom";
    inherit: "e/comp/effects/auto/diagonal";
    script {
@@ -224,14 +274,18 @@ group { name: "e/comp/effects/auto/zoom";
             new st;
 
             st = getarg(2);
+            // State 1: Prepare for "show" animation (zoom in).
             if (st == 1) {
               /* starting from offscreen */
+              // The mover is scaled down to 40% of its size (0.7 - 0.3), centered.
               set_state_val(PART:"mover", STATE_REL1, 0.3, 0.3);
               set_state_val(PART:"mover", STATE_REL2, 0.7, 0.7);
               set_state(PART:"mover", "custom", 0.0);
+              // The clip is made fully transparent.
               set_state(PART:"clip", "hidden", 0.0);
             } else {
               /* starting from normal position */
+              // The mover is scaled up to 340% of its size (1.7 - (-1.7)), centered.
               set_state_val(PART:"mover", STATE_REL1, -1.7, -1.7);
               set_state_val(PART:"mover", STATE_REL2, 1.7, 1.7);
               set_state(PART:"mover", "default", 0.0);
@@ -273,6 +327,7 @@ group { name: "e/comp/effects/auto/zoom";
       }
    }
    parts {
+      // A RECT part used for clipping. It controls the visibility of the content.
       part { name: "clip"; type: RECT; mouse_events: 0;
          insert_after: "mover";
          description { state: "default";
@@ -280,18 +335,24 @@ group { name: "e/comp/effects/auto/zoom";
             rel1.offset: -20 -20;
             rel2.to: "mover";
             rel2.offset: 20 20;
+            // The clipping rectangle is fully opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
          description { state: "hidden";
             rel1.to: "mover";
             rel2.to: "mover";
+            // In the "hidden" state, the clip is fully transparent (#FFFFFF00),
+            // effectively hiding the content.
             color: 255 255 255 0; // no cc
          }
       }
+      // The content is clipped by the "clip" part.
       part { name: "e.swallow.content"; clip_to: "clip";
       }
    }
    programs {
+      // This program animates the "clip" part to its "hidden" state when
+      // the "show" (zoom in) animation starts.
       program {
          name: "show2";
          signal: "e,action,go";
@@ -301,6 +362,8 @@ group { name: "e/comp/effects/auto/zoom";
          transition: ACCELERATE COMP_EFFECT_DURATION USE_DURATION_FACTOR 1 CURRENT;
          target: "clip";
       }
+      // This program animates the "clip" part back to its "default" (visible)
+      // state when the "hide" (zoom out) animation starts.
       program {
          name: "hide2";
          signal: "e,action,go";
@@ -313,6 +376,8 @@ group { name: "e/comp/effects/auto/zoom";
    }
 }
 
+// This group implements a simple blend (fade-in/fade-out) effect.
+// It works by animating the alpha channel of a clipping rectangle.
 group { name: "e/comp/effects/auto/blend";
    //data.item: "noclip" "1"; //setting this prevents object from being clipped to its zone during effect
    script {
@@ -322,9 +387,11 @@ group { name: "e/comp/effects/auto/blend";
             new st;
 
             st = getarg(2);
+            // State 1 sets the clip to "hidden" (transparent) to start the fade-in.
             if (st == 1) {
               /* starting from hidden */
               set_state(PART:"clip", "hidden", 0.0);
+            // Any other state sets the clip to "default" (opaque) to start the fade-out.
             } else {
               set_state(PART:"clip", "default", 0.0);
             }
@@ -332,19 +399,23 @@ group { name: "e/comp/effects/auto/blend";
       }
    }
    parts {
+      // A clipping rectangle that controls the content's alpha.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default";
             rel1.to: "e.swallow.content";
             rel1.offset: -20 -20;
             rel2.to: "e.swallow.content";
             rel2.offset: 20 20;
+            // "default" state is fully opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
          description { state: "hidden";
             inherit: "default" 0.0;
+            // "hidden" state is fully transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
       }
+      // The content is clipped by the "clip" part.
       part { name: "e.swallow.content"; type: SWALLOW;
         clip_to: "clip";
         description { state: "default" 0.0;
@@ -352,6 +423,8 @@ group { name: "e/comp/effects/auto/blend";
       }
    }
    programs {
+      // This program fades out the content. It's named "show" but transitions
+      // the clip from "default" (opaque) to "hidden" (transparent).
       program {
          name: "show";
          signal: "e,action,go";
@@ -362,6 +435,8 @@ group { name: "e/comp/effects/auto/blend";
          target: "clip";
          after: "done";
       }
+      // This program fades in the content. It's named "hide" but transitions
+      // the clip from "hidden" (transparent) to "default" (opaque).
       program {
          name: "hide";
          signal: "e,action,go";
@@ -387,6 +462,8 @@ group { name: "e/comp/effects/auto/blend";
    }
 }
 
+// This effect makes the content appear to grow from an edge or corner, or shrink
+// into it. It inherits from "pane" and overrides the script to control scaling.
 group { name: "e/comp/effects/auto/grow";
    inherit: "e/comp/effects/auto/pane";
    //data.item: "noclip" "1"; //setting this prevents object from being clipped to its zone during effect
@@ -409,6 +486,11 @@ group { name: "e/comp/effects/auto/grow";
             dx = getarg(8);
             dy = getarg(9);
 
+            // This logic sets the initial scale of the "mover" part to a single
+            // edge or corner, based on the desk change direction (dx, dy).
+            // For example, if dx is 1, it means movement is to the right, so the
+            // object will grow from its left edge (r1x is set to 1.0, collapsing
+            // the width to the right edge).
             custom_state(PART:"mover", "default", 0.0);
             if (dx == 1) r1x = 1.0;
             else if (dx == -1) r2x = 0.0;
@@ -421,6 +503,8 @@ group { name: "e/comp/effects/auto/grow";
    }
 }
 
+// This effect provides a vertical reveal animation, similar to a curtain
+// opening or closing. It works by changing the height of a clipping rectangle.
 group { name: "e/comp/effects/visibility/vertical";
    script {
       public message(Msg_Type:type, id, ...) {
@@ -429,21 +513,28 @@ group { name: "e/comp/effects/visibility/vertical";
             new st;
 
             st = getarg(2);
+            // State 1 sets the clip to "hid" (hidden/zero height).
             if (st == 1)
               set_state(PART:"clip", "hid", 0.0);
+            // Any other state sets the clip to "default" (full height).
             else
               set_state(PART:"clip", "default", 0.0);
          }
       }
    }
    parts {
+      // The clipping rectangle.
       rect { "clip";
+        // In the "default" state, it has its normal size.
         desc { rel2.offset: 10 10; }
+        // In the "hid" state, its height is collapsed to zero (rel2.relative y is 0),
+        // effectively hiding the content vertically.
         desc { "hid";
            rel2.relative: 1 0;
            rel2.offset: 10 10;
         }
       }
+      // The content is clipped by the "clip" part.
       swallow { "e.swallow.content"; clip: "clip"; }
    }
    programs {
@@ -482,7 +573,10 @@ group { name: "e/comp/effects/visibility/vertical";
    }
 }
 
+// This effect is specifically for tooltips, making them appear to grow from the
+// mouse pointer's position.
 group { name: "e/comp/effects/visibility/tooltip";
+   // This data item indicates that the effect needs pointer coordinates to work correctly.
    data.item: "need_pointer" "1";
    script {
       public message(Msg_Type:type, id, ...) {
@@ -496,6 +590,7 @@ group { name: "e/comp/effects/visibility/tooltip";
             else
               set_state(PART:"mover", "default", 0.0);
          } else if ((type == MSG_INT_SET) && (id == 1)) {
+            // This handler receives tooltip geometry and pointer position.
             /* absolute object geom[4] / screen size[2] / relative pointer xy[2] */
             new x, y;
             new ow, oh;
@@ -510,6 +605,11 @@ group { name: "e/comp/effects/visibility/tooltip";
             sx2 = x;
             sy2 = y;
             custom_state(PART:"mover", "default", 0.0);
+            // The logic determines where the pointer is relative to the tooltip.
+            // Based on this, it sets the initial state of the "mover" part to be
+            // collapsed to a point or edge that corresponds to the pointer's location.
+            // For example, if the pointer is to the left of the tooltip (x <= 0),
+            // it will grow from its left edge (rx2 = 0.0).
             if (x <= 0) {
                rx2 = 0.0;
             } else {
@@ -535,12 +635,15 @@ group { name: "e/comp/effects/visibility/tooltip";
       }
    }
    parts {
+      // The "mover" part acts as a resizable anchor for the tooltip content.
       spacer { "mover"; }
+      // The tooltip content is slaved to the "mover".
       swallow { "e.swallow.content";
          desc { rel.to: "mover"; }
       }
    }
    programs {
+      // Hides the tooltip by animating the mover to the "custom" state (collapsed).
       program {
          name: "hide";
          signal: "e,action,go";
@@ -576,7 +679,11 @@ group { name: "e/comp/effects/visibility/tooltip";
    }
 }
 
+// This group defines the standard "iconify" (minimize) effect. It makes a window
+// appear to fly towards and shrink into its icon representation (e.g., in a
+// taskbar or icon box).
 group { name: "e/comp/effects/iconify/default";
+   // These aliases allow this effect to be used for different iconification targets.
    alias: "e/comp/effects/iconify/ibar";
    alias: "e/comp/effects/iconify/ibox";
    alias: "e/comp/effects/iconify/tasks";
@@ -596,6 +703,8 @@ group { name: "e/comp/effects/iconify/default";
             else
               set_state(PART:"mover", "default", 0.0);
          } else if ((type == MSG_INT_SET) && (id == 1)) {
+            // This handler receives the source window geometry and the destination
+            // icon geometry.
             // border geom[4] / destination[4]
             new x, y, w, h;
             new dx, dy, dw, dh;
@@ -607,35 +716,44 @@ group { name: "e/comp/effects/iconify/default";
             dy = getarg(7);
             dw = getarg(8);
             dh = getarg(9);
+            // Calculate the center of the source window.
             x = x + (w / 2);
             y = y + (h / 2);
+            // Calculate the vector from the source center to the destination origin.
             dx = dx - x;
             dy = dy - y;
             custom_state(PART:"mover", "default", 0.0);
+            // Set the mover to be scaled down to zero size.
             set_state_val(PART:"mover", STATE_REL1, 1.0, 1.0);
             set_state_val(PART:"mover", STATE_REL2, 0.0, 0.0);
+            // Set the mover's offset to match the destination icon's position and size.
+            // This makes the window appear to shrink into the icon.
             set_state_val(PART:"mover", STATE_REL1_OFFSET, dx, dy);
             set_state_val(PART:"mover", STATE_REL2_OFFSET, dx + dw - 1, dy + dh - 1);
          }
       }
    }
    programs {
+      // The "show" program handles the iconification (minimize) animation.
       program {
          name: "show"; //iconify
          signal: "e,action,go";
          source: "e";
          filter: "mover" "default";
          action: STATE_SET "custom" 0.0;
+         // Uses an accelerating transition to give a "swoosh" effect.
          transition: ACCELERATE_FACTOR COMP_EFFECT_DURATION 2 USE_DURATION_FACTOR 1 CURRENT;
          target: "mover";
          after: "done";
       }
+      // The "hide" program handles the un-iconification (restore) animation.
       program {
          name: "hide"; //uniconify
          signal: "e,action,go";
          source: "e";
          filter: "mover" "custom";
          action: STATE_SET "default" 0.0;
+         // Uses a decelerating transition for a smooth arrival.
          transition: DECELERATE_FACTOR COMP_EFFECT_DURATION_FAST 2 USE_DURATION_FACTOR 1 CURRENT;
          target: "mover";
          after: "done";
@@ -655,7 +773,9 @@ group { name: "e/comp/effects/iconify/default";
    }
 }
 
+// This effect is currently disabled because of rendering issues with proxy visibility.
 #if 0 //this is weirdly broken with proxy visibility somehow...
+// It was intended to create a 3D rotation effect for windows during transitions.
 group { name: "e/comp/effects/auto/rotate";
    inherit: "e/comp/effects/auto/pane";
    script {

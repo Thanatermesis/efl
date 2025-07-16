@@ -1,58 +1,98 @@
+// This group defines the main UI for the backlight module, which is visually
+// represented as a light bulb. The alias allows it to be used for vertical
+// orientations as well.
 group { name: "e/modules/backlight/main";
    alias: "e/modules/backlight/main_vert";
+   // Preload images used in this group for efficiency.
+   // COMP indicates that the image data will be stored compressed in the
+   // final .edj file, which is ideal for PNG images.
    images.image: "bulb_middle.png" COMP;
    images.image: "bulb_over.png" COMP;
    images.image: "bulb_filament.png" COMP;
+   // Define the minimum and maximum size for this widget.
    min: 16 16;
    max: 160 160;
    script {
+      // This script handles dynamic behavior by processing messages sent to the
+      // Edje object. It's an Embryo script, a small, fast scripting language
+      // used within EFL.
       public message(Msg_Type:type, id, ...) {
+         // The message function is a special callback that gets triggered when
+         // edje_object_message_send() is called from C code.
          if ((type == MSG_FLOAT) && (id == 0)) {
+            // Check for a message of type FLOAT. This is typically used for
+            // sending values like slider positions or levels.
             new Float:val;
-            val = getfarg(2);
+            val = getfarg(2); // Get the float value from the message arguments.
+            // set_tween_state smoothly transitions a part from one state to another.
+            // Here, it animates the "glow" and "filament" parts based on the
+            // backlight level 'val'. A 'val' of 0.0 means the "default" state (off),
+            // and 1.0 means the "full" state (on), with intermediate values
+            // creating a smooth visual transition.
             set_tween_state(PART:"glow", val, "default", 0.0, "full", 0.0);
             set_tween_state(PART:"filament", val, "default", 0.0, "full", 0.0);
          }
       }
    }
    parts {
+      // The "base" part serves as the foundation of the light bulb, holding all other
+      // elements. It defines the component's boundaries and basic appearance.
       part { name: "base";
          description { state: "default" 0.0;
+            // 'aspect' and 'aspect_preference' ensure that the bulb maintains its
+            // proportions, preventing it from being stretched or squashed when
+            // the widget is resized.
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "bulb_middle.png";
+            // This color_class sets the bulb's color. The actual color value,
+            // including its hexadecimal representation, is defined by the current theme.
             color_class: "/bg-dark/normal/gadgets/backlight";
          }
       }
+      // The "glow" part creates the lighting effect. It is animated by the
+      // script to transition between an "off" and "on" state.
       part { name: "glow";
          description { state: "default" 0.0;
+            // In its default ("off") state, the glow is collapsed into a single
+            // point in the center of the "base" part. This makes it invisible.
             rel.to: "base";
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
             image.normal: "bulb_middle.png";
+            // Color for the "off" state.
             color_class: "/fg/normal/gadgets/backlight/light/off";
          }
          description { state: "full" 0.0;
             inherit: "default" 0.0;
+            // In the "full" ("on") state, the part expands to fill the entire
+            // "base" part, creating the illusion of the bulb being lit.
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
+            // Color for the "on" state.
             color_class: "/fg/normal/gadgets/backlight/light/on";
          }
       }
+      // The "filament" part represents the glowing element inside the bulb.
       part { name: "filament";
          description { state: "default" 0.0;
             rel.to: "base";
             image.normal: "bulb_filament.png";
+            // Color for the filament when the light is off.
             color_class: "/fg/normal/gadgets/backlight/filament/off";
          }
          description { state: "full" 0.0;
             inherit: "default" 0.0;
+            // Color for the filament when the light is on, making it look incandescent.
             color_class: "/fg/normal/gadgets/backlight/filament/on";
          }
       }
+      // This part is an overlay, likely for adding details like reflections
+      // or highlights on top of the bulb. It is always visible.
       part { name: "over";
          description { state: "default" 0.0;
             rel.to: "base";
             image.normal: "bulb_over.png";
+            // The color class for the base overlay elements of the bulb.
             color_class: "/fg/normal/gadgets/backlight/base";
          }
       }

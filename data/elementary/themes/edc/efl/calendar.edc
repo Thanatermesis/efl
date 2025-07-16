@@ -1,3 +1,6 @@
+// Defines text styles for calendar day items. These styles control the appearance
+// of dates based on their state (e.g., normal, holiday, today). 'color=cc:'
+// maps to a color defined in the theme's palette, making the widget themeable.
 #define CIT_STYLES\
       style { name: "efl_ui_calendar_date_style";\
          base: "font="FN" font_size=10 color=cc:/fg/normal/calendar/day align=center text_class=calendar_day_text";\
@@ -18,6 +21,9 @@
          base: "font="FN" font_size=10 color=cc:/fg/normal/calendar/day/weekend2 align=center text_class=calendar_day_text_weekend2";\
       }\
 
+// Creates the month/year spinner at the top of the calendar. This includes
+// left/right buttons for navigation and a text part to display the current
+// month and year.
 #define CAL_SPIN(_sufix, _text, _relative)\
       part { name: "left_bt"#_sufix; type: SPACER;\
          scale: 1;\
@@ -96,6 +102,8 @@
          }\
       }
 
+// Defines a column header for a day of the week (e.g., "Sun", "Mon").
+// _pos is the column index, from 0 to 6.
 #define CH(_pos) \
    part { name: "ch_"#_pos"_base"; type: SPACER; \
       description { state: "default" 0.0; \
@@ -126,6 +134,9 @@
       } \
    }
 
+// Defines a single day cell in the calendar grid. This is the most complex
+// macro, creating all parts and programs for a single date.
+// _pos is the cell index from 0 to 41.
 #define CIT(_pos) \
    part { name: "cit_"#_pos"_rect"; type: SPACER; \
       description { state: "default" 0.0; \
@@ -386,19 +397,26 @@
       } \
    }
 
+// This group defines the main layout and behavior of the calendar widget. It
+// assembles the spinner, headers, and day cells defined in the macros.
 group { name: "efl/calendar";
    data.item: "version" "123";
+   // This data item enables the focus highlight feature for the widget.
    data.item: "focus_highlight" "on";
    script {
-      public rtl;
-      public win_focus_enabled;
-      public item_focus_enabled;
-      public last_focused_item;
+      // These variables are shared across the group's programs. 'public' makes
+      // them accessible from the application code.
+      public rtl; // Flag for Right-To-Left language support.
+      public win_focus_enabled; // Tracks if the window has focus.
+      public item_focus_enabled; // Tracks if any calendar item has focus.
+      public last_focused_item; // Stores the index of the last focused item.
    }
    styles {
+      // Instantiates the styles defined in the CIT_STYLES macro.
       CIT_STYLES
    }
    parts {
+      // The main background area of the widget, with some padding.
       part { name: "bg"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -407,11 +425,15 @@ group { name: "efl/calendar";
             offscale;
          }
       }
+      // A SWALLOW part that can hold a custom background object, like an image
+      // or a rectangle, provided by the application.
       part { name: "efl.background"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // A spacer that defines the area for the month/year spinner at the top.
+      // It takes up the top 1/8th of the widget's height.
       part { name: "spinner-base1"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -422,6 +444,8 @@ group { name: "efl/calendar";
             align: 0.5 0.0;
          }
       }
+      // A spacer for the main calendar grid, containing the weekday headers and
+      // the day cells.
       part { name: "table-base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -435,6 +459,8 @@ group { name: "efl/calendar";
             offscale;
          }
       }
+      // A spacer for the row of weekday headers (Sun, Mon, etc.). It takes up
+      // the top 1/7th of the 'table-base' area.
       part { name: "header"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "table-base";
@@ -443,6 +469,7 @@ group { name: "efl/calendar";
             min: 0 25;
          }
       }
+      // A simple rectangle used as a separator line below the weekday headers.
       part { name: "header_separator"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -455,6 +482,8 @@ group { name: "efl/calendar";
             offscale;
          }
       }
+      // A spacer defining the area for the 6x7 grid of day cells, positioned
+      // below the 'header'.
       part { name: "base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -468,6 +497,8 @@ group { name: "efl/calendar";
          }
       }
 
+      // Instantiate the spinner, weekday headers, and all 42 day cells using
+      // the macros defined at the top of the file.
       CAL_SPIN(,month_text, spinner-base1)
       CH(0)   CH(1)   CH(2)   CH(3)   CH(4)   CH(5)   CH(6)
       CIT(0)  CIT(1)  CIT(2)  CIT(3)  CIT(4)  CIT(5)  CIT(6)
@@ -479,9 +510,13 @@ group { name: "efl/calendar";
 
    }
    programs {
+      // This program is triggered when the calendar widget's window gains focus.
       program {
          signal: "efl,action,focus_highlight,show";
          source: "efl";
+         // The script sets a flag indicating the window is focused. If an item
+         // was already focused, it re-emits the "focused" signal for that
+         // specific item. This makes the focus highlight appear.
          script {
             set_int(win_focus_enabled, 1);
             if (get_int(item_focus_enabled) == 1) {
@@ -491,9 +526,13 @@ group { name: "efl/calendar";
             }
          }
       }
+      // Triggered when the window loses focus.
       program {
          signal: "efl,action,focus_highlight,hide";
          source: "efl";
+         // It simply sets the flag to indicate the window is no longer focused.
+         // The focus highlight on the item will be hidden by the logic in the
+         // CIT macro's unfocused program.
          script {
             set_int(win_focus_enabled, 0);
          }
@@ -501,13 +540,18 @@ group { name: "efl/calendar";
    }
 }
 
+// Defines the appearance and behavior of the increment button (right arrow)
+// used in the month/year spinner.
 group { name: "efl/calendar/inc_button";
    data.item: "version" "123";
    script {
-      public mouse_down = 0;
-      public multi_down = 0;
+      // Flags to manage click behavior, preventing actions from firing
+      // multiple times on multi-touch or fast clicks.
+      public mouse_down = 0; // Tracks if the primary mouse button is down.
+      public multi_down = 0; // Tracks if a multi-touch event is in progress.
    }
    parts {
+      // The visual representation of the button, an arrow image.
       part { name: "arrow.image";
          scale: 1;
          description { state: "default" 0.0;
@@ -524,12 +568,16 @@ group { name: "efl/calendar/inc_button";
             color_class: "/fg/disabled/spinner/arrow";
          }
       }
+      // An invisible rectangle that overlays the part to capture mouse events.
+      // 'repeat_events: 1' allows events to pass through to parts below.
       part { name: "over"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // An invisible rectangle that appears when the button is disabled,
+      // blocking mouse events.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -542,7 +590,11 @@ group { name: "efl/calendar/inc_button";
       }
    }
    programs {
+      // Triggered on mouse down over the button.
       program { signal: "mouse,down,1"; source: "over";
+         // The script checks that this is not a multi-touch event and that the
+         // mouse isn't already down, then sets the mouse_down flag and runs the
+         // press action program. This logic prevents repeated press actions.
          script {
             if ((get_int(multi_down) == 0) &&
                 (get_int(mouse_down) == 0)) {
@@ -551,6 +603,8 @@ group { name: "efl/calendar/inc_button";
             }
          }
       }
+      // Emits a "press" signal for the application and then triggers the
+      // animation to show the button's pressed state.
       program { name: "button_press2";
          action: SIGNAL_EMIT "efl,action,press" "";
          after: "button_press_anim";
@@ -559,6 +613,7 @@ group { name: "efl/calendar/inc_button";
          action: STATE_SET "pressed" 0.0;
          target: "arrow.image";
       }
+      // Triggered on mouse up.
       program { signal: "mouse,up,1"; source: "over";
          script {
             if (get_int(mouse_down) == 1) {
@@ -575,22 +630,29 @@ group { name: "efl/calendar/inc_button";
          action: STATE_SET "default" 0.0;
          target: "arrow.image";
       }
+      // Triggered on a full click.
       program { signal: "mouse,clicked,1"; source: "over";
+         // If not a multi-touch, it runs the click action program.
          script {
             if (get_int(multi_down) == 0) {
                run_program(PROGRAM:"button_click2");
             }
          }
       }
+      // These programs allow the application to trigger the pressed/unpressed
+      // animations externally.
       program { signal: "efl,action,unpressed"; source: "efl";
          after: "button_unpress_anim";
       }
       program { signal: "efl,action,pressed"; source: "efl";
          after: "button_press_anim";
       }
+      // Emits the main "click" signal to the application.
       program { name: "button_click2";
          action: SIGNAL_EMIT "efl,action,click" "";
       }
+      // This program is for accessibility. When activated by an accessibility
+      // tool, it quickly flashes the pressed state.
       program { signal: "efl,state,animation,activated"; source: "efl";
          action: STATE_SET "pressed" 0.0;
          target: "arrow.image";
@@ -601,6 +663,8 @@ group { name: "efl/calendar/inc_button";
          transition: DECELERATE 0.1;
          target: "arrow.image";
       }
+      // These programs handle enabling and disabling the button, changing the
+      // state of the arrow image and the disabler part.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "arrow.image";
@@ -611,6 +675,8 @@ group { name: "efl/calendar/inc_button";
          target: "arrow.image";
          target: "disabler";
       }
+      // These programs set and unset the 'multi_down' flag when a multi-touch
+      // event starts or ends.
       program { signal: "efl,action,multi,down"; source: "efl";
          script {
             set_int(multi_down, 1);
@@ -624,12 +690,16 @@ group { name: "efl/calendar/inc_button";
    }
 }
 
+// Defines the decrement button (left arrow). It inherits all the behavior from
+// the increment button and simply overrides the arrow image.
 group { name: "efl/calendar/dec_button";
    inherit: "efl/calendar/inc_button";
    data.item: "version" "123";
    parts {
+      // Re-declares the 'arrow.image' part to override its properties.
       part { name: "arrow.image";
          scale: 1;
+         // Sets the image to a left-pointing arrow for all states.
          description { state: "default" 0.0;
             image.normal: "i-arrow-l";
          }
@@ -642,6 +712,9 @@ group { name: "efl/calendar/dec_button";
       }
    }
 }
+// It's good practice to undefine macros after they are used to avoid polluting
+// the global namespace for other files that might be parsed by the same edje
+// compiler process.
 #undef CIT_STYLES
 #undef CAL_SPIN
 #undef CIT

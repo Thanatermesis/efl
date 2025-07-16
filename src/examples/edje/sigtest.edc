@@ -7,6 +7,10 @@ images {
 }
 
 collections {
+   // This group is a Lua-only script container. It sets up a basic Edje object
+   // within Lua and handles various Edje messages. The 'lua_script_only: 1;'
+   // property indicates that this group does not contain any visual elements
+   // itself but is used purely for scripting logic.
    group {
       name: "lua_base";
       lua_script_only: 1;
@@ -15,7 +19,8 @@ collections {
          local D;
          local text_geom;
 
-         --// Functions to print tables.
+         --// These are helper functions to print the content of Lua tables,
+         --// useful for debugging complex data structures received from messages.
          local print_table, print_table_start;
 
          function print_table_start(table, space, name)
@@ -26,7 +31,7 @@ collections {
          end
 
          function print_table(table, space)
-            for k, v in pairs(table) do 
+            for k, v in pairs(table) do
                if type(v) == "table" then
                   print_table_start(v, space, k);
                elseif type(v) == "string" then
@@ -37,20 +42,27 @@ collections {
             end
          end
 
- 
+
          --// init object here
          D = {}; --// data is empty table to start
          edje_geom = edje.geom();
 
+         // This section demonstrates creating and managing an Edje object from within Lua.
+         // An Edje object is instantiated, its file is set to another group within this EDC,
+         // and it's positioned and resized to fill the parent Lua object's area.
          D.edje = edje.edje();
          D.edje:file("plain/edje/group");
          D.edje:move(0, 0);
          D.edje:resize(edje_geom.w, edje_geom.h);
          D.edje:show();
 
+         // Defines a text class that can be used by TEXT parts in Edje.
+         // This makes it possible to style text consistently.
          edje.text_class("test_text_class", "Sans:style=Bold", 10);
 
-         --// send some random edje message
+         --// This demonstrates sending various types of messages from Lua to the Edje object.
+         --// These messages can carry different data types like strings, integers, floats, and sets of these.
+         --// The message ID '7' is arbitrary and used to identify the message in the receiver.
          edje.messagesend(7, "none"      );
          edje.messagesend(7, "sig",      "lua message signal", "luaSource");
          edje.messagesend(7, "str",      "hello world");
@@ -63,9 +75,12 @@ collections {
          edje.messagesend(7, "strfloat", "hello world", 7.654);
          edje.messagesend(7, "strintset","hello world", {1, 2, 3});
          --// and a signal
+         // Emits a signal from Lua that can be caught by programs in Edje.
          edje.emit("lua signal", "luaSource");
 
- 
+
+         // These are callback functions that Edje will invoke on this Lua object
+         // for specific events like move, resize, message, and signal.
          function move (x, y)
             print("lua::move x=" .. x .. " x=" .. y);
             D.edje:move(0, 0);
@@ -76,10 +91,13 @@ collections {
             D.edje:resize(w, h);
          end
 
+         // This function handles incoming messages sent to the Lua object.
+         // It checks the message type and processes the payload accordingly.
+         // The vararg '...' is used to capture any number of arguments passed with the message.
          function message (id, type, ...)
             print("lua::message id=" .. id .. " type=" .. type);
             --// handle your message type here. check id + type then use the
-            --// vararg appropriately. they are the same as the params passed 
+            --// vararg appropriately. they are the same as the params passed
             --// to edje:messagesend() (if any are passed at all).  Any array
             --// arguments are passed as a single table.
 
@@ -107,15 +125,21 @@ collections {
             end
          end
 
+         // This function handles signals emitted within the Edje object.
+         // It receives the signal and source strings.
          function signal (sig, src)
             print("lua::signal sig=|" .. sig .. "| src=" .. src .. "|");
          end
       }
    }
 
-   // The group name NEEDS a / in it, 
+   // The group name NEEDS a / in it,
    // or the part below that tries to swallow it won't work.
    // Leaving just the lua part visible.
+   //
+   // This group uses Lua to create a grid of bubble images.
+   // The name 'bubbles/lua' is hierarchical. This allows other parts
+   // to reference 'bubbles/lua' as a source, embedding its visual output.
    group {
       name: "bubbles/lua";
       lua_script_only: 1;
@@ -124,7 +148,8 @@ collections {
          local bubbleCols = 8;
          local bubbleRows = 6;
 
-         --// Functions to print tables.
+         --// Helper functions for debugging. These are duplicates from the 'lua_base' group;
+         --// in a real application, this logic might be shared via a Lua module.
          local print_table, print_table_start;
 
          function print_table_start(table, space, name)
@@ -135,7 +160,7 @@ collections {
          end
 
          function print_table(table, space)
-            for k, v in pairs(table) do 
+            for k, v in pairs(table) do
                if type(v) == "table" then
                   print_table_start(v, space, k);
                elseif type(v) == "string" then
@@ -147,6 +172,8 @@ collections {
          end
 
 
+         // This loop creates a 2D array of Edje image objects.
+         // Each image is set to display "bubble.png".
          for i = 1, bubbleRows do
             row = { };
             for j = 1, bubbleCols do
@@ -158,6 +185,9 @@ collections {
             table.insert(bubbles, row);
          end
 
+         // The resize function is a callback that dynamically adjusts the layout of the bubbles
+         // to fit the container's dimensions. It calculates the size and position of each bubble
+         // to create a grid. Border bubbles are colored green, and inner bubbles are given a random color.
          function resize (w, h)
             for i = 1, bubbleRows do
                for j = 1, bubbleCols do
@@ -165,20 +195,19 @@ collections {
                   h1 = h / bubbleRows;
                   bubbles[i][j]:geom((j - 1) * w1, (i - 1) * h1, w1, h1);
                   if ((1 == i) or (1 == j) or (bubbleRows == i) or (bubbleCols == j)) then
+                     // Green (#00FF00C8) for border bubbles.
                      bubbles[i][j]:color(0, 255, 0, 200);
                   else
+                     // Random purplish color for inner bubbles.
                      bubbles[i][j]:color(math.random(200) + 55, 0, math.random(255) + 55, 200);
                   end
                end
             end
          end
 
+         // This function handles incoming messages, logging them with a "bubbles::" prefix for context.
          function message (id, type, ...)
             print("bubbles::message id=" .. id .. " type=" .. type);
-            --// handle your message type here. check id + type then use the
-            --// vararg appropriately. they are the same as the params passed 
-            --// to edje:messagesend() (if any are passed at all).  Any array
-            --// arguments are passed as a single table.
 
             if ("none" == type) then
                print("bubbles::message no args");
@@ -204,26 +233,34 @@ collections {
             end
          end
 
+         // Handles signals, printing them for debugging purposes with a "bubbles::" prefix.
          function signal (sig, src)
             print("bubbles::signal sig=|" .. sig .. "| src=|" .. src .. "|");
          end
       }
    }
 
+   // This group defines a standard Edje layout. It serves as a container
+   // for other parts, including a Lua-driven part.
    group {
       name: "plain/edje/group";
       parts {
+         // This is a simple rectangle part that acts as a background.
+         // 'mouse_events: 0;' makes it non-interactive.
          part {
             name: "background";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Opaque black color (#000000FF).
                color: 0 0 0 255;
             }
          }
 
-         // A lua group embedded in an edje group.
+         // This part is of type GROUP and its content is sourced from the 'bubbles/lua' group.
+         // This is a powerful feature allowing modular UI composition, where a complex,
+         // scripted component ('bubbles/lua') is embedded as a single part within another layout.
          part {
             name: "bubbles_lua";
             type: GROUP;
@@ -232,6 +269,8 @@ collections {
             description { state: "default" 0.0; visible: 1; }
          }
 
+         // A text part to display information. It uses a predefined text_class
+         // for styling, which is set up in the 'lua_base' script.
          part {
             name: "some_text";
             type: TEXT;
@@ -247,6 +286,9 @@ collections {
             }
          }
 
+         // This program listens for any signal ('*') from any source ('*').
+         // When triggered, it executes an Embryo script that updates the 'some_text' part
+         // to display the signal and source that were received. This is useful for debugging signals.
          program { name: "show_signals";
             signal: "*";
             source: "*";
@@ -259,12 +301,19 @@ collections {
             }
         }
 
+      // Embryo script block. Embryo is a small, fast scripting language for the EFL.
+      // It's used here for low-level manipulation of part properties and message handling.
       script {
+        // Public global variables accessible from outside the Edje object.
         public global_str0;
         public global_str1;
         public global_str2;
         public str_idx;
 
+        // This function sets the text of the 'some_text' part based on the value
+        // of 'str_idx'. It reads a string from one of the global string variables
+        // and also sends a message with the new text. This demonstrates script-driven
+        // UI updates and inter-part communication via messages.
         public set_text_string() {
            new tmp[1024];
            new idx;
@@ -282,6 +331,10 @@ collections {
            send_message(MSG_STRING, 1, tmp);
         }
 
+        // This is a message handler function within the Embryo script.
+        // It's designed to listen for messages of type MSG_STRING.
+        // When such a message is received, it extracts the string argument
+        // and updates the 'some_text' part to display it, prefixed with "embryo::message".
         public message(Msg_Type:type, id, ...) {
            if (type == MSG_STRING) {
               new text[64];

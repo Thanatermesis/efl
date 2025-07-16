@@ -15,11 +15,16 @@
  *    x = 4, y = 0, z = 0.8, for example
  */
 
+// Message identifiers used in the script block to distinguish
+// between different types of physics impulses.
 #define ID_IMPULSE (1)
 #define ID_TORQUE_IMPULSE (2)
 
 collections {
 
+   // The following groups define visual representations for each face of the cube.
+   // Each group contains a single colored rectangle that will be mapped to a
+   // specific face of the 'red_box' part in the main 'example_group'.
    group {
       name: "right";
       parts {
@@ -28,7 +33,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 0 0 255 255; /* blue */
+               color: 0 0 255 255; // blue (#0000FFFF)
             }
          }
       }
@@ -42,7 +47,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 0 255 0 255; /* green */
+               color: 0 255 0 255; // green (#00FF00FF)
             }
          }
       }
@@ -56,7 +61,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 0 0 0 255; /* black */
+               color: 0 0 0 255; // black (#000000FF)
             }
          }
       }
@@ -70,7 +75,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 120 120 120 255; /* gray */
+               color: 120 120 120 255; // gray (#787878FF)
             }
          }
       }
@@ -84,7 +89,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 255 0 255 255; /* purple */
+               color: 255 0 255 255; // magenta (#FF00FFFF)
             }
          }
       }
@@ -98,26 +103,38 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 0 255 255 255; /* yellow */
+               color: 0 255 255 255; // cyan (#00FFFFFF)
             }
          }
       }
    }
 
+   // This is the main group that orchestrates the physics simulation. It defines
+   // the physics world, contains the interactive cube, and sets up boundaries.
    group {
       name: "example_group";
 
+      // Configures the properties of the 3D physics world.
       physics {
          world {
+            // Sets the gravity vector (x, y, z). Here, it pulls objects downwards along the y-axis.
             gravity: 0 80 0;
+            // The physics simulation will update 30 times per second.
             rate: 30;
+            // Sets the camera's position on the z-axis.
             z: -100;
+            // Defines the depth of the viewport, creating a 3D space.
             depth: 200;
          }
       }
 
+      // This script handles external messages to manipulate the physics simulation.
+      // It allows for dynamic interaction with the objects, such as applying forces.
       script {
+         // This function is called when a message is sent to the edje object.
+         // It checks for specific message IDs to apply impulses.
          public message(Msg_Type:type, id, ...) {
+            // Applies a linear impulse to the 'red_box' part.
             if ((id == ID_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -127,6 +144,7 @@ collections {
                z = getfarg(4);
                physics_impulse(PART:"red_box", x, y, z);
             }
+            // Applies a torque (rotational) impulse to the 'red_box' part.
             else if ((id == ID_TORQUE_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -140,37 +158,49 @@ collections {
       }
 
       parts {
+         // A simple white background that fills the entire area.
+         // It has no physical properties and does not interact with the simulation.
          part {
             name: "background";
             type: RECT;
             physics_body: NONE;
             description {
                state: "default" 0.0;
-               color: 255 255 255 255; /* white */
+               color: 255 255 255 255; // white (#FFFFFFFF)
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }
          }
 
+         // The main interactive object in the scene: a 3D cube.
          part {
             name: "red_box";
             type: RECT;
+            // This defines the object as a rigid box, making it a dynamic participant
+            // in the physics simulation, affected by gravity and forces.
             physics_body: RIGID_BOX;
             description {
                state: "default" 0.0;
-               color: 255 0 0 255; /* light red */
+               color: 255 0 0 255; // red (#FF0000FF)
                rel1.relative: 0.4 0.1;
                rel2.relative: 0.55 0.3;
                aspect: 1 1;
+               // Physics properties specific to this part.
                physics {
+                  // The mass of the cube.
                   mass: 30;
+                  // z-position and depth, giving the 2D rectangle its 3D volume.
                   z: -24;
                   depth: 48;
+                  // Bounciness of the cube. 0.85 means it retains 85% of its energy after a collision.
                   restitution: 0.85;
+                  // Allows movement and rotation on all axes (x, y, z).
                   movement_freedom {
                      linear: 1 1 1;
                      angular: 1 1 1;
                   }
+                  // This block maps the previously defined groups to the faces of this cube,
+                  // giving each face a different appearance.
                   faces {
                      face {
                         type: BOX_FRONT;
@@ -201,14 +231,18 @@ collections {
             }
          }
 
+         // An invisible boundary at the bottom of the scene to act as a floor.
          part {
             name: "floor";
             type: RECT;
+            // Defines the part as a static boundary, which other physics objects can collide with.
             physics_body: BOUNDARY_BOTTOM;
             description {
                state: "default" 0.0;
+               // The boundary is not visible in the final render.
                visible: 0;
                physics {
+                  // The floor has a bounciness of 0.8.
                   restitution: 0.8;
                }
             }

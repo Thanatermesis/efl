@@ -7,65 +7,107 @@ Group: efl/group_item (@since 1.23)
 	 Signal: efl,state,enabled
 
 */
+// This group defines the visual style for a list group item, which typically serves as a header or separator.
 group { "efl/group_item";
+   // data.item is used for key-value metadata. Here, it versions the EDC file format.
    data.item: "version" "124";
+   // 'nomouse' makes the object and its children ignore mouse events unless a child part explicitly enables them.
    nomouse;
+   // Specifies that programs are defined externally in the efl source code rather than in this file.
    program_source: "efl";
    parts {
+      // The 'base' rectangle serves as the background for the entire group item.
       rect { "base";
          desc { "default";
+            // Sets the background color using a color class defined in the theme.
+            // For example, in a default dark theme this may be #252525.
             color_class: "/bg/normal/list/group";
          }
       }
+      // This is the main text label of the group item.
       text { "efl.text";
+         // 'scale' allows this part to be scaled with the rest of the UI,
+         // useful for accessibility and high-DPI displays.
          scale;
          desc { "default";
+            // 'offscale' ensures that scaling transformations on parent objects
+            // do not affect the scaling of this part, maintaining a consistent size relative to the UI scale factor.
             offscale;
+            // Sets the minimum size. Width is 0, and height is 'ICMIN', a predefined macro for icon minimum size.
             min: 0 ICMIN;
+            // The 'rel1' (top-left) corner of the text is positioned relative to 'efl.icon' and the parent.
+            // It starts 4 pixels to the right of efl.icon's right edge.
             rel1.offset: 4 4;
             rel1.relative: 1.0 0.0;
             rel1.to_x: "efl.icon";
+            // The 'rel2' (bottom-right) corner is positioned relative to 'efl.extra' and the parent.
+            // It ends 5 pixels to the left of efl.extra's left edge.
             rel2.offset: -5 -5;
             rel2.relative: 0.0 1.0;
             rel2.to_x: "efl.extra";
+            // Aligns the text to the left and vertical center within its bounding box.
             align: 0.0 0.5;
+            // Sets the text color. For example, in a default dark theme this may be #FFFFFF.
             color_class: "/fg/normal/list/group";
+            // The 'text' block defines text-specific properties.
             text { font: FNBD; size: 10;
+               // 'min' ensures the text block will always be at least 1x1 pixels.
                min: 1 1;
+               // 'ellipsis: -1' will add "..." at the end of the text if it doesn't fit.
                ellipsis: -1;
                align: 0.0 0.5;
+               // A class for styling the text. This allows theme overrides.
                text_class: "list_group_item";
             }
+            // This description is active when the 'efl,state,enabled' signal is received from the application logic.
             link.base: "efl,state,enabled";
          }
+         // This description is for the 'disabled' state.
          desc { "disabled";
+            // It inherits all properties from the 'default' state.
             inherit: "default";
+            // Overrides the text color for the disabled state. For example, #808080.
             color_class: "/fg/disabled/list/group";
+            // This description is active when the 'efl,state,disabled' signal is received.
             link.base: "efl,state,disabled";
          }
       }
+      // A 'swallow' part is a container that can hold another Evas object.
+      // This one is intended for an icon on the left side.
+      // 'mouse' enables mouse events for this part, overriding the group's 'nomouse' property.
       swallow { "efl.icon"; mouse;
          scale;
          desc { "default";
             offscale;
+            // Sets minimum width and height to 'ICMIN', a theme-defined macro for icon size.
             min: ICMIN ICMIN;
+            // 'fixed: 1 0' means the width is fixed and the height is not.
+            // This prevents the icon container from stretching horizontally.
             fixed: 1 0;
+            // Aligns the content to the left and vertical center.
             align: 0.0 0.5;
+            // Positioned at the top-left of the parent, with an offset.
             rel1.relative: 0.0 0.0;
             rel1.offset: 4 2;
+            // Bottom-left of the parent, creating a vertical strip for the icon.
             rel2.relative: 0.0 1.0;
             rel2.offset: 4 -3;
          }
       }
+      // Another swallow part, for extra content on the right side (e.g., a checkbox or a badge).
       swallow { "efl.extra"; mouse;
          scale;
          desc { "default";
             offscale;
             min: ICMIN ICMIN;
             fixed: 1 0;
+            // Aligns content to the right and vertical center.
             align: 1.0 0.5;
+            // Positioned on the right side of the parent. The top-left corner is anchored
+            // to the parent's top-right corner with an offset.
             rel1.offset: -5 4;
             rel1.relative: 1.0 0.0;
+            // The bottom-right corner is anchored to the parent's bottom-right corner.
             rel2.offset: -5 -5;
          }
       }

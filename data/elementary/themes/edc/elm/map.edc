@@ -1,7 +1,13 @@
+// The base group for the map widget itself. It's essentially a canvas where
+// map tiles will be displayed. By inheriting from "elm/photocam/base/default",
+// it gains panning and zooming capabilities, which are fundamental for a map.
 group { name: "elm/map/base/default";
    inherit: "elm/photocam/base/default";
 }
 
+// This group defines a "radio" marker, which is a selectable pin on the map.
+// The "radio" name suggests that it's part of a set where only one marker
+// can be selected at a time, similar to radio buttons.
 group { name: "elm/map/marker/radio/default";
    data.item: "size_w" 35;
    data.item: "size_h" 35;
@@ -9,6 +15,10 @@ group { name: "elm/map/marker/radio/default";
    data.item: "size_max_h" 35;
    images.image: "map_marker.png" COMP;
    parts {
+      // "mark" is the main visual element of the marker, using the "map_marker.png"
+      // image. Its alignment is set to (0.5, 1.0), which means the horizontal center
+      // and vertical bottom of the part is the anchor point. This is crucial for
+      // accurately placing the marker's tip on a specific map coordinate.
       part { name: "mark";
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -19,9 +29,15 @@ group { name: "elm/map/marker/radio/default";
             align: 0.5 1.0;
             min: 65 35; max: 65 35;
             image.normal: "map_marker.png";
+            // The color is defined by the "/bg/selected/map/marker" color class from the theme.
+            // This allows the marker's color to be customized globally.
             color_class: "/bg/selected/map/marker";
          }
       }
+      // This is a SWALLOW part, which acts as a container for an external icon
+      // object (like an Elm Icon widget). It is placed in a specific region
+      // inside the "mark" part. mouse_events are disabled to let events pass
+      // through to the underlying "mark" part.
       part { name: "elm.icon"; type: SWALLOW; mouse_events:  0;
          description { state: "default" 0.0;
             rel.to: "mark";
@@ -30,6 +46,9 @@ group { name: "elm/map/marker/radio/default";
             rel2.offset: 0 0;
          }
       }
+      // A TEXT part for displaying a label, like a number, on the marker.
+      // It's positioned relative to the icon and uses a theme-defined color.
+      // ellipsis: -1 causes text that doesn't fit to be truncated with "...".
       part { name: "elm.text"; type: TEXT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -45,12 +64,18 @@ group { name: "elm/map/marker/radio/default";
    }
 }
 
+// Defines a simple, possibly non-interactive, marker. The "empty" name suggests
+// it might be a placeholder or a minimalistic marker type. It doesn't use an
+// image for its body, instead relying on a SPACER part to define its area.
 group { name: "elm/map/marker/empty/default";
    data.item: "size_w" 16;
    data.item: "size_h" 16;
    data.item: "size_max_w" 24;
    data.item: "size_max_h" 24;
    parts {
+      // The "knob" is an invisible SPACER part that defines the marker's geometry
+      // and scalable area. Other parts are positioned relative to this spacer.
+      // This is a common technique to create a container for other visual elements.
       part { name: "knob"; type: SPACER;
          scale;
          description { state: "default" 0.0;
@@ -58,6 +83,7 @@ group { name: "elm/map/marker/empty/default";
             max: 24 24;
          }
       }
+      // A SWALLOW part to hold an icon, filling the entire area of the "knob" spacer.
       part { name: "elm.icon"; type: SWALLOW; mouse_events:  0;
          description { state: "default" 0.0;
             rel.to: "knob";
@@ -77,9 +103,14 @@ group { name: "elm/map/marker/empty/default";
    }
 }
 
+// Defines a simple circular overlay for the map. This could be used to highlight
+// an area, show a radius around a point, etc.
 group { name: "elm/map/circle/base/default";
    images.image: "map_circle.png" COMP;
    parts {
+      // The "base" part displays the circle image.
+      // ignore_flags: ON_HOLD is an optimization to prevent this part from
+      // processing "hold" events, as it's likely just a static visual.
       part { name: "base";
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
@@ -89,6 +120,8 @@ group { name: "elm/map/circle/base/default";
    }
 }
 
+// This group defines the style for the map scale indicator, which shows the
+// relationship between map distance and real-world distance (e.g., "1km").
 group { name: "elm/map/scale/base/default";
    data.item: "size_w" 100;
    data.item: "size_h" 22;
@@ -97,10 +130,15 @@ group { name: "elm/map/scale/base/default";
       part { name: "scale";
          description { state: "default" 0.0;
             min: 16 16;
+            // image.border defines a 9-patch scaling. The corners and edges of the
+            // image are not stretched, only the center area is. This allows the
+            // scale indicator to resize horizontally without distorting its visual style.
             image.border: 6 6 5 5;
             image.normal: "map_scale.png";
          }
       }
+      // The TEXT part displays the scale's textual value (e.g., "1 mi" or "500 m").
+      // A shadow effect is applied for better readability against varying map backgrounds.
       part { name: "elm.text"; type: TEXT;
          effect: SHADOW BOTTOM;
          description { state: "default" 0.0;
@@ -118,19 +156,30 @@ group { name: "elm/map/scale/base/default";
    }
 }
 
+// Defines the "bubble" or "info window" that typically appears when a map
+// marker is clicked. It serves as a container for more detailed information.
 group { name: "elm/map/marker_bubble/default";
    data.item: "size_w" 320;
    data.item: "size_h" 160;
    parts {
+      // A RECT part that acts as the semi-transparent background for the bubble.
+      // The color is themed via a color class.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // The color class "/dim/..." suggests a semi-transparent color, allowing
+            // the map to be partially visible behind the bubble.
             color_class: "/dim/normal/map/marker/bubble";
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // offscale ensures that scaling transformations are applied from the
+            // top-left corner (0,0) instead of the center (0.5,0.5).
             offscale;
          }
       }
+      // This SWALLOW part is the content area of the bubble. Any Evas object or
+      // Elm widget can be "swallowed" into this part to be displayed inside
+      // the info bubble. It is slightly padded inside the "base" rectangle.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
             rel1.to: "base";

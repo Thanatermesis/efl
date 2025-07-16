@@ -1,9 +1,14 @@
+// This group defines the default mouse cursor.
+// It consists of a base image and an invisible hotspot part
+// that determines the precise point of interaction.
 group { name: "elm/pointer/base/default";
    images {
       image: "pointer.png" COMP;
    }
    parts {
+      // The "base" part displays the cursor's image.
       part { name: "base";
+         // This part does not react to mouse events, so it doesn't interfere with widgets underneath.
          mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -17,24 +22,25 @@ group { name: "elm/pointer/base/default";
              * will be WITHIN the bounds the axes
              * of thre part describe */
             image.normal: "pointer.png";
+            // Uses a color class for theming, allowing the color to be changed globally.
             color_class: "/fg/normal/pointer/base";
          }
       }
+      // This "SWALLOW" part is a special, non-visible element used to define the pointer's hotspot.
+      // The hotspot is the exact coordinate within the cursor image that corresponds to the mouse position.
+      // For a standard arrow cursor, this is the tip of the arrow.
       part { name: "elm.swallow.hotspot"; type: SWALLOW;
-         /* this is a "fake" swallow part
-          * that is used by e to determine
-          * the pointer hotspot - or where
-          * the actual mouse events get
-          * reported from on the cursor */
          description { state: "default" 0.0;
             visible: 0;
             fixed: 1 1;
             rel1 { to: "base";
                /* the hotspot will scale with the cursor here */
+               // The top-left corner of the hotspot is positioned at 18.75% from the top and left of the "base" part.
                relative: 0.1875 0.1875;
                offset: 0 0;
             }
             rel2 { to: "base";
+               // The bottom-right corner is at the same position, creating a 1x1 pixel hotspot.
                relative: 0.1875 0.1875;
                offset: 0 0;
             }
@@ -43,40 +49,54 @@ group { name: "elm/pointer/base/default";
    }
 }
 
+// Defines the cursor for resizing from the bottom-right corner.
+// It inherits the default cursor and adds an animated box to indicate the resize direction.
 group { name: "elm/pointer/base/bottom_right_corner";
    inherit: "elm/pointer/base/default";
    parts {
+      // This part is a rectangle layered on top of the base cursor.
+      // It animates to indicate the direction of resizing.
       part { name: "box"; type: RECT;
          insert_after: "base";
          description { state: "default" 0.0;
             color_class: "/fg/normal/pointer/manipulator";
+            // Initially, the box is a smaller square in the middle.
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 0.7;
          }
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
+            // In the "p1" state, the box expands to the bottom-right corner.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
          }
       }
    }
+   // The programs create a pulsating animation for the "box" part.
    programs {
+      // On load, transition the box to state "p1" (expanded).
       program { name: "box1";
          signal: "load"; source: "";
          action: STATE_SET "p1" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
+         // After completing, trigger the "box2" program.
          after: "box2";
       }
+      // Transition the box back to the "default" state (centered).
       program { name: "box2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
+         // After completing, trigger "box1" to create an infinite loop.
          after: "box1";
       }
    }
 }
 
+// Defines the cursor for resizing from the top-right corner.
+// It inherits from bottom_right_corner and redefines the "p1" state of the "box" part
+// to change the animation's direction towards the top-right.
 group { name: "elm/pointer/base/top_right_corner";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -86,6 +106,7 @@ group { name: "elm/pointer/base/top_right_corner";
             rel2.relative: 0.7 0.7;
          }
          description { state: "p1" 0.0;
+            // In state "p1", the box expands to the top-right.
             rel1.relative: 0.3 0.0;
             rel2.relative: 1.0 0.7;
          }
@@ -93,6 +114,7 @@ group { name: "elm/pointer/base/top_right_corner";
    }
 }
 
+// Defines the cursor for resizing from the top-left corner by redefining the animation states.
 group { name: "elm/pointer/base/top_left_corner";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -109,6 +131,7 @@ group { name: "elm/pointer/base/top_left_corner";
    }
 }
 
+// Defines the cursor for resizing from the bottom-left corner by redefining the animation states.
 group { name: "elm/pointer/base/bottom_left_corner";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -125,6 +148,7 @@ group { name: "elm/pointer/base/bottom_left_corner";
    }
 }
 
+// Defines the cursor for resizing from the bottom side by redefining the animation states.
 group { name: "elm/pointer/base/bottom_side";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -141,6 +165,7 @@ group { name: "elm/pointer/base/bottom_side";
    }
 }
 
+// Defines the cursor for resizing from the top side by redefining the animation states.
 group { name: "elm/pointer/base/top_side";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -157,6 +182,7 @@ group { name: "elm/pointer/base/top_side";
    }
 }
 
+// Defines the cursor for resizing from the left side by redefining the animation states.
 group { name: "elm/pointer/base/left_side";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -173,6 +199,7 @@ group { name: "elm/pointer/base/left_side";
    }
 }
 
+// Defines the cursor for resizing from the right side by redefining the animation states.
 group { name: "elm/pointer/base/right_side";
    inherit: "elm/pointer/base/bottom_right_corner";
    parts {
@@ -189,9 +216,12 @@ group { name: "elm/pointer/base/right_side";
    }
 }
 
+// Defines a "hand" cursor, typically used for clickable or draggable items.
+// It features a more complex, multi-stage animation to create a "grabbing" or "waving" effect.
 group { name: "elm/pointer/base/hand1";
    inherit: "elm/pointer/base/default";
    parts {
+      // The "box" part animates through five different states to create the effect.
       part { name: "box"; type: RECT;
          insert_after: "base";
          description { state: "default" 0.0;
@@ -199,6 +229,8 @@ group { name: "elm/pointer/base/hand1";
             rel1.relative: 0.5 0.5;
             rel2.relative: 1.0 1.0;
          }
+         // Each "p" state defines a step in the animation sequence,
+         // moving and resizing the box to different positions.
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.5 0.2;
@@ -221,12 +253,15 @@ group { name: "elm/pointer/base/hand1";
          }
       }
    }
+   // The programs chain together to create a five-step animation loop.
    programs {
+      // On load, the animation starts by transitioning to "p1".
       program { name: "box1";
          signal: "load"; source: "";
          action: STATE_SET "p1" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
+         // Each program triggers the next in the sequence.
          after: "box2";
       }
       program { name: "box2";
@@ -247,6 +282,8 @@ group { name: "elm/pointer/base/hand1";
          target: "box";
          after: "box5";
       }
+      // The final program transitions back to the "default" state
+      // and then restarts the cycle by calling "box1".
       program { name: "box5";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
@@ -256,12 +293,17 @@ group { name: "elm/pointer/base/hand1";
    }
 }
 
+// Defines the "move" cursor, which is a static version of the "hand1" cursor.
 group { name: "elm/pointer/base/move";
    inherit: "elm/pointer/base/hand1";
+   // By overriding the programs block and leaving it empty,
+   // the animation inherited from "hand1" is disabled.
    programs {
    }
 }
 
+// Defines the "rotate" cursor. It features a rectangle that rotates back and forth
+// to indicate that a rotation action is possible.
 group { name: "elm/pointer/base/rotate";
    inherit: "elm/pointer/base/default";
    parts {
@@ -271,21 +313,27 @@ group { name: "elm/pointer/base/rotate";
             color_class: "/fg/normal/pointer/manipulator";
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.8 0.8;
+            // Enables 3D-like transformations (mapping) on this part.
             map.on: 1;
             map.smooth: 1;
+            // The rotation will occur around the center of the "box" itself.
             map.rotation.center: "box";
          }
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
+            // In state "p1", the box is rotated 30 degrees around the Z-axis.
             map.rotation.z: 30;
          }
          description { state: "p2" 0.0;
             inherit: "default" 0.0;
+            // In state "p2", it's rotated -60 degrees.
             map.rotation.z: -60;
          }
       }
    }
+   // The programs create a continuous back-and-forth rotation animation.
    programs {
+      // On load, start rotating to state "p1".
       program { name: "box1";
          signal: "load"; source: "";
          action: STATE_SET "p1" 0.0;
@@ -293,12 +341,14 @@ group { name: "elm/pointer/base/rotate";
          target: "box";
          after: "box2";
       }
+      // Then rotate to state "p2".
       program { name: "box2";
          action: STATE_SET "p2" 0.0;
          transition: SINUSOIDAL 0.5;
          target: "box";
          after: "box3";
       }
+      // Then rotate back to "p1" and loop by calling "box2" again.
       program { name: "box3";
          action: STATE_SET "p1" 0.0;
          transition: SINUSOIDAL 0.5;
@@ -308,10 +358,13 @@ group { name: "elm/pointer/base/rotate";
    }
 }
 
+// Defines the "plus" cursor, used for actions like "add" or "copy".
+// It adds a pulsating plus icon to the default cursor.
 group { name: "elm/pointer/base/plus";
    inherit: "elm/pointer/base/default";
    images.image: "pointer_plus.png" COMP;
    parts {
+      // This part displays the "plus" icon.
       part { name: "add";
          insert_after: "base";
          scale: 1;
@@ -319,6 +372,7 @@ group { name: "elm/pointer/base/plus";
             image.normal: "pointer_plus.png";
             color_class: "/fg/normal/pointer/manipulator";
             aspect: 1.0 1.0; aspect_preference: BOTH;
+            // Positions the icon towards the bottom-right of the main cursor.
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
             align: 1.0 1.0;
@@ -326,11 +380,15 @@ group { name: "elm/pointer/base/plus";
          }
          description { state: "faded" 0.0;
             inherit: "default" 0.0;
+            // The "faded" state is semi-transparent white (#FFFFFF80).
+            // The "// no cc" indicates this color is fixed and not affected by the color class.
             color: 255 255 255 128; // no cc
          }
       }
    }
+   // The programs create a simple fade in/out animation loop for the "add" icon.
    programs {
+      // On load, transition to the "faded" state.
       program { name: "fade1";
          signal: "load"; source: "";
          action: STATE_SET "faded" 0.0;
@@ -338,6 +396,7 @@ group { name: "elm/pointer/base/plus";
          target: "add";
          after: "fade2";
       }
+      // Then transition back to the "default" (fully opaque) state.
       program { name: "fade2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.5;
@@ -347,18 +406,26 @@ group { name: "elm/pointer/base/plus";
    }
 }
 
+// Defines the "xterm" or "I-beam" cursor, used for text entry fields.
+// Unlike other cursors, this one does not inherit from the default pointer, as its shape is fundamentally different.
 group { name: "elm/pointer/base/xterm";
    images.image: "pointer_entry.png" COMP;
    parts {
+      // The base part for the I-beam cursor image.
       part { name: "base";
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/fg/normal/pointer/base";
             image.normal: "pointer_entry.png";
+            // Sets a 0.5 aspect ratio, making the cursor taller than it is wide.
+            // aspect_preference: VERTICAL ensures it scales vertically while maintaining the ratio.
             aspect: (44/88) (44/88); aspect_preference: VERTICAL;
+            // This is a preprocessor macro that likely expands to `min: 32 32; max: 32 32;`,
+            // fixing the cursor's size to 32x32 pixels.
             FIXED_SIZE(32, 32)
          }
       }
+      // The hotspot for the text cursor is positioned exactly in the center of the image.
       part { name: "elm.swallow.hotspot"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;

@@ -26,6 +26,7 @@ Group: efl/button:anchor (@since 1.23)
 	 Signal: efl,text,set
 	 Signal: efl,text,unset
 */
+// These defines are used as bitmasks to manage the button's state.
 #define ICON         1
 #define LABEL        2
 #define MASK         3
@@ -33,13 +34,21 @@ Group: efl/button:anchor (@since 1.23)
 #define PRESSED      8
 #define BACKGROUND  16
 
+// The "efl/button" group defines the default style for a standard button widget.
+// It includes visual states for default, pressed, and disabled, and supports
+// showing a label, an icon, or both.
 group { name: "efl/button";
    data.item: "version" "123";
    script {
+      // This macro embeds a script that manages the button's appearance based on a set of flags (ICON, LABEL, etc.).
+      // The script evaluates the current state and applies the corresponding visual properties to the parts.
       BUTTONMODE_SCRIPT2
    }
    images.image: "win_shadow.png" COMP;
    parts {
+      // A part to display a shadow effect around the button. It is positioned
+      // relative to the "base" part and changes its appearance when the button
+      // is pressed or disabled.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -60,6 +69,9 @@ group { name: "efl/button";
             color_class: "/shadow/disabled/button";
          }
       }
+      // The "base" part is a rectangle that serves as the main background of the button.
+      // Its color and position change to create a visual feedback effect when the
+      // button is pressed. `offscale` allows it to be scaled beyond its container.
       rect { "base";
          scale: 1;
          desc { "default";
@@ -81,6 +93,9 @@ group { name: "efl/button";
             visible: 0;
          }
       }
+      // A swallow part that allows an external object to be used as a background.
+      // It is hidden by default and is only made visible when the
+      // "efl,state,background,set" signal is received.
       swallow { "efl.background"; nomouse; required;
          desc { "default";
             rel.to: "base";
@@ -90,6 +105,9 @@ group { name: "efl/button";
             visible: 1;
          }
       }
+      // A clipping rectangle for the icon. This ensures that the icon content
+      // does not draw outside its designated area. It becomes partially transparent
+      // in the "disabled" state to dim the icon.
       rect { "icon_clip";
          desc { "default";
             color: 255 255 255 255; // no cc
@@ -98,9 +116,14 @@ group { name: "efl/button";
             color: 255 255 255 255; // no cc
          }
          desc { "disabled"; inherit;
+            // The color is set to white with 25% opacity (#FFFFFF40) to give the
+            // icon a faded look when the button is disabled.
             color: 255 255 255 64; // no cc
          }
       }
+      // This swallow part is where the button's icon is placed. It is clipped by "icon_clip".
+      // It has different states to adjust its layout depending on whether it is
+      // shown alone ("icononly") or with text ("visible").
       swallow { "efl.content"; nomouse; required;
          clip_to: "icon_clip";
          scale: 1;
@@ -128,6 +151,10 @@ group { name: "efl/button";
             min: ICMIN ICMIN;
          }
       }
+      // The text part for the button's label. It is positioned relative to the icon ("efl.content").
+      // It has several description blocks to handle different states like "visible", "pressed_visible",
+      // "textonly", and their disabled counterparts, ensuring the text color and layout
+      // are correct in all situations.
       text { "efl.text"; nomouse; required;
          scale: 1;
          desc { "default";
@@ -182,6 +209,10 @@ group { name: "efl/button";
             visible: 1;
          }
       }
+      // A transparent rectangle that covers the entire button to capture mouse events.
+      // This approach separates the clickable area from the visual components, simplifying
+      // event handling. `ignore_flags: ON_HOLD;` prevents continuous "mouse,down"
+      // signals when the mouse button is held down.
       rect { "event";
          ignore_flags: ON_HOLD;
          desc { "default";
@@ -193,26 +224,35 @@ group { name: "efl/button";
       }
    }
    programs {
+      // This macro binds standard clickable behavior (like emitting "efl,clicked") to the "event" part.
       EFL_UI_CLICKABLE_PART_BIND("event")
+      // When the left mouse button is pressed, start the click animation.
       program { signal: "mouse,down,1"; source: "event";
          after: "button_click_anim";
       }
       program { name: "button_click_anim";
+         // Set the PRESSED flag, which the script uses to update the button's state to "pressed".
          script { flag_set(PRESSED); }
       }
+      // When the left mouse button is released, stop the click animation.
       program { name: "button_unclick";
          signal: "mouse,up,1"; source: "event";
          after: "button_unclick_anim";
       }
       program { name: "button_unclick_anim";
+         // Unset the PRESSED flag, returning the button to its default state.
          script { flag_unset(PRESSED); }
       }
+      // This program is triggered for accessibility or programmatic activation. It visually
+      // simulates a button press and release.
       program { signal: "efl,state,animation,activated"; source: "efl";
          action: STATE_SET "pressed" 0.0;
          target: "shadow";
          target: "base";
          after: "button_unpressed_anim";
       }
+      // After the activation animation, this program smoothly transitions
+      // the button back to its default state over 0.5 seconds.
       program { name: "button_unpressed_anim";
          in: 0.5 0.0;
          action: STATE_SET "default" 0.0;
@@ -220,34 +260,50 @@ group { name: "efl/button";
          target: "base";
       }
       program { signal: "efl,text,set"; source: "efl";
+         // When text is set on the widget, set the LABEL flag. The script will then make the text visible.
          script { flag_set(LABEL); }
       }
       program { signal: "efl,text,unset"; source: "efl";
+         // When text is removed, unset the LABEL flag.
          script { flag_unset(LABEL); }
       }
       program { signal: "efl,content,set"; source: "efl";
+         // When an icon is set, set the ICON flag. The script will make the icon part visible.
          script { flag_set(ICON); }
       }
       program { signal: "efl,content,unset"; source: "efl";
+         // When the icon is removed, unset the ICON flag.
          script { flag_unset(ICON); }
       }
       program { signal: "efl,state,background,set"; source: "efl";
+         // Set the BACKGROUND flag when a custom background is provided.
          script { flag_set(BACKGROUND); }
       }
       program { signal: "efl,state,background,unset"; source: "efl";
+         // Unset the BACKGROUND flag when the custom background is removed.
          script { flag_unset(BACKGROUND); }
       }
       program { signal: "efl,state,disabled"; source: "efl";
+         // When the widget is disabled, set the DISABLE flag to apply the disabled state visuals.
          script { flag_set(DISABLE); }
       }
       program { signal: "efl,state,enabled"; source: "efl";
+         // When the widget is enabled, unset the DISABLE flag.
          script { flag_unset(DISABLE); }
       }
    }
 }
 
+// The "efl/button:anchor" group defines a style that resembles a hyperlink.
+// It is typically composed of text with an underline, and may include an icon.
+// The visual states are managed by an explicit Embryo script.
 group { name: "efl/button:anchor";
    data.item: "version" "123";
+   // The script manages the button's state using a single integer, `btmode`, which stores
+   // bitmasked flags. The `eval_mode` function is the core of the logic, responsible
+   // for updating the visual appearance of all parts based on the current `btmode` value.
+   // This centralized approach simplifies state management for the complex interactions
+   // between icon, label, pressed, and disabled states.
    script {
       public btmode;
       public eval_mode(m) {
@@ -341,6 +397,7 @@ group { name: "efl/button:anchor";
          }
          desc { "disabled";
             inherit: "default";
+            // Dims the icon with 25% opacity white (#FFFFFF40) when disabled.
             color: 255 255 255 64; // no cc
          }
       }
@@ -446,6 +503,8 @@ group { name: "efl/button:anchor";
             visible: 1;
          }
       }
+      // This rectangle creates the underline effect characteristic of an anchor button.
+      // Its color changes depending on the button's state (pressed, disabled).
       rect { "bar"; nomouse;
          desc { "default";
             color_class: "/fg/normal/button-anchor";
@@ -477,6 +536,8 @@ group { name: "efl/button:anchor";
       program { signal: "mouse,down,1"; source: "event";
          after: "button_click_anim";
       }
+      // On mouse down, this program updates the `btmode` state variable with the
+      // PRESSED flag and calls `eval_mode` to apply the visual changes.
       program { name: "button_click_anim";
          script {
             new m = get_int(btmode);
@@ -487,6 +548,8 @@ group { name: "efl/button:anchor";
       program { signal: "mouse,up,1"; source: "event";
          after: "button_unclick_anim";
       }
+      // On mouse up, it removes the PRESSED flag from `btmode` and calls `eval_mode`
+      // to revert to the default appearance.
       program { name: "button_unclick_anim";
          script {
             new m = get_int(btmode);
@@ -504,6 +567,9 @@ group { name: "efl/button:anchor";
          in: 0.5 0.0;
          target: "base";
       }
+      // All subsequent programs for state changes (text, content, disabled/enabled)
+      // follow the same pattern: they modify the corresponding flag in the `btmode`
+      // variable and then call `eval_mode` to update the button's visuals accordingly.
       program { signal: "efl,text,set"; source: "efl";
          script {
             new m = get_int(btmode);
@@ -532,6 +598,9 @@ group { name: "efl/button:anchor";
             eval_mode(m);
          }
       }
+      // Unlike other states, the background visibility is handled directly via state
+      // changes on the "efl.background" part, not through the Embryo script. This is
+      // because it's a simple toggle that doesn't affect the layout of other parts.
       program { signal: "efl,state,background,set"; source: "efl";
          action: STATE_SET "visible" 0.0;
          target: "efl.background";

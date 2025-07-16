@@ -1,17 +1,33 @@
+// Bitmask flags for different Bluetooth states. Using powers of 2 allows
+// combining states (e.g., ON and SCANNING) with bitwise operations.
+// BZ5_EXIST:   Adapter is present.
+// BZ5_ON:      Adapter is powered on.
+// BZ5_VISIBLE: Adapter is discoverable.
+// BZ5_SCAN:    Adapter is scanning.
 #define BZ5_EXIST   1
 #define BZ5_ON      2
 #define BZ5_VISIBLE 4
 #define BZ5_SCAN    8
 
+// This group defines the main UI for the bluez5 module, handling all visual
+// states and interactions related to Bluetooth status.
 group { name: "e/modules/bluez5/main";
    images.image: "bz5_none.png" COMP;
    images.image: "bz5_logo.png" COMP;
    images.image: "radio.png" COMP;
    max: 160 160;
+   // The script block contains Embryo code to manage the widget's state logic.
+   // It centralizes state handling, making the EDC more maintainable.
    script {
+      // A public integer to store the current Bluetooth state as a bitmask.
       public bzmode;
+      // This function evaluates the current state and updates the UI accordingly.
+      // It's called whenever a state flag changes.
       eval_mode(m) {
+         // Store the previous state to detect transitions.
          new prev = get_int(bzmode);
+         // Update the base part's state based on whether the adapter is ON,
+         // just EXISTS, or is not present at all.
          if (m & BZ5_ON)
             set_state(PART:"base", "on", 0.0);
          else if (m & BZ5_EXIST)
@@ -19,15 +35,21 @@ group { name: "e/modules/bluez5/main";
          else
             set_state(PART:"base", "default", 0.0);
 
+         // The logic for animations is based on state transitions. An animation
+         // is started only when a state is newly enabled and stopped when it's
+         // disabled. This prevents re-triggering on every state evaluation.
          if      ((!(prev & BZ5_VISIBLE)) && ( (m & BZ5_VISIBLE))) {
+            // If visibility was just turned on, start the blinking animation.
             run_program(PROGRAM:"visible0");
          }
          else if (( (prev & BZ5_VISIBLE)) && (!(m & BZ5_VISIBLE))) {
+            // If visibility was turned off, stop the animation and reset the part.
             stop_program(PROGRAM:"visible0");
             stop_program(PROGRAM:"visible1");
             run_program(PROGRAM:"visiblereset");
          }
 
+         // Handle scanning state change with the same transition logic.
          if      ((!(prev & BZ5_SCAN)) && ( (m & BZ5_SCAN))) {
             run_program(PROGRAM:"scan0");
          }
@@ -37,69 +59,96 @@ group { name: "e/modules/bluez5/main";
             run_program(PROGRAM:"scanreset");
          }
       }
+      // Helper function to set a state flag using bitwise OR.
       flag_set(flag) {
          new m = get_int(bzmode) | flag;
          eval_mode(m); set_int(bzmode, m);
       }
+      // Helper function to unset a state flag using bitwise AND and NOT.
       flag_unset(flag) {
          new m = get_int(bzmode) & ~flag;
          eval_mode(m); set_int(bzmode, m);
       }
    }
    parts {
+      // The "base" part serves as the main icon and background for other elements.
+      // Its state reflects the overall status of the Bluetooth adapter.
       part { name: "base";
+         // "default" state: No adapter present.
          description { state: "default" 0.0;
             rel1.relative: (25/380) (25/380);
             rel2.relative: (365/380) (365/380);
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "bz5_none.png";
+            // Color defined by the theme, likely a visible color like blue.
             color_class: "/fg/normal/gadgets/bluez/on";
          }
+         // "exist" state: Adapter is present but turned off.
          description { state: "exist" 0.0;
             inherit;
             image.normal: "bz5_logo.png";
+            // Color defined by the theme, likely a dim color like grey.
             color_class: "/fg/normal/gadgets/bluez/off";
          }
+         // "on" state: Adapter is present and turned on.
          description { state: "on" 0.0;
             inherit;
             image.normal: "bz5_logo.png";
+            // Uses the same "on" color as the default state.
             color_class: "/fg/normal/gadgets/bluez/on";
          }
       }
+      // The "visible" part is an indicator icon that shows when the device is
+      // discoverable. It is positioned relative to the "base" part.
       part { name: "visible";
+         // "default" state: Hidden by default.
          description { state: "default" 0.0;
             rel.to: "base";
+            // Positioned at the bottom-left of the "base" part.
             rel1.relative: 0.0 0.8;
             rel2.relative: 0.2 1.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "radio.png";
+            // Color for visibility indication, likely a bright color like green.
             color_class: "/fg/normal/gadgets/bluez/visible";
             visible: 0;
             min: 1 1;
          }
+         // "on" state: Made visible to indicate discoverability.
          description { state: "on" 0.0;
             inherit;
             visible: 1;
          }
       }
+      // The "scan" part is an indicator icon that shows when the device is
+      // scanning. It is also positioned relative to "base".
       part { name: "scan";
+         // "default" state: Hidden by default.
          description { state: "default" 0.0;
             rel.to: "base";
+            // Positioned at the bottom-right of the "base" part.
             rel1.relative: 0.8 0.8;
             rel2.relative: 1.0 1.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "radio.png";
+            // Color for scanning indication, likely a different shade of blue.
             color_class: "/fg/normal/gadgets/bluez/scan";
             visible: 0;
             min: 1 1;
          }
+         // "on" state: Made visible to indicate scanning.
          description { state: "on" 0.0;
             inherit;
             visible: 1;
          }
       }
    }
+   // The programs block defines how the widget reacts to events (signals) or
+   // performs timed actions (animations).
    programs {
+      // These programs listen for signals from the application logic (e.g., C code)
+      // and update the widget's state via the script functions. This decouples
+      // the application's state changes from the UI's implementation details.
       program { signal: "e,state,exist"; source: "e";
          script { flag_set(BZ5_EXIST); }
       }
@@ -118,6 +167,8 @@ group { name: "e/modules/bluez5/main";
       program { signal: "e,state,invisible"; source: "e";
          script { flag_unset(BZ5_VISIBLE); }
       }
+      // The commented-out 'action' shows a direct but less flexible way of changing
+      // state. Using the script centralizes all logic in the eval_mode() function.
       program { signal: "e,state,scanning"; source: "e";
 //         action: STATE_SET "on" 0.0;
 //         target: "scan";
@@ -128,6 +179,10 @@ group { name: "e/modules/bluez5/main";
 //         target: "scan";
          script { flag_unset(BZ5_SCAN); }
       }
+      // The "visible0" and "visible1" programs create a blinking animation loop
+      // for the "visible" part. "visible0" sets the state to "on" (visible)
+      // and then calls "visible1", which sets it back to "default" (hidden)
+      // and calls "visible0" again. This loop is started/stopped from the script.
       program { name: "visible0";
          action: STATE_SET "on" 0.0;
          target: "visible";
@@ -140,10 +195,14 @@ group { name: "e/modules/bluez5/main";
          in: 0.5 0.0;
          after: "visible0";
       }
+      // This program explicitly resets the "visible" part to its default state,
+      // which is used to stop the animation cleanly.
       program { name: "visiblereset";
          action: STATE_SET "default" 0.0;
          target: "visible";
       }
+      // The scan animation programs are analogous to the visibility ones,
+      // creating a blinking effect for the "scan" part.
       program { name: "scan0";
          action: STATE_SET "on" 0.0;
          target: "scan";

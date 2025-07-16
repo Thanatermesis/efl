@@ -1,4 +1,9 @@
+// Main user interface for the cpufreq module, designed as a circular gauge.
+// This group visualizes CPU frequency, including current, minimum, and maximum values,
+// using rotating hands on a dial.
 group { name: "e/modules/cpufreq/main";
+   // Image sets for different display scales. Edje will select the best-fitting image
+   // based on the part's size, allowing for resolution independence.
    set { name: "cpu_markers";
       image { image: "cpu_markers-160.png"  COMP; size: 81 81 99999 99999; }
       image { image: "cpu_markers-080.png"  COMP; size: 41 41 80 80 99999; }
@@ -30,12 +35,18 @@ group { name: "e/modules/cpufreq/main";
       image { image: "cpu_marker3.png" COMP; size: 18 18 36 36; }
       image { image: "cpu_marker4.png" COMP; size: 0 0 4 18; }
    }
+   // The script block contains the logic for this widget, handling communication
+   // with the module's C code and controlling the UI elements.
    script {
+      // These are lists populated from the C side of the module.
       public available_frequencies;
       public available_governors;
 
 //      public cur_freq_anim;
 
+      // Variables to store old, new, and current frequency values for animation purposes.
+      // 'old' and 'new' values are used to interpolate the transition, while 'now' holds
+      // the smoothly animated value.
       public cur_freq_old;
       public cur_freq_new;
       public cur_freq_now;
@@ -48,10 +59,13 @@ group { name: "e/modules/cpufreq/main";
       public max_freq_new;
       public max_freq_now;
 
+      // This function updates the positions of the frequency meter hands.
+      // It interpolates between old and new frequency values based on the input 'v' (from 0.0 to 1.0).
       public show_freq(Float:v) {
          new Float:freq, Float:min_freq, Float:max_freq, Float:tf, Float:fdiff;
          new f, f0, f1;
 
+         // Interpolate and update the current frequency meter.
          min_freq = fetch_int(available_frequencies, 0);
          max_freq = fetch_int(available_frequencies,
                               count(available_frequencies) - 1);
@@ -66,9 +80,13 @@ group { name: "e/modules/cpufreq/main";
 
          fdiff = max_freq - min_freq;
 
+         // Normalize the frequency to a 0.0-1.0 range.
          if (fdiff <= 0) { freq = 1.0; }
          else { freq = (float(f) - min_freq) / (fdiff); }
+         // Map the normalized frequency to a rotation angle for the meter hand.
+         // The range is 225 degrees, with an offset of -135 degrees to start from the correct position on the dial.
          tf = (freq * 225.0) - 135.0;
+         // Apply the rotation to the meter part using a custom map state.
          custom_state(PART:"meter", "default", 0.0);
          set_state_val(PART:"meter", STATE_MAP_ROT_Z, tf);
          set_state(PART:"meter", "custom", 0.0);
@@ -114,8 +132,11 @@ group { name: "e/modules/cpufreq/main";
 //         return 1;
 //      }
 
+      // Message handler to receive data from the C code.
       public message(Msg_Type:type, id, ...) {
+         // id 1: Update the list of available CPU frequencies.
          if ((type == MSG_INT_SET) && (id == 1)) { // add an available freq
+            // Clear the existing list before populating with new values.
             while (count(available_frequencies) > 0) {
                remove(available_frequencies, 0);
             }
@@ -123,6 +144,7 @@ group { name: "e/modules/cpufreq/main";
                append_int(available_frequencies, getarg(i));
             }
          }
+         // id 2: Update the list of available CPU governors.
          else if ((type == MSG_STRING_SET) && (id == 2)) { // add a governor
             new text[100];
             while (count(available_governors) > 0) {
@@ -132,6 +154,7 @@ group { name: "e/modules/cpufreq/main";
                snprintf(text, 100, "%s", getarg(i));
                append_str(available_governors, text);
             }
+         // id 3: Update frequency values (current, min, max) and the text readout.
          } else if ((type == MSG_INT_SET) && (id == 3)) { // avg freq
 //            new ani;
             new f, curf, minf, maxf;
@@ -148,6 +171,7 @@ group { name: "e/modules/cpufreq/main";
             }
             set_text(PART:"readout", text);
 
+            // Store the new and old frequency values to prepare for animation.
             f = getarg(2);
             curf = get_int(cur_freq_now);
             set_int(cur_freq_old, curf);
@@ -167,8 +191,11 @@ group { name: "e/modules/cpufreq/main";
 //            if (ani > 0) cancel_anim(ani);
 //            ani = anim(0.2, "slide_cur_freq", 0);
 //            set_int(cur_freq_anim, ani);
+            // Calling show_freq(1.0) instantly updates the meter hands to the new position
+            // without a smooth transition animation.
             show_freq(1.0);
 
+         // id 4: Receives a string, but this handler is currently empty.
          } else if ((type == MSG_STRING) && (id == 4)) {
             new text[100];
             snprintf(text, 100, "%s", getarg(2));
@@ -176,13 +203,18 @@ group { name: "e/modules/cpufreq/main";
       }
    }
    parts {
+      // A clipper part used to fade the entire widget when disabled.
       part { name: "fade_clip"; type: RECT;
          description { state: "default" 0.0;
          }
          description { state: "faded" 0.0;
-            color: 255 255 255 128; // no cc
+            // The widget is slightly transparent when faded (128 out of 255 alpha).
+            color: 255 255 255 128; // #FFFFFF80
          }
       }
+      // Clipper parts for the meter hands. Each hand is clipped by one of these parts,
+      // which allows for effects where hands can overlap or be separated visually.
+      // All are clipped by "fade_clip" to ensure they fade with the widget.
       part { name: "clip1";
          clip_to: "fade_clip";
          description { state: "default" 0.0;
@@ -204,6 +236,7 @@ group { name: "e/modules/cpufreq/main";
             image.normal: "cpu_clip_3";
          }
       }
+      // The main background of the gauge. It maintains a 1:1 aspect ratio.
       part { name: "base";
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
@@ -227,6 +260,7 @@ group { name: "e/modules/cpufreq/main";
             color_class: "/fg/normal/gadgets/cpufreq/digits";
          }
       }
+      // Displays the current CPU frequency as text in the center of the gauge.
       part { name: "readout"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "fade_clip";
@@ -241,6 +275,9 @@ group { name: "e/modules/cpufreq/main";
             }
          }
       }
+      // Meter hands for minimum, maximum, and average frequencies. Each is clipped by a
+      // dedicated part ("clip1", "clip2", "clip3") and rotates around the center of the "base".
+      // The `map` property enables transformations, with rotation angles controlled by the script.
       part { name: "meter_min"; mouse_events: 0;
          clip_to: "clip3";
          description { state: "default" 0.0;
@@ -279,10 +316,13 @@ group { name: "e/modules/cpufreq/main";
       }
    }
    programs {
+      // These programs listen for signals from the Enlightenment window manager ("e").
+      // When the module is enabled, it sets "fade_clip" to the "default" state (fully visible).
       program { signal: "e,state,enabled"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "fade_clip";
       }
+      // When the module is disabled, it sets "fade_clip" to the "faded" state (semi-transparent).
       program { signal: "e,state,disabled"; source: "e";
          action: STATE_SET "faded" 0.0;
          target: "fade_clip";
@@ -292,13 +332,19 @@ group { name: "e/modules/cpufreq/main";
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// A compact version of the module, likely for use in a shelf or as a smaller gadget.
+// It provides a swallow part to host other content (like the main gauge) and adds
+// text overlays for CPU usage and frequency.
 group { name: "e/modules/cpufreq/gadget";
   // new gadget with cpu usage swallow
   parts {
+    // A SWALLOW part acts as a container where external Evas objects can be placed.
+    // Here, it's likely used to hold the main cpufreq gauge (`e/modules/cpufreq/main`).
     part { name: "e.swallow.content"; type: SWALLOW;
       description { state: "default" 0.0;
       }
     }
+    // Text part to display CPU usage, aligned to the top-half of the gadget.
     part { name: "e.text.cpu.usage"; type: TEXT; mouse_events: 0;
       scale: 1;
       description { state: "default" 0.0;
@@ -312,6 +358,7 @@ group { name: "e/modules/cpufreq/gadget";
         }
       }
     }
+    // Text part to display CPU frequency, aligned to the bottom-half of the gadget.
     part { name: "e.text.cpu.freq"; type: TEXT; mouse_events: 0;
       scale: 1;
       description { state: "default" 0.0;
@@ -328,17 +375,24 @@ group { name: "e/modules/cpufreq/gadget";
   }
 }
 
+// Defines the detailed popup view for the cpufreq module.
+// This layout includes swallows for graphical displays and multiple text parts
+// for detailed statistics like min/max/avg usage and frequency.
 group { name: "e/modules/cpufreq/popup/detail";
   // new gadget with cpu usage swallow
   parts {
+    // A background rectangle. Its size and position are dynamically calculated
+    // based on other elements, providing a flexible container.
     part { name: "bg"; type: RECT;
       scale: 1;
       description { state: "default" 0.0;
         offscale;
         color_class: "/bg/normal/gadgets/cpufreq/popup/detail/base";
+        // The top of this part is positioned 4px below the "cpu_usage_bg" part.
         rel1.to_y: "cpu_usage_bg";
         rel1.relative: 0.0 1.0;
         rel1.offset: 0 4;
+        // The bottom is positioned 5px above the "cpu_freq_bg" part.
         rel2.to_y: "cpu_freq_bg";
         rel2.relative: 1.0 0.0;
         rel2.offset: -1 -5;
@@ -349,16 +403,22 @@ group { name: "e/modules/cpufreq/popup/detail";
         rel.to: "bg";
       }
     }
+    // A rectangle used as a background for the text labels, providing contrast.
     part { name: "dim"; type: RECT;
       scale: 1;
       description { state: "default" 0.0;
         offscale;
         rel.to: "bg";
+        // Its width is determined by the "text_sizer" part plus an offset, ensuring
+        // it's wide enough for the text it backs.
         rel2.to_x: "text_sizer";
         rel2.offset: 4 -1;
         color_class: "/bg/normal/gadgets/cpufreq/popup/detail/text/bg";
       }
     }
+    // An invisible text part used as a sizing guide.
+    // By setting its text to a representative string ("99999 Mhz"), it establishes a
+    // width that other parts can reference. This ensures layout consistency.
     part { name: "text_sizer"; type: TEXT;
       scale: 1;
       description { state: "default" 0.0;
@@ -379,6 +439,8 @@ group { name: "e/modules/cpufreq/popup/detail";
         }
       }
     }
+    // The following text parts display detailed CPU statistics. They are arranged
+    // relative to the "bg" part and to each other to create a structured list.
     part { name: "e.text.cpu.usage.max"; type: TEXT; mouse_events: 0;
       scale: 1;
       description { state: "default" 0.0;
@@ -497,6 +559,7 @@ group { name: "e/modules/cpufreq/popup/detail";
         }
       }
     }
+    // Background for the CPU usage gradient.
     part { name: "cpu_usage_bg"; type: RECT;
       scale: 1;
       description { state: "default" 0.0;
@@ -506,12 +569,14 @@ group { name: "e/modules/cpufreq/popup/detail";
         align: 0.5 0.0;
       }
     }
+    // Embeds the CPU usage gradient group.
     part { name: "cpu_usage"; type: GROUP; mouse_events: 0;
       source: "e/modules/cpufreq/grad/cpu_usage";
       description { state: "default" 0.0;
         rel.to: "cpu_usage_bg";
       }
     }
+    // Background for the CPU frequency gradient.
     part { name: "cpu_freq_bg"; type: RECT;
       scale: 1;
       description { state: "default" 0.0;
@@ -521,6 +586,7 @@ group { name: "e/modules/cpufreq/popup/detail";
         align: 0.5 1.0;
       }
     }
+    // Embeds the CPU frequency gradient group.
     part { name: "cpu_freq"; type: GROUP; mouse_events: 0;
       source: "e/modules/cpufreq/grad/cpu_freq";
       description { state: "default" 0.0;
@@ -530,6 +596,12 @@ group { name: "e/modules/cpufreq/popup/detail";
   }
 }
 
+// Macro to simplify the creation of gradient segments.
+// _p:  The gradient name (e.g., "cpu_usage").
+// _p0: The start color class suffix.
+// _p1: The end color class suffix for the horizontal gradient image.
+// _v0: The starting horizontal position (0.0 to 1.0).
+// _v1: The ending horizontal position (0.0 to 1.0).
 #define G(_p, _p0, _p1, _v0, _v1) \
 part { name: "g"_p0".0"; type: RECT; mouse_events: 0; \
   description { state: "default" 0.0; \
@@ -546,6 +618,9 @@ part { name: "g"_p0".1"; mouse_events: 0; \
   } \
 }
 
+// Defines a horizontal gradient for CPU usage visualization.
+// It's constructed from four segments, each using the G macro.
+// The color classes likely correspond to a theme-defined color palette.
 group { name: "e/modules/cpufreq/grad/cpu_usage";
   // 0 -> :bg-dark
   // 1 -> :selected-dim
@@ -561,6 +636,8 @@ group { name: "e/modules/cpufreq/grad/cpu_usage";
   }
 }
 
+// Defines a horizontal gradient for CPU frequency visualization.
+// Similar to the usage gradient, it uses four segments to create a smooth color transition.
 group { name: "e/modules/cpufreq/grad/cpu_freq";
   // :bg-dark
   // :comment-dim

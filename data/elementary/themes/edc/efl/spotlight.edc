@@ -1,16 +1,27 @@
+// This group defines the main spotlight widget, which acts as a container.
+// It is designed to hold an indicator, allowing for flexible content swapping.
 group { "efl/spotlight";
    data.item: "version" "123";
    parts {
+      // The 'swallow' part "efl.indicator" serves as a placeholder where an external
+      // Edje object, in this case the indicator, can be placed. This allows for
+      // decoupling the container from its content.
       swallow { "efl.indicator";
          scale;
          desc { "default";
+            // Positions the indicator at the top edge of the container, horizontally centered.
             rel2.relative: 1.0 0.0;
             align: 0.5 0.0;
+            // Sets a minimum height for the indicator area, making it visible.
             min: 0 46;
          }
       }
    }
 }
+
+// This group provides an alternative container for the spotlight indicator.
+// Its structure is identical to "efl/spotlight", suggesting it might be
+// used in a different context or layout while reusing the same indicator logic.
 group { "efl/spotlight/indicator_holder";
    data.item: "version" "123";
    parts {
@@ -25,32 +36,50 @@ group { "efl/spotlight/indicator_holder";
    }
 }
 
+// This group defines the actual indicator. It consists of a base and an icon
+// and includes a script to handle state changes, like highlighting.
 group { "efl/spotlight/indicator";
    data.item: "version" "123";
    parts {
+      // A spacer part that likely serves as a transparent base, ensuring
+      // the group has a defined area, which can be useful for layout calculations.
       spacer { "base";
          scale;
          desc { "default";
          }
       }
+      // The visual representation of the indicator, an icon that changes
+      // color based on its state (default or selected).
       image { "icon";
          scale;
          desc { "default";
             image.normal: "i-radio";
+            // Sets the icon color to black (#000000).
             color: 0 0 0 255; // no cc
             min: 8 8;
+            // Offsets ensure the icon has padding within its container (4px top/left, 5px bottom/right).
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // Prevents the icon from being scaled up if the container is larger, maintaining its original size.
             offscale;
          }
          desc { "selected";
             inherit: "default";
+            // On selection, the icon color changes to red (#FF0000).
             color: 255 0 0 255; // no cc
          }
       }
    }
+   // The script block allows for dynamic behavior using the Embryo scripting language.
+   // It can respond to messages sent from the application code.
    script {
+      // This function is triggered when a message is sent to the object.
+      // It's used to transition the icon between its 'default' and 'selected' states.
       public message(Msg_Type:type, id, ...) {
+         // Animates the icon's state. `getfarg(2)` retrieves the third argument
+         // from the message, which is expected to be a float value used as the
+         // interpolation position. With both states at position 0.0, this likely
+         // functions as a direct state switch based on the input value.
          set_tween_state(PART:"icon", getfarg(2),
                          "default", 0.0, "selected", 0.0);
       }

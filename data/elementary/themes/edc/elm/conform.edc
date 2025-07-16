@@ -1,5 +1,11 @@
+// This group defines the layout for a conformant widget. It uses a set of
+// SWALLOW parts to reserve space for system UI elements like an indicator,
+// on-screen keyboard, etc. The main content part automatically resizes to
+// fit in the remaining space, preventing UI overlap.
 group { name: "elm/conformant/base/default";
    parts {
+      // A SWALLOW part for the top-edge indicator (status bar). When content
+      // is added, it will occupy a fixed-height space at the top.
       part { name: "elm.swallow.indicator";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -8,6 +14,9 @@ group { name: "elm/conformant/base/default";
             rel2.relative: 1.0 0.0;
          }
       }
+      // The main content area. It's designed to occupy the space between the
+      // indicator and the clipboard area, effectively filling all available
+      // vertical space not used by other conformant parts.
       part { name: "elm.swallow.content";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -17,6 +26,8 @@ group { name: "elm/conformant/base/default";
             rel2.to_y: "elm.swallow.clipboard";
          }
       }
+      // A SWALLOW part for the clipboard UI. It is positioned directly above
+      // the virtual keypad area, and will only appear when content is set.
       part { name: "elm.swallow.clipboard";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -28,6 +39,8 @@ group { name: "elm/conformant/base/default";
             rel2.to_y: "elm.swallow.virtualkeypad";
          }
       }
+      // A SWALLOW part for the virtual keypad (on-screen keyboard). It is
+      // positioned just above the softkey area at the bottom of the screen.
       part { name: "elm.swallow.virtualkeypad";
          type: SWALLOW;
          description { state: "default" 0.0;
@@ -39,6 +52,8 @@ group { name: "elm/conformant/base/default";
             rel2.to_y: "elm.swallow.softkey";
          }
       }
+      // A SWALLOW part for a softkey bar, which is anchored to the very
+      // bottom of the container.
       part { name: "elm.swallow.softkey";
          type: SWALLOW;
          description { state: "default" 0.0;

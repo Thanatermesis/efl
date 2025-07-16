@@ -1,16 +1,35 @@
+// Collections are the top-level container for all UI elements, scripts, and other resources defined in an EDC file.
 collections {
+   // A 'group' defines a single UI component layout. It can be instantiated as an Edje object in an application.
    group {
+      // 'name' is the identifier used to load this specific group from the compiled .edj file.
       name: "example_group";
+      // 'max' and 'min' define the maximum and minimum size hints for the container.
+      // The window manager might use these hints to control window sizing.
       max: 500 500;
       min: 50 50;
 
+      // The 'parts' block contains all the visual elements that make up this group's layout.
       parts {
+         // A 'part' is a fundamental building block of an Edje layout.
          part {
+            // The 'name' of the part is used to reference it from code or other parts.
             name: "part_one";
+            // 'SWALLOW' type parts are special containers. They act as placeholders where an application can
+            // "swallow" (or embed) another Evas object, like a widget or another Edje layout.
+            // This allows for dynamic content to be placed inside a static Edje design.
             type: SWALLOW;
             description {
+               // The 'min' property for a part sets its minimum size, which can influence the overall group's size calculation.
+               // Here, it ensures the part is at least 50x50 pixels.
                min: 50 50;
+               // 'state' defines a specific appearance or configuration for the part.
+               // "default" is the initial state when the part is created. 0.0 is the state version, not used for transitions here.
                state: "default" 0.0;
+               // 'rel1' and 'rel2' define the part's position and size relative to its container (the group).
+               // rel1 sets the top-left corner, and rel2 sets the bottom-right corner.
+               // A relative value of 0.0 corresponds to the top/left edge, and 1.0 to the bottom/right edge.
+               // These settings make the part fill the entire area of its parent group.
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }

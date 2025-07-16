@@ -1,5 +1,8 @@
+// Provides a standard dimmed background for popups that block events.
+// It inherits the basic block_events behavior and overrides the color.
 group { name: "elm/notify/block_events/popup/default";
    inherit: "elm/notify/block_events/default";
+   // Override the 'block_events' part from the inherited group.
    parts.part { "block_events";
       desc { "visible";
          color_class: "/dim/normal/popup";
@@ -7,28 +10,43 @@ group { name: "elm/notify/block_events/popup/default";
    }
 }
 
+// Provides a transparent background for popups that block events.
+// This is used when the popup is dismissed by clicking outside, but the background
+// should not be dimmed. It provides visual feedback on click.
 group { name: "elm/notify/block_events/popup/transparent";
    parts {
+      // The base part is a rectangle that covers the entire area.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The color is fully transparent white (#FFFFFF00).
             color_class: "/dim/normal/popup";
             color: 255 255 255 0; // no cc
          }
          description { state: "clicked" 0.0;
+            // On click, it becomes opaque white (#FFFFFFFF) for visual feedback.
             color_class: "/dim/normal/popup";
             color: 255 255 255 255; // no cc
          }
       }
+      // When the user clicks down on the background...
       program { signal: "mouse,down,1"; source: "base";
+         // ...emit a signal that the popup should be dismissed...
          action: SIGNAL_EMIT "elm,action,click" "elm";
+         // ...and start the click animation.
          after: "click1";
       }
+      // The click animation program.
       program { name: "click1";
+         // It changes the base to the "clicked" state (opaque white)
+         // over a short duration.
          action: STATE_SET "clicked" 0.0;
          target: "base";
          transition: SINUSOIDAL 0.2;
       }
+      // When the user releases the mouse button...
       program { signal: "mouse,up,1"; source: "base";
+         // ...the base returns to the "default" state (transparent)
+         // with a fade-out effect.
          action: STATE_SET "default" 0.0;
          target: "base";
          transition: DECELERATE 0.5;
@@ -36,8 +54,16 @@ group { name: "elm/notify/block_events/popup/transparent";
    }
 }
 
+// Defines a popup that appears at the top of the screen.
+// It inherits positioning from the standard top notification and applies
+// the popup-specific visual style using the OVERRIDE_BASE macro.
 group { name: "elm/notify/top/popup/default";
    inherit: "elm/notify/top/default";
+// This macro defines the common visual structure for standard popups,
+// including a shadow and a base rectangle. This avoids code repetition
+// for different popup positions (top, bottom, left, etc.).
+// The shadow part provides a drop-shadow effect for the popup; `mouse_events: 0`
+// ensures it doesn't block mouse input. The base part is the main background.
 #define OVERRIDE_BASE() \
    parts { \
       part { name: "shadow"; mouse_events: 0; \
@@ -100,6 +126,10 @@ group { name: "elm/notify/center/popup/default";
 }
 #undef OVERRIDE_BASE
 
+// These "transparent" notify groups provide the positioning for popups but without
+// any specific popup styling (like shadows or backgrounds). This is useful for
+// applications that want to implement a fully custom popup appearance by providing
+// their own content object that includes background and decorations.
 group { name: "elm/notify/top/popup/transparent";
    inherit: "elm/notify/top/default";
 }
@@ -136,9 +166,11 @@ group { name: "elm/notify/center/popup/transparent";
    inherit: "elm/notify/center/default";
 }
 
+// Defines the style for labels used within popups.
 group { name: "elm/label/base/popup/default";
    alias: "elm/label/base/popup/transparent";
    styles {
+      // Style for the main description text of the popup.
       style { name: "popup_desc_style";
          base: "font="FN" font_size=10 text_class=label align=center color=cc:/fg/normal/popup/text wrap=mixed";
          tag: "br" "\n";
@@ -147,6 +179,7 @@ group { name: "elm/label/base/popup/default";
          tag: "whitecolor" "+ color=#fff"; // no cc
          tag: "tab" "\t";
       }
+      // Style for the popup title, with ellipsis enabled for long text.
       style { name: "popup_title_style_ellipsis";
          base: "font="FNBD" font_size=10 text_class=label align=center color=cc:/fg/normal/popup/text/title ellipsis=1.0 wrap=mixed";
          tag: "br" "\n";
@@ -157,6 +190,8 @@ group { name: "elm/label/base/popup/default";
       }
    }
    parts {
+      // The textblock part that will display the label text.
+      // `mouse_events: 0` allows clicks to pass through to objects behind it.
       part { name: "elm.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -172,17 +207,25 @@ group { name: "elm/label/base/popup/default";
    }
 }
 
+// Defines a standard button style for use within popups.
 group { name: "elm/button/base/popup/default";
    inherit: "elm/button/base/default";
 }
 
+// Defines a transparent/anchor-like button style for popups.
+// This is typically used for less prominent actions.
 group { name: "elm/button/base/popup/transparent";
    inherit: "elm/button/base/anchor";
 }
 
+// This is the core group for the popup widget. It defines the layout structure
+// with placeholders (swallows) for title, content, and action buttons.
+// It also contains the logic for dynamically adjusting the layout when
+// different sections are shown or hidden.
 group { name: "elm/popup/base/default";
    alias: "elm/popup/base/transparent";
    styles {
+      // Style for the popup's title text.
       style { name: "popup_title_style";
          base: "font="FNBD" font_size=10 text_class=label align=center color=cc:/fg/normal/popup/text/title wrap=mixed";
          tag: "br" "\n";
@@ -193,6 +236,9 @@ group { name: "elm/popup/base/default";
       }
    }
    parts {
+      // A base rectangle that sets a minimum width for the popup.
+      // It is transparent (#00000000) as the visible background is
+      // provided by elm.swallow.background.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -200,6 +246,8 @@ group { name: "elm/popup/base/default";
             color: 0 0 0 0; // no cc
          }
       }
+      // A swallow part for a custom background object. This allows applications
+      // to set a themed background for the popup.
       part { name: "elm.swallow.background"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -207,6 +255,8 @@ group { name: "elm/popup/base/default";
             rel.to: "base";
          }
       }
+      // A transparent rectangle used as the background for the title area.
+      // Other parts can be relative to this, simplifying layout adjustments.
       part { name: "elm.bg.title"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -214,6 +264,7 @@ group { name: "elm/popup/base/default";
             color: 0 0 0 0; // no cc
          }
       }
+      // The textblock for the popup's title. It is hidden by default.
       part { name: "elm.text.title"; type: TEXTBLOCK;
          scale: 1;
          description { state: "default" 0.0;
@@ -234,6 +285,7 @@ group { name: "elm/popup/base/default";
             visible: 1;
          }
       }
+      // A swallow part for an icon in the title area. Also hidden by default.
       part { name: "elm.swallow.title.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -250,23 +302,31 @@ group { name: "elm/popup/base/default";
             visible: 1;
          }
       }
+      // The main content area of the popup. Its position is dynamic, adapting to
+      // the visibility of the title and action areas.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
+         // Default state: content fills most of the popup.
          description { state: "default" 0.0;
             rel1.offset: 5 5;
             rel2.offset: -6 -6;
             offscale;
          }
+         // State when only the title area is visible.
          description { state: "show_title_area" 0.0;
             inherit: "default" 0.0;
+            // The top of the content is attached to the bottom of the title background.
             rel1.relative: 0.0 1.0;
             rel1.to_y: "elm.bg.title";
          }
+         // State when only the action area is visible.
          description { state: "show_action_area" 0.0;
             inherit: "default" 0.0;
+            // The bottom of the content is attached to the top of the action area.
             rel2.relative: 1.0 0.0;
             rel2.to_y: "elm.swallow.action_area";
          }
+         // State when both title and action areas are visible.
          description { state: "show_action_title_area" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 1.0;
@@ -275,6 +335,7 @@ group { name: "elm/popup/base/default";
             rel2.to_y: "elm.swallow.action_area";
          }
       }
+      // The area at the bottom for action buttons. Hidden by default.
       part { name: "elm.swallow.action_area"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -293,6 +354,8 @@ group { name: "elm/popup/base/default";
          }
       }
 
+      // Accessibility parts: these define regions for screen readers.
+      // They are transparent and repeat events to not interfere with interaction.
       part { name: "access.title"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -309,6 +372,8 @@ group { name: "elm/popup/base/default";
       }
    }
    programs {
+      // These programs toggle the visibility of the title icon and text
+      // by switching between their "default" (hidden) and "visible" states.
       program { signal: "elm,state,title,icon,visible"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.swallow.title.icon";
@@ -325,17 +390,28 @@ group { name: "elm/popup/base/default";
          action: STATE_SET "default" 0.0;
          target: "elm.text.title";
       }
+      // This program is triggered when the title area should become visible.
       program { signal: "elm,state,title_area,visible"; source: "elm";
+         // The script intelligently sets the state of the content area.
+         // This avoids having a complex web of states for every possible combination
+         // of visible/hidden title and action areas.
          script {
             new st[31], Float:vl;
+            // Check if the action area is currently visible.
             get_state(PART:"elm.swallow.action_area", st, 30, vl);
             if (!strcmp(st, "visible"))
+              // If yes, set content to a state where both title and action areas are shown.
               set_state(PART:"elm.swallow.content", "show_action_title_area", 0.0);
             else
+              // Otherwise, set content to a state where only the title area is shown.
               set_state(PART:"elm.swallow.content", "show_title_area", 0.0);
             set_state(PART:"elm.text.title", "visible", 0.0);
          }
       }
+      // The following programs manage the visibility of the title and action areas.
+      // They use scripts to check the state of the *other* area and then set the
+      // content area to the appropriate state ("show_action_area", "show_title_area", etc.)
+      // This ensures the main content area resizes correctly.
       program { signal: "elm,state,title_area,hidden"; source: "elm";
          script {
             new st[31], Float:vl;
@@ -372,19 +448,23 @@ group { name: "elm/popup/base/default";
    }
 }
 
+// This group defines a content area for a popup that can optionally be scrollable.
 group { name: "elm/popup/content/popup/default";
    alias: "elm/popup/content/popup/transparent";
    alias: "elm/popup/content/popup/subpopup";
+   // This data item signals to the C code that this part can host a scroller.
    data.item: "scroller_enable" "on";
    parts {
       part { name:"elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
+         // When scrolling is enabled, this state ensures a minimum width.
          description { state: "scroll" 0.0;
             min: 240 0;
          }
       }
    }
+   // These programs toggle the scroll state based on signals from the C code.
    programs {
       program { signal: "elm,scroll,enable"; source: "elm";
          action: STATE_SET "scroll" 0.0;
@@ -397,6 +477,10 @@ group { name: "elm/popup/content/popup/default";
    }
 }
 
+// The following groups define layouts for the action area with 1, 2, or 3 buttons.
+// `data.item` provides a hint to the C code about the desired height of this part.
+
+// Layout for a single button that fills the entire action area.
 group { name: "elm/popup/buttons1/popup/default";
    alias: "elm/popup/buttons1/popup/transparent";
    alias: "elm/popup/buttons1/popup/subpopup";
@@ -409,6 +493,7 @@ group { name: "elm/popup/buttons1/popup/default";
    }
 }
 
+// Layout for two buttons, each taking up half of the action area width.
 group { name: "elm/popup/buttons2/popup/default";
    alias: "elm/popup/buttons2/popup/transparent";
    alias: "elm/popup/buttons2/popup/subpopup";
@@ -427,6 +512,7 @@ group { name: "elm/popup/buttons2/popup/default";
    }
 }
 
+// Layout for three buttons, dividing the action area into three equal parts.
 group { name: "elm/popup/buttons3/popup/default";
    alias: "elm/popup/buttons3/popup/transparent";
    alias: "elm/popup/buttons3/popup/subpopup";
@@ -453,9 +539,12 @@ group { name: "elm/popup/buttons3/popup/default";
    }
 }
 
+// Defines an item for use in a list within a popup.
 group { name: "elm/popup/item/popup/default";
    inherit: "elm/list/item/default";
    parts {
+      // Swallows a content part, typically a label or other small widget.
+      // It's inserted after the standard icon swallow from the inherited list item.
       part { name: "elm.swallow.content"; type: SWALLOW;
          insert_after: "elm.swallow.icon";
          description { state: "default" 0.0;
@@ -464,6 +553,7 @@ group { name: "elm/popup/item/popup/default";
          }
       }
    }
+   // Standard programs for handling clicks and selection states.
    programs {
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,state,selected" "elm";
@@ -477,9 +567,13 @@ group { name: "elm/popup/item/popup/default";
    }
 }
 
+// Defines a "subpopup" style, which is a variation of the base popup
+// that includes a close button.
 group { name: "elm/popup/base/subpopup";
    inherit: "elm/popup/base/default";
    parts {
+      // A small spacer part used to correctly position the close button
+      // just outside the top-right corner of the main 'base' part.
       part { name: "pad_closebtn"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -491,6 +585,7 @@ group { name: "elm/popup/base/subpopup";
             align: 0 1;
          }
       }
+      // A swallow for the close button itself.
       part { name: "elm.swallow.closebtn"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;

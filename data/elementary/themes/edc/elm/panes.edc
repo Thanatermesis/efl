@@ -11,17 +11,27 @@
       elm,action,unpress: Used for "unpress" smart callback.
 */
 
+// Minimum size for the pane handle.
 #define PANEMIN  8
+// A secondary minimum size, likely for a different dimension of the handle.
 #define PANEMIN2 24
+// Width of the pane handle.
 #define PANEWID  24
 
+// This group defines the style for a default vertical pane.
+// It consists of two content areas separated by a draggable vertical bar.
 group { name: "elm/panes/vertical/default";
+   // Defines the image used for the vertical pane handle, with compression.
    images.image: "pane_handle_v.png" COMP;
    parts {
+      // "whole" serves as the main container for the entire panes widget.
       part { name: "whole"; type: SPACER;
          description { state: "default" 0.0;
          }
       }
+      // "right_constraint" is a draggable SPACER used to define the right
+      // boundary for the pane. It's confined to "whole" and can only be dragged
+      // horizontally. Its max size is 0, making it an invisible constraint.
       part { name: "right_constraint"; type: SPACER;
          dragable { confine: "whole";
             x: 1 1 1;
@@ -31,6 +41,7 @@ group { name: "elm/panes/vertical/default";
             max: 0 0;
          }
       }
+      // "left_constraint" is similar to "right_constraint", defining the left boundary.
       part { name: "left_constraint"; type: SPACER;
          dragable { confine: "whole";
             x: 1 1 1;
@@ -40,6 +51,8 @@ group { name: "elm/panes/vertical/default";
             max: 0 0;
          }
       }
+      // "sub_whole" defines the draggable area for the separator, positioned
+      // between "left_constraint" and "right_constraint".
       part { name: "sub_whole"; type: SPACER;
          description { state: "default" 0.0;
             rel1.relative: 1.0 0.0;
@@ -48,18 +61,24 @@ group { name: "elm/panes/vertical/default";
             rel2.to_x: "right_constraint";
          }
       }
+      // "whole_left" is a RECT part that represents the left content area.
+      // Its right edge is attached to the left side of "elm.bar".
       part { name: "whole_left"; type: RECT;
          description { state: "default" 0.0;
             rel2.to_x: "elm.bar";
             rel2.relative: 0.0 1.0;
          }
       }
+      // "whole_right" is the right content area. Its left edge is attached
+      // to the right side of "elm.bar".
       part { name: "whole_right"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_x: "elm.bar";
             rel1.relative: 1.0 0.0;
          }
       }
+      // "elm.swallow.left" is where the user's content for the left pane is placed.
+      // It's clipped by "whole_left" to ensure content doesn't overflow.
       part { name: "elm.swallow.left"; type: SWALLOW;
          clip_to: "whole_left";
          description { state: "default" 0.0;
@@ -67,6 +86,8 @@ group { name: "elm/panes/vertical/default";
             rel2.relative: 0.0 1.0;
          }
       }
+      // "elm.swallow.right" is the SWALLOW part for the right pane's content,
+      // clipped by "whole_right".
       part { name: "elm.swallow.right"; type: SWALLOW;
          clip_to: "whole_right";
          description { state: "default" 0.0;
@@ -74,6 +95,9 @@ group { name: "elm/panes/vertical/default";
             rel1.relative: 1.0 0.0;
          }
       }
+      // "elm.bar" is the draggable separator. It is confined within "sub_whole"
+      // and can be moved horizontally. The `scale: 1` property makes it
+      // scale with the rest of the UI.
       part { name: "elm.bar"; type: SPACER;
          scale: 1;
          dragable { confine: "sub_whole";
@@ -88,6 +112,9 @@ group { name: "elm/panes/vertical/default";
             rel2.relative: 1.0 0.5;
          }
       }
+      // The "dots" part is the visual representation of the handle on the bar.
+      // `mouse_events: 0` means it won't react to mouse events directly;
+      // these are handled by the "bar" part. It changes color when pressed.
       part { name: "dots"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -101,6 +128,9 @@ group { name: "elm/panes/vertical/default";
             color_class: "/fg/pressed/panes/handle";
          }
       }
+      // "elm.swallow.event" is an invisible SWALLOW part centered on "elm.bar".
+      // It's used to define a larger, more user-friendly event area around the
+      // thin separator bar, making it easier to click and drag.
       part { name: "elm.swallow.event"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -110,6 +140,12 @@ group { name: "elm/panes/vertical/default";
             rel.to: "elm.bar";
          }
       }
+      // The "bar" part is a transparent RECT that captures mouse events for
+      // dragging. `dragable.events: "elm.bar"` forwards these events to "elm.bar".
+      // Its size is defined by "elm.swallow.event", making the clickable area larger.
+      // The color is transparent (#00000000). It becomes invisible when disabled.
+      // The event-capturing "bar" is sized relative to "elm.swallow.event"
+      // but vertically centered and smaller, creating two hover areas ("bar1" and "bar2").
       part { name: "bar"; type: RECT;
          scale: 1;
          dragable.events: "elm.bar";
@@ -128,34 +164,44 @@ group { name: "elm/panes/vertical/default";
       }
    }
    programs {
-      program { signal: "mouse,down,1"; source: "bar"; // for "press" smart callback
+      // When the left mouse button is pressed on the "bar", it emits the
+      // "elm,action,press" signal, used for the "press" smart callback.
+      program { signal: "mouse,down,1"; source: "bar";
          action: SIGNAL_EMIT "elm,action,press" "elm";
       }
-      program { signal: "mouse,up,1"; source: "bar"; // for "unpress" smart callback
+      // Emits "elm,action,unpress" when the mouse button is released.
+      program { signal: "mouse,up,1"; source: "bar";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
       }
+      // Changes the state of "dots" to "pressed" when the bar is pressed.
       program { name: "bar_down";
          signal: "mouse,down,1"; source: "bar";
          action: STATE_SET "pressed" 0.0;
          target: "dots";
       }
+      // Reverts "dots" to its "default" state on mouse release.
       program { name: "bar_up";
          signal: "mouse,up,1"; source: "bar";
          action: STATE_SET "default" 0.0;
          target: "dots";
       }
-      program { signal: "mouse,clicked,1"; source: "bar"; // for "clicked" smart callback
+      // Emits "elm,action,click" for a single click.
+      program { signal: "mouse,clicked,1"; source: "bar";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
-      program { signal: "mouse,down,1,double"; source: "bar"; // for "clicked,double" smart callback
+      // Emits "elm,action,click,double" for a double click.
+      program { signal: "mouse,down,1,double"; source: "bar";
          action: SIGNAL_EMIT "elm,action,click,double" "elm";
       }
-      program { // for elm_panes_fixed_set()
+      // When the "elm,panes,fixed" signal is received, the "bar" is disabled,
+      // preventing it from being dragged. This is for elm_panes_fixed_set().
+      program {
          signal: "elm,panes,fixed"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "bar";
       }
-      program { // for elm_panes_fixed_set()
+      // Re-enables the "bar" when the "elm,panes,unfixed" signal is received.
+      program {
          signal: "elm,panes,unfixed"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "bar";
@@ -163,6 +209,8 @@ group { name: "elm/panes/vertical/default";
    }
 }
 
+// This group defines the style for a default horizontal pane, which is
+// similar to the vertical version but with a horizontal separator bar.
 group { name: "elm/panes/horizontal/default";
    images.image: "pane_handle_h.png" COMP;
    parts {
@@ -241,6 +289,8 @@ group { name: "elm/panes/horizontal/default";
          description { state: "default" 0.0;
             FIXED_SIZE(24, 8)
             image.normal: "pane_handle_h.png";
+            // `fill.smooth: 0` disables smooth scaling for the image,
+            // preserving pixel art clarity.
             fill.smooth: 0;
             rel.to: "elm.bar";
             color_class: "/fg/normal/panes/handle";
@@ -313,6 +363,8 @@ group { name: "elm/panes/horizontal/default";
 
 ////////////////////////////////////////////////////////////////////////////
 
+// This group defines a "flush" style for the vertical pane, where the
+// separator bar has no visible width, and a glow effect appears on hover.
 group { name: "elm/panes/vertical/flush";
    images.image: "shadow_circle_vert.png" COMP;
    parts {
@@ -346,18 +398,24 @@ group { name: "elm/panes/vertical/flush";
             rel2.to_x: "right_constraint";
          }
       }
+      // The content areas are defined to meet at the center of the bar,
+      // creating a seamless, "flush" appearance. "whole_left" extends
+      // to the right side of "elm.bar".
       part { name: "whole_left"; type: RECT;
          description { state: "default" 0.0;
             rel2.to_x: "elm.bar";
             rel2.relative: 1.0 1.0;
          }
       }
+      // "whole_right" starts from the left side of "elm.bar".
       part { name: "whole_right"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_x: "elm.bar";
             rel1.relative: 0.0 0.0;
          }
       }
+      // The swallow parts for content are aligned like "whole_left" and "whole_right"
+      // and are clipped by them. `fixed: 1 0` makes their width scalable but height fixed.
       part { name: "elm.swallow.left"; type: SWALLOW;
          clip_to: "whole_left";
          description { state: "default" 0.0;
@@ -374,6 +432,8 @@ group { name: "elm/panes/vertical/flush";
             fixed: 1 0;
          }
       }
+      // In the flush style, "elm.bar" has a max width of 0, making it invisible.
+      // This is key to the "flush" look.
       part { name: "elm.bar"; type: SPACER;
          scale: 1;
          dragable { confine: "sub_whole";
@@ -415,6 +475,10 @@ group { name: "elm/panes/vertical/flush";
             visible: 0;
          }
       }
+      // "glow1a" is a glow effect for the right pane, clipped by "whole_right".
+      // It's invisible by default (transparent white, #FFFFFF00) and becomes
+      // visible and opaque white (#FFFFFFFF) in the "active" state (on hover).
+      // `offscale` means it's not affected by `elm_scale_set()`.
       part { name: "glow1a"; mouse_events: 0;
          clip_to: "whole_right";
          scale: 1;
@@ -435,6 +499,8 @@ group { name: "elm/panes/vertical/flush";
             visible: 1;
          }
       }
+      // "glow2a", "glowbar1a", and "glowbar2a" provide similar glow effects
+      // for the different sides of the separator.
       part { name: "glow2a"; mouse_events: 0;
          clip_to: "whole_left";
          scale: 1;
@@ -489,6 +555,9 @@ group { name: "elm/panes/vertical/flush";
             visible: 1;
          }
       }
+      // "bar1" and "bar2" are two transparent RECTs that split the main "bar"
+      // into two hover-sensitive areas (left and right). `repeat_events: 1`
+      // allows events to be passed to other parts below.
       part { name: "bar1"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -529,12 +598,15 @@ group { name: "elm/panes/vertical/flush";
          action: STATE_SET "default" 0.0;
          target: "bar";
       }
+      // When the mouse enters "bar1", the corresponding glow parts transition
+      // to the "active" state with a deceleration effect.
       program { signal: "mouse,in"; source: "bar1";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.2;
          target: "glow1a";
          target: "glowbar1a";
       }
+      // The glow fades out when the mouse leaves.
       program { signal: "mouse,out"; source: "bar1";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -556,6 +628,7 @@ group { name: "elm/panes/vertical/flush";
    }
 }
 
+// Horizontal version of the "flush" style.
 group { name: "elm/panes/horizontal/flush";
    images.image: "shadow_circle_horiz.png" COMP;
    parts {
@@ -799,14 +872,22 @@ group { name: "elm/panes/horizontal/flush";
    }
 }
 
+// This group defines a "foldable" vertical pane, where the left pane can be
+// collapsed. It inherits from the default style and adds scripting logic.
 group { name: "elm/panes/vertical/left-fold";
    inherit: "elm/panes/vertical/default";
+   // The script manages the open/closed state of the pane.
+   // `public` variables can be accessed from the C code.
+   // - open: Tracks if the pane is open (1) or closed (0).
+   // - drag_x, drag_y: Store the separator's position before folding.
    script {
       public open;
       public drag_x;
       public drag_y;
    }
    parts {
+      // Redefines the "dots" part as a clickable arrow icon to control folding.
+      // It has different states for open, closed, and pressed.
       image { "dots";
          desc { "default";
             image.normal: "i-arrow-l";
@@ -828,6 +909,7 @@ group { name: "elm/panes/vertical/left-fold";
             color_class: "/fg/pressed/panes/fold/arrow";
          }
       }
+      // An invisible "event" rectangle on top of "dots" to capture clicks.
       rect { "event";
          repeat;
          desc { "default";
@@ -837,11 +919,14 @@ group { name: "elm/panes/vertical/left-fold";
       }
    }
    programs {
+      // On load, initialize the pane as open.
       program { signal: "load"; source: "";
          script {
             set_int(open, 1);
          }
       }
+      // Overrides the "bar_down" program to set the correct "pressed" state
+      // for the arrow icon depending on whether the pane is open or closed.
       program { name: "bar_down";
          script {
             if (get_int(open) == 1) {
@@ -860,18 +945,26 @@ group { name: "elm/panes/vertical/left-fold";
             }
          }
       }
+      // Handles clicks on the folding arrow.
       program { signal: "mouse,clicked,1"; source: "event";
          script {
+            // If the pane is open, close it.
             if (get_int(open) == 1) {
                new Float: dx;
                new Float: dy;
+               // Set state to closed.
                set_int(open, 0);
+               // Save the current drag position.
                get_drag(PART:"elm.bar", dx, dy);
                set_float(drag_x, dx);
+               // Move the bar to the far left to collapse the pane.
                set_drag(PART:"elm.bar", 0.0, 0.5);
                set_state(PART:"dots", "closed", 0.0);
+            // If closed, open it.
             } else if (get_int(open) == 0) {
+               // Set state to open.
                set_int(open, 1);
+               // Restore the drag position from before it was closed.
                set_drag(PART:"elm.bar", get_float(drag_x), 0.5);
                set_state(PART:"dots", "default", 0.0);
             }
@@ -880,6 +973,7 @@ group { name: "elm/panes/vertical/left-fold";
    }
 }
 
+// Similar to left-fold, but for collapsing the right pane.
 group { name: "elm/panes/vertical/right-fold";
    inherit: "elm/panes/vertical/default";
    script {
@@ -962,6 +1056,7 @@ group { name: "elm/panes/vertical/right-fold";
    }
 }
 
+// Horizontal version for folding the upper pane.
 group { name: "elm/panes/horizontal/up-fold";
    inherit: "elm/panes/horizontal/default";
    script {
@@ -1044,6 +1139,7 @@ group { name: "elm/panes/horizontal/up-fold";
    }
 }
 
+// Horizontal version for folding the lower pane.
 group { name: "elm/panes/horizontal/down-fold";
    inherit: "elm/panes/horizontal/default";
    script {
@@ -1126,6 +1222,7 @@ group { name: "elm/panes/horizontal/down-fold";
    }
 }
 
+// Undefine macros to avoid conflicts with other files.
 #undef PANEMIN
 #undef PANEMIN2
 #undef PANEWID

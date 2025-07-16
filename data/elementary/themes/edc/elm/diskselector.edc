@@ -1,16 +1,24 @@
+// This group defines the base layout for the diskselector widget. It serves as
+// the main container that holds the interactive elements.
 group { name: "elm/diskselector/base/default";
    parts {
+      // "bg" is a basic rectangle that provides the background color for the
+      // widget. It does not respond to mouse events.
       part { name: "bg"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/diskselector";
          }
       }
+      // "clipper" is an invisible rectangle that defines the clipping area. It
+      // ensures that any content extending beyond the widget's bounds is hidden.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // "elm.swallow.content" is a container where the actual diskselector
+      // items will be placed. It's clipped by the "clipper" part.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          scale;
@@ -26,14 +34,21 @@ group { name: "elm/diskselector/base/default";
    }
 }
 
+// This group defines the default appearance and behavior of an individual item
+// in the diskselector. Items can display an icon, text, or both. The style can
+// be changed dynamically.
 group { name: "elm/diskselector/item/default";
+   // Data fields provide configuration values that can be queried from the C
+   // code.
    data {
       item: "len_threshold" "14";
       item: "display_item_num" "3";
       item: "min_height" "-1";
       item: "min_width" "-1";
    }
+   // The "parts" block defines the visual components of the item.
    parts {
+      // "elm.swallow.icon" is a container for the item's icon.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -52,32 +67,41 @@ group { name: "elm/diskselector/item/default";
             rel2.offset: 4 -5;
             offscale;
          }
+         // "show" state is used for the central item, making it fully visible
+         // and with a defined aspect ratio.
          description { state: "show" 0.0;
             inherit: "default" 0.0;
             min: 20 20;
             aspect: 1.0 1.0;
          }
+         // "default_small" is for a smaller version of the central item.
          description { state: "default_small" 0.0;
             inherit: "default" 0.0;
             min: 10 10;
             aspect: 1.0 1.0;
          }
+         // "left_side" state is for items to the left of the center. They are
+         // smaller and partially transparent white (#FFFFFFA0).
          description { state: "left_side" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0 0.2;
             rel2.relative: 0 0.8;
-            color: 255 255 255 160; // no cc
+            color: 255 255 255 160; // #FFFFFFA0, no cc
             min: 10 10;
             aspect: 1.0 1.0;
          }
+         // "right_side" is for items to the right of the center, styled
+         // similarly to "left_side" items.
          description { state: "right_side" 0.0;
             inherit: "left_side" 0.0;
             rel1.relative: 0.4 0.2;
             rel2.relative: 0.4 0.8;
-            color: 255 255 255 160; // no cc
+            color: 255 255 255 160; // #FFFFFFA0, no cc
             min: 10 10;
             aspect: 1.0 1.0;
          }
+         // "icon_only" state makes the icon fill the entire item area when
+         // only icons are displayed.
          description { state: "icon_only" 0.0;
             inherit: "default" 0.0;
             align: 0.5 0.5;
@@ -87,6 +111,7 @@ group { name: "elm/diskselector/item/default";
             aspect: 1.0 1.0;
          }
       }
+      // "elm.text" displays the item's label. It is positioned to the right of the icon.
       part { name: "elm.text"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -103,40 +128,48 @@ group { name: "elm/diskselector/item/default";
             }
             offscale;
          }
+         // In the "show" state, the text becomes visible, for the central item.
          description { state: "show" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
+         // "default_small" is for a smaller version of the text.
          description { state: "default_small" 0.0;
             inherit: "default" 0.0;
             visible: 1;
             text.size: 10;
          }
+         // "left_side" state styles the text for side items, with a gray color
+         // (#808080FF) and smaller font.
          description { state: "left_side" 0.0;
             inherit: "default" 0.0;
-            color: 128 128 128 255; // no cc
+            color: 128 128 128 255; // #808080FF, no cc
             text.size: 8;
             visible: 1;
             text.align: 0.2 0.5;
          }
+         // "right_side" mirrors the "left_side" styling for items on the right.
          description { state: "right_side" 0.0;
             inherit: "default" 0.0;
-            color: 128 128 128 255; // no cc
+            color: 128 128 128 255; // #808080FF, no cc
             visible: 1;
             text.size: 8;
             text.align: 0.8 0.5;
          }
+         // "text_only" state expands the text to fill the entire item area.
          description { state: "text_only" 0.0;
             inherit: "default" 0.0;
             visible: 1;
             rel1.relative: 0 0;
             rel2.relative: 1 1;
          }
+         // "text_only_left_side" combines "text_only" and "left_side" styling.
          description { state: "text_only_left_side" 0.0;
             inherit: "left_side" 0.0;
             rel1.relative: 0 0;
             rel2.relative: 1 1;
          }
+         // "text_only_right_side" combines "text_only" and "right_side" styling.
          description { state: "text_only_right_side" 0.0;
             inherit: "right_side" 0.0;
             visible: 1;
@@ -144,20 +177,30 @@ group { name: "elm/diskselector/item/default";
             rel2.relative: 1 1;
          }
       }
+      // "over1" is an invisible rectangle that captures mouse clicks for the
+      // entire item. This is a common technique to make a composite object
+      // easily clickable.
       part { name: "over1"; type: RECT;
          mouse_events: 1;
          repeat_events: 1;
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, no cc
          }
       }
    }
 
+   // The "programs" block defines the interactive logic of the item.
    programs {
+      // An embedded script that declares a public integer variable 'item_style'.
+      // This variable controls the display mode of the item:
+      // 0: icon and text (default)
+      // 1: text only
+      // 2: icon only
       script {
          public item_style; // 0:icon and text, 1:text only, 2:con only
       }
+      // This program is triggered when the item becomes the central element.
       program { name: "center_text";
          signal: "elm,state,center"; source: "elm";
          script {
@@ -172,12 +215,14 @@ group { name: "elm/diskselector/item/default";
               }
          }
       }
+      // Triggered for a smaller central item state.
       program { name: "center_small_text";
          signal: "elm,state,center_small"; source: "elm";
          action: STATE_SET "default_small" 0.0;
          target: "elm.text";
          target: "elm.swallow.icon";
       }
+      // This program is triggered when the item is on the left side.
       program { name: "l_side_text";
          signal: "elm,state,left_side"; source: "elm";
          script {
@@ -192,6 +237,7 @@ group { name: "elm/diskselector/item/default";
               }
          }
       }
+      // This program is triggered when the item is on the right side.
       program { name: "r_side_text";
          signal: "elm,state,right_side"; source: "elm";
          script {
@@ -206,6 +252,8 @@ group { name: "elm/diskselector/item/default";
               }
          }
       }
+      // The following programs allow external code to change the 'item_style'.
+      // Sets the item to display only the icon.
       program { name: "icon_only";
          signal: "elm,state,icon,only"; source: "elm";
          script {
@@ -213,6 +261,7 @@ group { name: "elm/diskselector/item/default";
             set_int(item_style, 2);
          }
       }
+      // Sets the item to display only text.
       program { name: "text_only";
          signal: "elm,state,text,only"; source: "elm";
          script {
@@ -220,12 +269,15 @@ group { name: "elm/diskselector/item/default";
             set_int(item_style, 1);
          }
       }
+      // Sets the item to display both text and icon.
       program { name: "text_icon";
          signal: "elm,state,text,icon"; source: "elm";
          script {
             set_int(item_style, 0);
          }
       }
+      // When the 'over1' part is clicked, this program emits a signal to notify
+      // the application that the item has been clicked.
       program { name: "field_click";
          signal: "mouse,clicked,1"; source: "over1";
          action: SIGNAL_EMIT "elm,action,click" "elm";
@@ -233,16 +285,19 @@ group { name: "elm/diskselector/item/default";
    }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// diskselector item : datetime style
-///////////////////////////////////////////////////////////////////////////////
+// This group defines a specialized, text-only style for diskselector items,
+// typically used for implementing date and time pickers. It provides distinct
+// visual states for selected and unselected items in central and side
+// positions.
 group { name: "elm/diskselector/item/datetime/default";
    data {
       item: "len_threshold" "10";
       item: "min_height" "-1";
       item: "min_width" "-1";
    }
+   // The "parts" block defines the visual components of the datetime item.
    parts {
+     // This part displays the date or time as text.
      part { name: "elm.text"; type: TEXT;
         mouse_events: 0;
         scale: 1;
@@ -259,46 +314,61 @@ group { name: "elm/diskselector/item/datetime/default";
               ellipsis: -1;
            }
         }
+        // State for a selected item in the center position.
         description { state: "center_sel" 0.0;
            inherit: "default" 0.0;
            color_class: "/fg/selected/diskselector";
         }
+        // State for an unselected item on the left, with a gray color (#808080FF).
         description { state: "left_side" 0.0;
            inherit: "default" 0.0;
-           color: 128 128 128 255; // no cc
+           color: 128 128 128 255; // #808080FF, no cc
            text.align: 0.2 0.5;
         }
+        // State for a selected item on the left.
         description { state: "left_side_sel" 0.0;
            inherit: "default" 0.0;
            color_class: "/fg/selected/diskselector";
            text.align: 0.2 0.5;
         }
+        // State for an unselected item on the right, with a gray color (#808080FF).
         description { state: "right_side" 0.0;
            inherit: "default" 0.0;
-           color: 128 128 128 255; // no cc
+           color: 128 128 128 255; // #808080FF, no cc
            text.align: 0.8 0.5;
         }
+        // State for a selected item on the right.
         description { state: "right_side_sel" 0.0;
            inherit: "default" 0.0;
            color_class: "/fg/selected/diskselector";
            text.align: 0.8 0.5;
         }
      }
+     // An invisible rectangle for capturing clicks, similar to the default item style.
      part { name: "over1"; type: RECT;
         mouse_events: 1;
         repeat_events: 1;
         ignore_flags: ON_HOLD;
         description {
            state: "default" 0.0;
-           color: 0 0 0 0; // no cc
+           color: 0 0 0 0; // #00000000, no cc
         }
      }
    }
+   // The "programs" block contains the logic for managing the item's state.
    programs {
+      // This script defines the state management logic for the datetime item.
+      // It uses public variables to track the item's position and selection
+      // status, and a function to apply the correct visual state. This
+      // centralizes the state logic, avoiding redundancy in the programs.
       script {
+         // 'field_pos' stores the item's position: 0 for center, 1 for left, 2 for right.
          public field_pos; // center = 0,left = 1, right =2.
+         // 'field_selected' tracks if the item is selected (1) or not (0).
          public field_selected; //field is selected(1) or not(0).
 
+         // 'update_state' applies the appropriate visual state to the "elm.text"
+         // part based on the current 'field_pos' and 'field_selected' values.
          public update_state() {
             new pos, is_sel;
             pos = get_int(field_pos)
@@ -320,42 +390,51 @@ group { name: "elm/diskselector/item/datetime/default";
             }
          }
       }
+      // The following programs respond to signals from the application to update
+      // the item's state and then call 'update_state()' to refresh the view.
+      // Triggered when the item is selected.
       program { signal: "elm,state,selected"; source: "elm";
          script {
             set_int(field_selected, 1);
             update_state();
          }
       }
+      // Triggered when the item is deselected (returns to default).
       program { signal: "elm,state,default"; source: "elm";
          script {
             set_int(field_selected, 0);
             update_state();
          }
       }
+      // Triggered when the item moves to the center.
       program { signal: "elm,state,center"; source: "elm";
          script {
             set_int(field_pos, 0);
             update_state();
          }
       }
+      // Also triggered for a central position.
       program { signal: "elm,state,center_small"; source: "elm";
          script {
             set_int(field_pos, 0);
             update_state();
          }
       }
+      // Triggered when the item moves to the left side.
       program { signal: "elm,state,left_side"; source: "elm";
          script {
             set_int(field_pos, 1);
             update_state();
          }
       }
+      // Triggered when the item moves to the right side.
       program { signal: "elm,state,right_side"; source: "elm";
          script {
             set_int(field_pos, 2);
             update_state();
          }
       }
+      // Emits a click signal to the application.
       program { signal: "mouse,clicked,1"; source: "over1";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }

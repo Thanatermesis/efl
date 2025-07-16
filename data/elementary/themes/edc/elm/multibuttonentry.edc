@@ -1,13 +1,24 @@
+// This group defines the base layout for the multibuttonentry widget.
+// It serves as the main container for the widget's elements, providing a background
+// and swallow parts for content like buttons and an entry field.
 group { name: "elm/multibuttonentry/base/default";
+   // Data items are key-value pairs used to configure widget properties from code.
+   // These define padding and a specific height when the widget is in a 'closed' state.
    data.item: "horizontal_pad" 0;
    data.item: "vertical_pad" 0;
    data.item: "closed_height" 0;
    parts {
+      // The 'bg' part is a transparent rectangle that acts as the base layer.
+      // It fills the entire widget area and other parts are placed relative to it.
+      // The color 0 0 0 0 corresponds to RGBA(0, 0, 0, 0), which is fully transparent.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // 'elm.swallow.background' is a swallow part, which is a placeholder for custom content.
+      // Here, it's intended to hold a background object, like a frame or a custom color.
+      // It is scaled, meaning its content will be scaled according to the widget's scaling factor.
       part { name: "elm.swallow.background"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -15,7 +26,11 @@ group { name: "elm/multibuttonentry/base/default";
          }
       }
       /* this widget was released with non-namespaced parts in legacy api */
+      // This alias provides backward compatibility for older applications
+      // that might use "box.swallow" instead of the namespaced "elm.swallow.box".
       alias: "box.swallow" "elm.swallow.box";
+      // 'elm.swallow.box' is the primary content area. It swallows the box container
+      // that holds the entry and the buttons. It's placed relative to the 'bg' part.
       part { name: "elm.swallow.box"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "bg";
@@ -24,28 +39,42 @@ group { name: "elm/multibuttonentry/base/default";
    }
 }
 
+// This group defines the style for the label part of the multibuttonentry.
+// The label is typically displayed above or next to the entry field.
 group { name: "elm/multibuttonentry/label/default";
    parts {
+      // 'elm.text' is a TEXT part that displays the label's text.
+      // 'mouse_events: 0' makes it transparent to mouse clicks, passing them to underlying elements.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // 'color_class' allows the text color to be themed and changed at runtime.
             color_class: "/fg/normal/multibuttonentry/text";
-            text { font: FNBD; size: 10;
-               min: 1 1;
+            text { font: FNBD; size: 10; // Sets the font to bold and size to 10.
+               min: 1 1; // Ensures the text part has a minimum size of 1x1 pixels.
+               // 'ellipsis: -1' enables ellipsizing at the end of the text if it overflows.
+               // A value of 1.0 would also work, but -1 is a convention for the end.
                ellipsis: -1;
-               align: 0.5 0.5;
+               align: 0.5 0.5; // Centers the text horizontally and vertically.
                text_class: "multibuttonentry_label";
             }
+            // 'rel1.offset' and 'rel2.offset' define padding around the text.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // 'offscale' prevents this part from being scaled by the global 'scale' factor of the widget.
+            // This is useful for maintaining a consistent font size regardless of widget scaling.
             offscale;
          }
       }
    }
 }
 
+// This group styles the guide text (placeholder) of the multibuttonentry.
+// This text is shown inside the entry area when it is empty to guide the user.
 group { name: "elm/multibuttonentry/guidetext/default";
    parts {
+      // The 'elm.text' part for the guide text. Its properties are similar to the label,
+      // but with a different color class and text alignment.
       part { name: "elm.text"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -54,6 +83,7 @@ group { name: "elm/multibuttonentry/guidetext/default";
             color_class: "/fg/normal/multibuttonentry/text/guide";
             text { font: FNBD; size: 10;
                min: 0 1;
+               // 'align: 0.0 0.5' aligns the text to the left, which is typical for entry fields.
                align: 0.0 0.5;
             }
             offscale;
@@ -62,8 +92,14 @@ group { name: "elm/multibuttonentry/guidetext/default";
    }
 }
 
+// This group defines the appearance and behavior of an individual button
+// that represents an item in the multibuttonentry.
 group { name: "elm/multibuttonentry/btn/default";
+   // Styles define reusable text properties for textblock parts.
    styles {
+      // This style sets the default appearance for the button's text.
+      // It specifies font, alignment, size, color (#ffffff, white), and text class.
+      // It also defines tags for simple text formatting, like line breaks (<br>) and bold (<b>).
       style { name: "multibuttonentry_textblock_style";
          base: "font="FN" align=0.5 font_size=10 color=#fff text_class=multibuttonentry_item ellipsis=1.0"; // no cc for color
          tag: "br" "\n";
@@ -74,11 +110,18 @@ group { name: "elm/multibuttonentry/btn/default";
       }
    }
 
+   // Scripts allow for imperative logic within the EDC file.
+   // Embryo scripting language is used here.
    script {
+      // 'public disabled = 0;' declares a public variable 'disabled' initialized to 0 (false).
+      // This variable can be accessed and modified from the application code to enable/disable the button.
+      // It's used within this group's programs to control behavior.
       public disabled = 0;
    }
 
    parts {
+      // 'base' is the button's main background rectangle. It is slightly smaller than the full part area
+      // due to the offsets, creating a small margin.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -87,11 +130,14 @@ group { name: "elm/multibuttonentry/btn/default";
             rel2.offset: -3 -3;
             offscale;
          }
+         // The 'pressed' state changes the button's background color to give visual feedback on click.
          description { state: "pressed" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/pressed/multibuttonentry/button";
          }
       }
+      // 'glow' is a rectangle used to display a focus highlight.
+      // It's positioned at the bottom of the 'base' part. It is normally invisible.
       part { name: "glow"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -101,6 +147,7 @@ group { name: "elm/multibuttonentry/btn/default";
             color_class: "/bg/selected/multibuttonentry/button/bar";
             visible: 0;
          }
+         // When in the 'focused' state, the glow becomes visible as a 5px high bar.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             min: 0 5;
@@ -110,6 +157,9 @@ group { name: "elm/multibuttonentry/btn/default";
             inherit: "default" 0.0;
          }
       }
+      // 'close' is the 'x' icon for deleting the button.
+      // 'mouse_events: 0' ensures that clicks on the icon are handled by the 'del' part below it.
+      // It is a fixed size of 15x15 pixels.
       part { name: "close"; mouse_events: 0;
          scale;
          description { state: "default" 0.0;
@@ -125,6 +175,9 @@ group { name: "elm/multibuttonentry/btn/default";
             color_class: "/fg/pressed/multibuttonentry/button/delete";
          }
       }
+      // 'del' is a transparent rectangle that serves as the clickable area for the delete button.
+      // It is positioned at the right end of the 'base' part. Using a separate, larger, transparent
+      // area for clicks makes it easier for users to hit the target.
       part { name: "del"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -139,6 +192,9 @@ group { name: "elm/multibuttonentry/btn/default";
             offscale;
          }
       }
+      // This is a common Edje technique: 'elm.btn.text' is an invisible textblock
+      // that holds the button's text content and defines its layout boundaries.
+      // It's sized relative to the 'base' and 'del' parts, leaving space for the delete button.
       part { name: "elm.btn.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -157,6 +213,10 @@ group { name: "elm/multibuttonentry/btn/default";
             offscale;
          }
       }
+      // The 'text' part is the visible text on the button.
+      // It uses 'text_source' to display the content from 'elm.btn.text'.
+      // This separation allows for more complex text layouts and effects, as the source
+      // text geometry is calculated in 'elm.btn.text' and then used here.
       part { name: "text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -170,6 +230,7 @@ group { name: "elm/multibuttonentry/btn/default";
             }
             color_class: "/fg/normal/multibuttonentry/text/button";
          }
+         // These descriptions change the text color for different button states.
          description { state: "pressed" 0.0;
             inherit: "default";
             color_class: "/fg/pressed/multibuttonentry/text/button";
@@ -181,6 +242,9 @@ group { name: "elm/multibuttonentry/btn/default";
       }
    }
    programs {
+      // This program runs when the 'base' part is clicked.
+      // It checks the 'disabled' variable and, if the button is not disabled,
+      // it emits a "clicked" signal that the widget's code can listen for.
       program { signal: "mouse,clicked,1"; source: "base";
          script {
             if (get_int(disabled) == 0) {
@@ -188,22 +252,32 @@ group { name: "elm/multibuttonentry/btn/default";
             }
          }
       }
+      // When the widget receives the "elm,state,default" signal, it sets the 'glow' part
+      // to its "default" state (invisible) with a smooth transition.
       program { signal: "elm,state,default"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.2;
          target: "glow";
       }
+      // When the widget is focused, this program sets the 'glow' part to its "focused"
+      // state (visible), making the focus highlight appear.
       program { signal: "elm,state,focused"; source: "elm";
          action: STATE_SET "focused" 0.0;
          transition: SINUSOIDAL 0.2;
          target: "glow";
       }
+      // When the widget is enabled, this script resets the text to its "default" state
+      // and sets the 'disabled' variable to 0 (false).
       program { signal: "elm,state,enabled"; source: "elm";
          script {
             set_state(PART:"text", "default", 0.0);
             set_int(disabled , 0);
          }
       }
+      // When the widget is disabled, this script performs several actions:
+      // - It checks if the button is currently focused. If so, it removes the focus glow.
+      // - It sets the 'text' part to its "disabled" state (changing its color).
+      // - It sets the 'disabled' variable to 1 (true).
       program { signal: "elm,state,disabled"; source: "elm";
          script {
             new st[31];
@@ -215,10 +289,14 @@ group { name: "elm/multibuttonentry/btn/default";
             set_int(disabled , 1);
          }
       }
+      // Hides the focus 'glow' when the widget loses focus.
       program { signal: "elm,state,unfocused"; source: "elm";
          action: STATE_SET "unfocused" 0.0;
          target: "glow";
       }
+      // When the mouse button is pressed down on 'base', if not disabled,
+      // both the 'base' and 'text' parts are set to their "pressed" state
+      // to provide immediate visual feedback.
       program { signal: "mouse,down,1"; source: "base";
          script {
             if (get_int(disabled) == 0) {
@@ -227,6 +305,8 @@ group { name: "elm/multibuttonentry/btn/default";
             }
          }
       }
+      // When the mouse button is released, the 'base' and 'text' parts
+      // are returned to their "default" state.
       program { signal: "mouse,up,1"; source: "base";
          script {
             if (get_int(disabled) == 0) {
@@ -235,13 +315,17 @@ group { name: "elm/multibuttonentry/btn/default";
             }
          }
       }
+      // Clicking the 'del' area emits an "elm,deleted" signal,
+      // which the application code can use to remove this item.
       program { signal: "mouse,clicked,1"; source: "del";
          action: SIGNAL_EMIT "elm,deleted" "elm";
       }
+      // Pressing down on the delete area changes the 'close' icon state to "clicked".
       program { signal: "mouse,down,1"; source: "del";
          action: STATE_SET "clicked" 0.0;
          target: "close";
       }
+      // Releasing the mouse button reverts the 'close' icon to its "default" state.
       program { signal: "mouse,up,1"; source: "del";
          action: STATE_SET "default" 0.0;
          target: "close";
@@ -249,6 +333,8 @@ group { name: "elm/multibuttonentry/btn/default";
    }
 }
 
+// This group defines the button shown when the multibuttonentry is in its 'closed' or 'shrunk' state.
+// It typically displays a summary, like "+N more", to indicate hidden items.
 group { name: "elm/multibuttonentry/closedbutton/default";
    styles {
       style { name: "textblock_style_multibuttonentry_default";
@@ -261,11 +347,13 @@ group { name: "elm/multibuttonentry/closedbutton/default";
       }
    }
    parts {
+      // A transparent background for the button.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // The textblock for displaying the summary text (e.g., "+3").
       part { name: "elm.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;

@@ -1,9 +1,17 @@
+// This group defines the visual style for a window preview, which is commonly
+// used in UI components like taskbars or pagers. It combines a snapshot of
+// the window's content with its title.
 group { name: "e/comp/preview";
    parts {
+      // This part is a SWALLOW container for the actual window preview content.
+      // It is configured to not receive mouse events, allowing them to pass through.
       part { name: "e.swallow.preview"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
          }
       }
+      // This part displays the window's title. It is set to scale, and the text
+      // properties are defined for font, size, alignment, and ellipsis, ensuring
+      // long titles are handled gracefully.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -20,13 +28,19 @@ group { name: "e/comp/preview";
    }
 }
 
+// This group defines the base layer for a screen, which typically holds the
+// desktop background. The alias provides backward compatibility.
 group { name: "e/comp/screen/base/default";
    alias: "e/comp/screen/base/noeffects"; // legacy
    parts {
+      // A RECT part used as a clipping mask for other parts in this group.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
          }
       }
+      // A SWALLOW part to hold the actual background content (e.g., wallpaper).
+      // It is clipped by the "clip" part to ensure it doesn't draw outside the
+      // designated screen area.
       part { name: "e.swallow.background"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -35,15 +49,22 @@ group { name: "e/comp/screen/base/default";
    }
 }
 
+// This group defines an overlay for the entire screen, used for global effects
+// like screensavers, suspend/hibernate fades, and restart notifications.
 group { name: "e/comp/screen/overlay/default";
    alias: "e/comp/screen/overlay/noeffects"; // legacy
    images.image: "screen_circular_shadow.png" COMP;
+   // This data item indicates that the theme handles the 'restarted' state,
+   // which is used after a configuration or theme reload.
    data.item: "restarted" "on";
    parts {
+      // Clipping rectangle for the entire overlay.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
          }
       }
+      // A shadow effect that expands from the center of the screen, used
+      // during screensaver activation.
       part { name: "shadow"; mouse_events: 0;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -51,6 +72,7 @@ group { name: "e/comp/screen/overlay/default";
             rel2.relative: 2.0 2.0;
             image.normal: "screen_circular_shadow.png";
             fill.smooth: 0;
+            // Initially transparent (#FFFFFF00) and invisible.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
@@ -58,34 +80,45 @@ group { name: "e/comp/screen/overlay/default";
             inherit;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
+            // Fades to opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // A black rectangle that fades in for the screensaver.
       part { name: "blanker"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Initially transparent black (#00000000) and invisible.
             color: 0 0 0 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit;
+            // Fades to opaque black (#000000FF).
             color: 0 0 0 255; // no cc
             visible: 1;
          }
       }
+      // A black rectangle that quickly fades in for suspend, hibernate,
+      // reboot, halt, and logout actions to obscure the screen content.
       part { name: "suspender"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Initially transparent black (#00000000) and invisible.
             color: 0 0 0 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit;
+            // Fades to opaque black (#000000FF).
             color: 0 0 0 255; // no cc
             visible: 1;
          }
       }
    }
    programs {
+         // When the screensaver is activated, this program animates the "blanker"
+         // part to fade in over 3 seconds. Once complete, it signals that the
+         // screensaver is now active.
          program { signal: "e,state,screensaver,on"; source: "e";
             action: STATE_SET "visible" 0.0;
             transition: ACCELERATE 3.0 USE_DURATION_FACTOR 1 CURRENT;
@@ -94,21 +127,28 @@ group { name: "e/comp/screen/overlay/default";
                action: SIGNAL_EMIT "e,state,screensaver,active" "e";
             }
          }
+         // Simultaneously, the "shadow" part also animates to its "visible"
+         // state, creating a complementary visual effect.
          program { signal: "e,state,screensaver,on"; source: "e";
             action: STATE_SET "visible" 0.0;
             transition: DECELERATE 3.0 USE_DURATION_FACTOR 1 CURRENT;
             target: "shadow";
          }
+         // When the screensaver is deactivated, the "blanker" part fades out.
          program { signal: "e,state,screensaver,off"; source: "e";
             action: STATE_SET "default" 0.0;
             transition: ACCELERATE 0.5 USE_DURATION_FACTOR 1 CURRENT;
             target: "blanker";
          }
+         // The "shadow" part also fades out.
          program { signal: "e,state,screensaver,off"; source: "e";
             action: STATE_SET "default" 0.0;
             transition: ACCELERATE 0.5 USE_DURATION_FACTOR 1 CURRENT;
             target: "shadow";
          }
+         // For suspend, hibernate, reboot, halt, logout, and restart, the "suspender" part
+         // quickly fades in to black. A `done` signal is emitted in a sequence, allowing
+         // the system to proceed with the action after the screen is obscured.
          program { signal: "e,state,sys,suspend"; source: "e";
             action: STATE_SET "visible" 0.0;
             transition: ACCELERATE 0.5 USE_DURATION_FACTOR 1 CURRENT;
@@ -125,6 +165,7 @@ group { name: "e/comp/screen/overlay/default";
                action: SIGNAL_EMIT "e,state,sys,hibernate,done" "e";
             }
          }
+         // When resuming, the "suspender" part fades out, revealing the desktop.
          program { signal: "e,state,sys,resume"; source: "e";
             action: STATE_SET "default" 0.0;
             transition: DECELERATE 0.5 USE_DURATION_FACTOR 1 CURRENT;
@@ -162,10 +203,15 @@ group { name: "e/comp/screen/overlay/default";
                 action: SIGNAL_EMIT "e,state,sys,restart,done" "e";
             }
          }
+         // When the compositor restarts (e.g., after a theme change), this program
+         // immediately sets the "suspender" to its visible state without a transition,
+         // hiding any graphical glitches during the restart process.
          program { signal: "e,state,sys,restarted"; source: "e";
             action: STATE_SET "visible" 0.0;
             target: "suspender";
          }
+         // After the restart is complete, this program fades out the "suspender",
+         // revealing the newly themed desktop.
          program { signal: "e,state,sys,restarted,show"; source: "e";
             action: STATE_SET "default" 0.0;
             transition: ACCELERATE 0.5 USE_DURATION_FACTOR 1 CURRENT;
@@ -177,12 +223,20 @@ group { name: "e/comp/screen/overlay/default";
    }
 }
 
+// This group defines the default appearance and behavior of a window frame.
+// It includes shadows, focus effects, and basic animations for visibility changes.
+// An alias is provided for legacy themes.
 group { name: "e/comp/frame/default";
    alias: "e/comp/frame/default/fast"; // legacy
    images.image: "win_shad_flat.png" COMP;
+   // This embedded script handles resizing messages sent to the frame.
+   // It allows for dynamic adjustment of the 'gspacer' part, which can be
+   // used to control geometry or other properties programmatically.
    script {
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_INT) && (id == 0)) {
+            // Responds to MSG_INT with id 0 to toggle a custom state
+            // on the "gspacer" part.
             /* set state */
             new st;
 
@@ -192,6 +246,9 @@ group { name: "e/comp/frame/default";
             else
               set_state(PART:"gspacer", "default", 0.0);
          } else if ((type == MSG_INT_SET) && (id == 1)) {
+            // Responds to MSG_INT_SET with id 1 to apply custom offsets
+            // to the "gspacer" part based on the provided integer arguments.
+            // This is useful for fine-tuning layout from external code.
             new l, r, t, b;
 
             l = getarg(2);
@@ -206,54 +263,73 @@ group { name: "e/comp/frame/default";
       }
    }
    parts {
+      // A clipper part that controls the overall visibility of the window frame.
+      // It is defined much larger than the window to ensure that effects like
+      // shadows are not clipped. It starts invisible.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -1.0  -1.0;
             rel1.offset: -9999 -9999;
             rel2.relative: 2.0   2.0;
             rel2.offset: 9999  9999;
+            // Transparent white (#FFFFFF00) and invisible by default.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit;
+            // Opaque white (#FFFFFFFF) when visible.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // A rectangle for the shadow, clipped by the "clipper".
       part { name: "shadow"; type: RECT;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "clipper";
          }
+         // A state to hide the shadow.
          description { state: "hidden" 0.0;
             inherit;
             visible: 0;
          }
       }
+      // This rectangle sits on top of the shadow and changes color based on focus.
+      // It allows the shadow's color to indicate whether the window is active.
       part { name: "focus-shadow"; type: RECT;
          clip_to: "shadow";
          description { state: "default" 0.0;
             rel.to: "clipper";
             color_class: "/shadow/normal/comp/win";
          }
+         // The color_class changes when the window is focused.
          description { state: "focused" 0.0;
             inherit;
             color_class: "/shadow/selected/comp/win";
          }
       }
+      // This macro generates the parts for a window shadow using a nine-patch image.
+      // It attaches the shadow to the "focus-shadow" part and applies it around
+      // the "e.swallow.content" part. The numerical parameters define the size
+      // and insets of the shadow image.
       WIN_SHAD("e.swallow.content", "focus-shadow", "win_shad_flat.png", 21, 21, 14, 28, 0.5)
+      // A SPACER part used to animate the window content's appearance.
+      // It transitions from a smaller size to full size, creating a "zoom in" effect.
       part { name: "shower"; type: SPACER;
          description { state: "default" 0.0;
             rel1.relative: 0.05 0.05;
             rel2.relative: 0.95 0.95;
          }
+         // In the "visible" state, it expands to fill the entire area.
          description { state: "visible" 0.0;
             inherit;
             rel1.relative: 0.0  0.0;
             rel2.relative: 1.0  1.0;
          }
       }
+      // This RECT acts as a background and clipper for the main window content.
+      // Its color changes with focus state, providing a visual cue.
       part { name: "focus-clipper";
          type: RECT;
          clip_to: "clipper";
@@ -262,25 +338,32 @@ group { name: "e/comp/frame/default";
             rel.to: "clipper";
             color_class: "/bg/normal/comp/win";
          }
+         // Uses a different color class when focused.
          description { state: "focused" 0.0;
             inherit;
             color_class: "/bg/selected/comp/win";
          }
       }
 #define FOCUSGLOWSZ 20
+      // These parts create a "glow" effect around the window when it gains focus.
+      // The "focusglow" part is a container, and "focusglow1-4" are the four
+      // sides of the glow, which animate outwards.
       part { name: "focusglow"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
          }
+         // The "active" state defines the final, expanded size of the glow effect.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             offscale;
             rel1.offset: (0-FOCUSGLOWSZ) (0-FOCUSGLOWSZ);
             rel2.offset: (FOCUSGLOWSZ-1) (FOCUSGLOWSZ-1);
+            // Starts transparent to fade in.
             color: 255 255 255 0; // no cc
         }
       }
+      // Top part of the focus glow.
       part { name: "focusglow1"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -292,6 +375,7 @@ group { name: "e/comp/frame/default";
             color_class: "/bg/selected/comp/focusglow";
          }
       }
+      // Bottom part of the focus glow.
       part { name: "focusglow2"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -303,6 +387,7 @@ group { name: "e/comp/frame/default";
             color_class: "/bg/selected/comp/focusglow";
          }
       }
+      // Left part of the focus glow.
       part { name: "focusglow3"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -314,6 +399,7 @@ group { name: "e/comp/frame/default";
             color_class: "/bg/selected/comp/focusglow";
          }
       }
+      // Right part of the focus glow.
       part { name: "focusglow4"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
@@ -326,12 +412,16 @@ group { name: "e/comp/frame/default";
          }
       }
 #undef FOCUSGLOWSZ
+      // The main content of the window is swallowed here. It is clipped by
+      // "focus-clipper" and its position is relative to the "shower" part,
+      // allowing it to be animated.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "focus-clipper";
          description { state: "default" 0.0;
             rel.to: "shower";
           }
       }
+      // A spacer used by the script for dynamic geometry adjustments.
       spacer { "gspacer";
          desc {
             rel.to: "e.swallow.content";
@@ -341,6 +431,8 @@ group { name: "e/comp/frame/default";
       }
    }
    programs {
+       // These programs toggle the visibility of the "shadow" part based on
+       // "e,state,shadow,on" and "e,state,shadow,off" signals.
        program { signal: "e,state,shadow,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "shadow";
@@ -349,6 +441,9 @@ group { name: "e/comp/frame/default";
          action: STATE_SET "hidden" 0.0;
          target: "shadow";
       }
+      // When the window becomes visible, "clipper" and "shower" animate
+      // to the "visible" state, creating a zoom-in effect. A "done" signal is
+      // emitted upon completion.
       program { name: "visible_on";
          signal: "e,state,visible"; source: "e";
          action: STATE_SET "visible" 0.0;
@@ -358,14 +453,19 @@ group { name: "e/comp/frame/default";
              action: SIGNAL_EMIT "e,action,show,done" "e";
          }
       }
+      // This program ensures that a "visible" animation stops any "hidden"
+      // animation currently in progress, preventing conflicting state changes.
       program { signal: "e,state,visible"; source: "e";
          action: ACTION_STOP;
          target: "visible_off";
       }
+      // Likewise, this stops the "visible" animation if a "hidden" signal is received.
       program { signal: "e,state,hidden"; source: "e";
          action: ACTION_STOP;
          target: "visible_on";
       }
+      // Hides the window by animating "clipper" and "shower" to their
+      // default (shrunken) states.
       program { name: "visible_off";
          signal: "e,state,hidden"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -375,16 +475,21 @@ group { name: "e/comp/frame/default";
              action: SIGNAL_EMIT "e,action,hide,done" "e";
          }
       }
+      // When the window receives focus, the "focus-clipper" and "focus-shadow"
+      // parts transition to their "focused" state, changing their colors.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          transition: SINUSOIDAL 0.1 USE_DURATION_FACTOR 1;
          targets: "focus-clipper" "focus-shadow";
       }
+      // When the window loses focus, they transition back to the "default" state.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.2 USE_DURATION_FACTOR 1;
          targets: "focus-clipper" "focus-shadow";
       }
+      // Triggers the focus glow animation. It starts from "default" and
+      // transitions to "active", creating an expanding glow effect.
       program { name: "focusbounce";
          signal: "e,state,focused"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -395,6 +500,8 @@ group { name: "e/comp/frame/default";
             transition: DECELERATE 0.3 USE_DURATION_FACTOR 1;
          }
       }
+      // When focus is lost, the glow is immediately reset to its "default"
+      // (invisible) state.
       program { name: "focusbounceoff";
          signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -431,10 +538,13 @@ group { name: "e/comp/frame/default";
    }
 }
 
+// This group inherits from "e/comp/frame/default" and adds a rotation
+// animation when the window focus changes.
 group { name: "e/comp/frame/rotate";
    alias: "e/comp/frame/rotate/fast"; // legacy
    inherit: "e/comp/frame/default";
    parts {
+      // The focus glow effect is disabled in this style by making it always invisible.
       part { name: "focusglow"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -444,6 +554,8 @@ group { name: "e/comp/frame/rotate";
             visible: 0;
         }
       }
+      // Overrides the "e.swallow.content" part to enable mapping, which allows
+      // for 3D transformations.
       part { name: "e.swallow.content";
          description { state: "default";
             map {
@@ -453,11 +565,15 @@ group { name: "e/comp/frame/rotate";
                }
             }
          }
+         // A new state "focus-out" is defined to rotate the content 180 degrees
+         // around the Z-axis when the window is unfocused.
          description { state: "focus-out";
             inherit: "default";
             map.rotation.z: 180;
          }
       }
+      // The "shower" part is overridden to be always fully visible, disabling
+      // the zoom-in animation from the parent theme.
       part {
          name: "shower";
          description { state: "default";
@@ -467,16 +583,20 @@ group { name: "e/comp/frame/rotate";
       }
    }
    programs {
+      // When focused, the content animates back to its default (0-degree) rotation.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.swallow.content";
          transition: LINEAR 0.3 USE_DURATION_FACTOR 1;
       }
+      // When unfocused, the content animates to the "focus-out" state (180-degree rotation).
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "focus-out" 0.0;
          target: "e.swallow.content";
          transition: LINEAR 0.3 USE_DURATION_FACTOR 1;
       }
+      // The focus bounce programs are disabled by redirecting them to a
+      // non-existent signal "xxx".
       program { name: "focusbounce";
          signal: "xxx";
       }
@@ -486,6 +606,8 @@ group { name: "e/comp/frame/rotate";
    }
 }
 
+// This group inherits from "e/comp/frame/rotate" and changes the animation
+// to a 3D flip (Y-axis rotation) instead of a 2D spin (Z-axis rotation).
 group { name: "e/comp/frame/flip";
    alias: "e/comp/frame/flip/fast"; // legacy
    inherit: "e/comp/frame/rotate";
@@ -498,9 +620,12 @@ group { name: "e/comp/frame/flip";
                   z: 0;
                   y: 0;
                }
+               // Hides the back of the part when it is rotated away from the viewer.
                backface_cull: 1;
             }
          }
+         // The "focus-out" state is overridden to rotate 180 degrees on the Y-axis,
+         // creating the flip effect.
          description { state: "focus-out";
             inherit: "default";
             map.rotation {
@@ -512,10 +637,13 @@ group { name: "e/comp/frame/flip";
    }
 }
 
+// This group is for popups. It inherits from the default frame but disables
+// the focus glow effect, as popups are typically transient and do not need it.
 group { name: "e/comp/frame/popup";
    alias: "e/comp/frame/popup/fast"; // legacy
    inherit: "e/comp/frame/default";
    parts {
+      // Disables the focus glow effect by making it invisible.
       part { name: "focusglow"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -531,6 +659,7 @@ group { name: "e/comp/frame/popup";
       }
    }
    programs {
+      // Disables the focus bounce programs.
       program { name: "focusbounce";
          signal: "xxx";
       }
@@ -540,14 +669,20 @@ group { name: "e/comp/frame/popup";
    }
 }
 
+// A minimal, borderless frame style. It contains only the essential swallow
+// part for the window content and has no visual decorations or animations.
 group { name: "e/comp/frame/none";
    parts {
+      // The only part is the SWALLOW for the client content.
       part { name: "e.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
       }
    }
    programs {
+      // Since there are no animations, the show/hide programs immediately
+      // emit the "done" signals to notify the compositor that the action
+      // is complete.
       program { signal: "e,state,visible"; source: "e";
          action: SIGNAL_EMIT "e,action,show,done" "e";
       }
@@ -557,10 +692,13 @@ group { name: "e/comp/frame/none";
    }
 }
 
+// This style provides a static frame with no animations. It inherits from the
+// default but disables the focus glow and the show/hide zoom effect.
 group { name: "e/comp/frame/still";
    alias: "e/comp/frame/still/fast"; // legacy
    inherit: "e/comp/frame/default";
    parts {
+      // Disables the focus glow.
       part { name: "focusglow"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -570,6 +708,7 @@ group { name: "e/comp/frame/still";
             visible: 0;
         }
       }
+      // Disables the zoom animation by making the "shower" part always fully visible.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -587,17 +726,25 @@ group { name: "e/comp/frame/still";
    }
 }
 
+// A specialized frame for menus, inheriting from the "popup" style.
+// It features a distinct angled shadow and is always in a "focused" state,
+// as menus are inherently active when visible.
 group { name: "e/comp/frame/menu";
    alias: "e/comp/frame/menu/fast"; // legacy
    inherit: "e/comp/frame/popup";
    images.image: "win_shad_angle.png" COMP;
    parts {
+      // Overrides the focus shadow to always use the "selected" color,
+      // reflecting the menu's active state.
       part { name: "focus-shadow"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/shadow/selected/comp/win";
          }
       }
+      // Uses an angled shadow image for a distinct menu look.
       WIN_SHAD("e.swallow.content", "focus-shadow", "win_shad_angle.png", 21, 21, 14, 28, 0.5)
+      // Adjusts the "shower" part to create an animation that appears to
+      // originate from the top, which is typical for dropdown menus.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: 0.05 0.0;
@@ -607,10 +754,13 @@ group { name: "e/comp/frame/menu";
    }
 }
 
+// This is a special frame style used by the "Everything" launcher. It inherits
+// from "popup" but has a more pronounced appearance to stand out.
 group { name: "e/comp/frame/everything";
    alias: "e/comp/frame/everything/fast"; // legacy
    inherit: "e/comp/frame/popup";
    parts {
+      // Disables the focus glow.
       part { name: "focusglow"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -620,11 +770,15 @@ group { name: "e/comp/frame/everything";
             visible: 0;
         }
       }
+      // Overrides the "hidden" state of the shadow to make it always visible,
+      // ensuring the frame has a shadow even if the parent style would hide it.
       part { name: "shadow";
          description { state: "hidden" 0.0;
             visible: 1;
          }
       }
+      // The "shower" part is made larger than the window content, creating a
+      // wide, expansive zoom-in animation effect.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: -0.3 -0.3;
@@ -642,20 +796,27 @@ group { name: "e/comp/frame/everything";
    }
 }
 
+// This group defines a transition effect for windows entering fullscreen mode.
+// It darkens the rest of the screen and animates the window to fill the display.
 group { name: "e/comp/frame/fullscreen";
    alias: "e/comp/frame/fullscreen/fast"; // legacy
    images.image: "screen_circular_shadow.png" COMP;
    data.item: "screen.bg" "fullscreen.bg";
    parts {
+      // A clipper for the window content animation.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -1.0  -1.0;
             rel1.offset: -9999 -9999;
             rel2.relative: 2.0   2.0;
             rel2.offset: 9999  9999;
+            // Initially transparent white (#FFFFFF00) and invisible.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
+         // The animation happens in two stages. Both "visible1" and "visible2"
+         // make the clipper opaque white (#FFFFFFFF), but they are used at
+         // different times in the animation sequence.
          description { state: "visible1" 0.0;
             inherit;
             color: 255 255 255 255; // no cc
@@ -667,10 +828,13 @@ group { name: "e/comp/frame/fullscreen";
             visible: 1;
          }
       }
+      // A clipper for the entire screen, used by the shadow/shade effects.
       part { name: "clipper_all"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // A shadow overlay for the entire screen, which darkens the background
+      // when a window goes fullscreen.
       part { name: "scr_shadow"; mouse_events: 0;
          clip_to: "clipper_all";
          description { state: "default" 0.0;
@@ -678,6 +842,7 @@ group { name: "e/comp/frame/fullscreen";
             rel2.relative: 2.0 2.0;
             image.normal: "screen_circular_shadow.png";
             fill.smooth: 0;
+            // Starts as transparent black (#00000000).
             color: 0 0 0 0; // no cc
             visible: 0;
          }
@@ -685,10 +850,12 @@ group { name: "e/comp/frame/fullscreen";
             inherit;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
+            // Fades to opaque black (#000000FF).
             color: 0 0 0 255; // no cc
             visible: 1;
          }
       }
+      // Another overlay, similar to scr_shadow, to help darken the screen.
       part { name: "scr_shade"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -705,6 +872,8 @@ group { name: "e/comp/frame/fullscreen";
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
          }
+         // The first stage of the window animation: it grows to fill most of
+         // the horizontal space but remains vertically centered and thin.
          description { state: "visible1" 0.0;
             inherit;
             rel1.relative: 0.1 0.49;
@@ -712,18 +881,23 @@ group { name: "e/comp/frame/fullscreen";
             rel2.relative: 0.9 0.51;
             rel2.offset: -1 -1;
          }
+         // The second stage of the animation: the window expands to fill the
+         // entire screen.
          description { state: "visible2" 0.0;
             inherit;
             rel1.relative: 0.0  0.0;
             rel2.relative: 1.0  1.0;
          }
       }
+      // The container for the actual window content.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "shower";
          }
       }
+      // A fader rectangle that covers the window content during the transition.
+      // It fades in and then out, helping to smooth the animation.
       part { name: "fader"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
@@ -743,12 +917,16 @@ group { name: "e/comp/frame/fullscreen";
       }
    }
    programs {
+      // When entering fullscreen, this program fades in the screen shadow/shade.
       program { name: "visible_on";
          signal: "e,state,visible"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.25 USE_DURATION_FACTOR 1;
          targets: "scr_shadow" "scr_shade";
       }
+      // This program orchestrates the two-stage window animation.
+      // It first transitions to "visible1", then in a sequence, transitions
+      // to "visible2", and finally signals completion.
       program { name: "visible_on2";
          signal: "e,state,visible"; source: "e";
          action: STATE_SET "visible1" 0.0;
@@ -761,6 +939,7 @@ group { name: "e/comp/frame/fullscreen";
              action: SIGNAL_EMIT "e,action,show,done" "e";
          }
       }
+      // Animation stoppers to prevent conflicts.
       program { signal: "e,state,visible"; source: "e";
          action: ACTION_STOP;
          targets: "visible_off" "visible_off2";
@@ -769,12 +948,15 @@ group { name: "e/comp/frame/fullscreen";
          action: ACTION_STOP;
          targets: "visible_on" "visible_on2";
       }
+      // When exiting fullscreen, this program fades out the screen shadow/shade.
       program { name: "visible_off";
          signal: "e,state,hidden"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.25 USE_DURATION_FACTOR 1;
          targets: "scr_shadow" "scr_shade";
       }
+      // This program reverses the window animation, shrinking it back from
+      // fullscreen to its initial state before hiding it.
       program { name: "visible_off2";
          signal: "e,state,hidden"; source: "e";
          action: STATE_SET "visible1" 0.0;

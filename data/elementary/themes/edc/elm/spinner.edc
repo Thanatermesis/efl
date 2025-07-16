@@ -1,21 +1,30 @@
+// The default horizontal spinner layout.
+// It consists of increment/decrement buttons and a text display area.
+// The text area can be replaced by an entry for direct input.
 group { name: "elm/spinner/base/default";
    alias: "elm/spinner/base/colorselector/default";
    parts {
+      // A clipping rectangle for the text entry part, ensuring the entry field
+      // does not draw outside the text button area.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.text_button";
          }
       }
+      // The background of the spinner.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/bg/normal/spinner/base";
          }
       }
+      // An invisible rectangle for accessibility features, highlighting the widget
+      // when it's active. It passes events through to other parts.
       part { name: "access"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // Transparent color: #00000000
             color: 0 0 0 0; // no cc
             visible: 0;
          }
@@ -24,6 +33,8 @@ group { name: "elm/spinner/base/default";
             visible: 1;
          }
       }
+      // Swallow part for an entry widget, allowing direct text input.
+      // It is only visible when the spinner is in entry mode.
       part { name: "elm.swallow.entry"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -36,6 +47,8 @@ group { name: "elm/spinner/base/default";
             visible: 1;
          }
       }
+      // Swallow part for the decrement button, placed on the left side.
+      // Overrides the decrement button to be placed at the bottom of the widget.
       part { name: "elm.swallow.dec_button"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -43,10 +56,14 @@ group { name: "elm/spinner/base/default";
             rel2.offset: 4 -5;
             rel2.relative: 0.0 1.0;
             align: 0.0 0.5;
+            // The FIXED_SIZE macro sets a fixed size for this part.
             FIXED_SIZE(15, 15)
+            // The offscale property prevents this part from being scaled with its container.
             offscale;
          }
       }
+      // Swallow part for the increment button, placed on the right side.
+      // Overrides the increment button to be placed at the top of the widget.
       part { name: "elm.swallow.inc_button"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -58,6 +75,9 @@ group { name: "elm/spinner/base/default";
             offscale;
          }
       }
+      // Swallow part for the text display, positioned between the increment and decrement buttons.
+      // It becomes invisible when the spinner is in entry mode.
+      // Overrides the text display to be positioned vertically between the increment and decrement buttons.
       part { name: "elm.swallow.text_button"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -75,6 +95,7 @@ group { name: "elm/spinner/base/default";
             visible: 0;
          }
       }
+      // An invisible rectangle that captures horizontal drag events over the text area to change the spinner value.
       part { name: "elm.dragable.slider"; type: RECT;
          repeat_events: 1;
          dragable.x: 1 1 0;
@@ -82,13 +103,16 @@ group { name: "elm/spinner/base/default";
          description { state: "default" 0.0;
             fixed: 1 0;
             rel.to: "elm.swallow.text_button";
+            // Transparent color: #00000000
             color: 0 0 0 0; // no cc
          }
       }
+      // A part that covers the entire widget to disable mouse events when in a disabled state.
       part { name: "disabler"; type: RECT;
          repeat_events: 0;
          mouse_events: 0;
          description { state: "default" 0.0;
+            // Transparent color: #00000000
             color: 0 0 0 0; // no cc
             visible: 0;
          }
@@ -98,27 +122,37 @@ group { name: "elm/spinner/base/default";
          }
       }
    }
+   // The programs section defines reactions to signals, typically changing the state of parts.
    programs {
+      // When the "elm,state,entry,active" signal is received, this program changes
+      // the state of the "elm.swallow.entry" part to "active", making it visible.
       program { name: "entry_active";
          signal: "elm,state,entry,active"; source: "elm";
          action: STATE_SET "active" 0.0;
          target: "elm.swallow.entry";
       }
+      // When the "elm,state,entry,inactive" signal is received, this program changes
+      // the state of the "elm.swallow.entry" part back to "default", hiding it.
       program { name: "entry_inactive";
          signal: "elm,state,entry,inactive"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.entry";
       }
+      // Corresponds to entry mode being deactivated. The text display part is set
+      // to its "default" state, making it visible again.
       program { name: "text_button_active";
          signal: "elm,state,button,active"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.text_button";
       }
+      // Corresponds to entry mode being activated. The text display part is set
+      // to its "inactive" state, hiding it to make space for the entry field.
       program { name: "text_button_inactive";
          signal: "elm,state,button,inactive"; source: "elm";
          action: STATE_SET "inactive" 0.0;
          target: "elm.swallow.text_button";
       }
+      // These programs toggle the accessibility highlight by changing the "access" part's state.
       program { name: "access_activate";
          signal: "elm,state,access,active"; source: "elm";
          action:  STATE_SET "active" 0.0;
@@ -129,6 +163,7 @@ group { name: "elm/spinner/base/default";
          action:  STATE_SET "default" 0.0;
          target: "access";
       }
+      // These programs enable or disable the widget by showing or hiding the "disabler" part.
       program { name: "disable";
          signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
@@ -142,6 +177,8 @@ group { name: "elm/spinner/base/default";
    }
 }
 
+// A vertical spinner layout that inherits from the default horizontal spinner.
+// It redefines the positions of the increment/decrement buttons and the text display.
 group { name: "elm/spinner/base/vertical";
    inherit: "elm/spinner/base/default";
    parts {
@@ -185,6 +222,7 @@ group { name: "elm/spinner/base/vertical";
             align: 0.5 1.0;
          }
       }
+      // Overrides the draggable slider to respond to vertical dragging instead of horizontal.
       part { name: "elm.dragable.slider"; type: RECT;
          repeat_events: 1;
          dragable.x: 0 0 0;
@@ -192,6 +230,7 @@ group { name: "elm/spinner/base/vertical";
          description { state: "default" 0.0;
             fixed: 1 0;
             rel.to: "elm.swallow.text_button";
+            // Transparent color: #00000000
             color: 0 0 0 0; // no cc
          }
       }

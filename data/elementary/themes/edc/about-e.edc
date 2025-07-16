@@ -1,9 +1,17 @@
+// This group defines the main layout and behavior of the 'About' window in Enlightenment.
+// It includes animations, text styling, and interactive elements.
 group { name: "e/widgets/about/main";
    // data.item: "borderless" "1";
    // data.item: "shaped" "1";
+   // These data items are hints for the window manager.
+   // "borderless" "1" suggests a window without standard decorations.
+   // "shaped" "1" suggests the window can have a non-rectangular shape.
+   // Pre-loading images used in this theme. COMP indicates compression.
    images.image: "about-lines.png" COMP;
    images.image: "about-triangles.png" COMP;
    images.image: "win_shadow.png" COMP;
+   // Defines a set of logos for different resolutions.
+   // The application will automatically select the best-fit logo based on the display size.
    set { name: "logo_mono";
       image { image: "logo.png" COMP;  size: 601 601 99999 99999; }
       image { image: "logo2.png" COMP; size: 301 301   600   600; }
@@ -12,6 +20,9 @@ group { name: "e/widgets/about/main";
       image { image: "logo5.png" COMP; size:  0    0    75    75; }
    }
    styles {
+      // Defines a style for the main about text.
+      // 'base' sets the default appearance. Tags like 'hilight' and 'title' allow for rich text formatting.
+      // 'color=cc:' means the color is inherited from a color class, making it themeable.
       style { name: "about_style";
          base: "font="FN" font_size=10 align=center text_class=e-about color=cc:/fg/normal/text-overlay wrap=word";
          tag: "hilight" "+ font="FNBD" text_class=tb_light color=cc:/fg/normal/text-hilight align=center";
@@ -19,6 +30,7 @@ group { name: "e/widgets/about/main";
          tag: "/title" "- \n \n";
          tag: "br" "\n";
       }
+      // Defines a style for the authors text, with different alignment and color.
       style { name: "authors_style";
          base: "font="FNBD" font_size=10 align=left text_class=e-about-authors color=cc:/fg/normal/text-subtle wrap=none";
          tag: "hilight" "+ font="FNBD" text_class=tb_light color=cc:/fg/normal/text-hilight";
@@ -27,14 +39,18 @@ group { name: "e/widgets/about/main";
          tag: "br" "\n";
       }
    }
+   // Set the minimum size of the widget.
    min: 320 420;
    parts {
+      // A spacer part to enforce the minimum size of the window.
+      // It's invisible but occupies space.
       part { name: "sizer"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
             min: 320 420;
          }
       }
+      // Background rectangle, colored using the theme's 'entry' color class.
       part { name: "image"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -42,8 +58,12 @@ group { name: "e/widgets/about/main";
          }
       }
       ////////////////////////////////////////////////////////////////
+      // This TEXTBLOCK part is for displaying the list of authors.
+      // It uses an animation to scroll the text vertically.
       part { name: "e.textblock.authors"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
+         // The "default" state positions the text block below the visible area.
+         // 'offscale' ensures it's not rendered if it's outside the main object area.
          description { state: "default" 0.0;
             fixed: 1 1;
             max: 20000 20000;
@@ -59,6 +79,7 @@ group { name: "e/widgets/about/main";
             }
             offscale;
          }
+         // The "up" state positions the text block above the visible area.
          description { state: "up" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -68,19 +89,27 @@ group { name: "e/widgets/about/main";
             align: 0.5 1.0;
          }
       }
+      // This program starts the scrolling animation when it receives the "show" signal.
       program { name: "show1";
          signal: "show"; source: "";
+         // It transitions the 'e.textblock.authors' part to the "up" state over 60 seconds.
          action: STATE_SET "up" 0.0;
          transition: LINEAR 60.0;
          target: "e.textblock.authors";
+         // After completing, it triggers the 'show2' program.
          after: "show2";
       }
+      // This program resets the text block to its starting position.
       program { name: "show2";
+         // It sets the state to "default" instantly.
          action: STATE_SET "default" 0.0;
          target: "e.textblock.authors";
+         // After resetting, it triggers 'show1' again, creating an infinite loop for scrolling.
          after: "show1";
       }
       ////////////////////////////////////////////////////////////////
+      // This part displays the main about text, also with a vertical scrolling animation.
+      // The logic is identical to the authors text block but with a faster scroll time (25s vs 60s).
       part { name: "e.textblock.about"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -107,6 +136,7 @@ group { name: "e/widgets/about/main";
             align: 0.5 1.0;
          }
       }
+      // These programs create a looping scroll animation for the about text.
       program { name: "show3";
          signal: "show"; source: "";
          action: STATE_SET "up" 0.0;
@@ -120,6 +150,7 @@ group { name: "e/widgets/about/main";
          after: "show3";
       }
       ////////////////////////////////////////////////////////////////
+      // A decorative part displaying lines at the top of the window.
       part { name: "lines";
          scale: 1;
          description { state: "default" 0.0;
@@ -129,17 +160,22 @@ group { name: "e/widgets/about/main";
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 0.0;
             fill.smooth: 1;
+            // The color is determined by the theme's color class for titlebars.
             color_class: "/bg/normal/titlebar";
          }
+         // This state is applied when the window is focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // The color changes to the selected titlebar color.
             color_class: "/bg/selected/titlebar";
          }
       }
       ////////////////////////////////////////////////////////////////
+      // Displays the Enlightenment logo.
       part { name: "logo";
          scale: 1;
          description { state: "default" 0.0;
+            // Uses the 'logo_mono' image set for resolution-independent display.
             image.normal: "logo_mono";
             align: 0.5 0.0;
             rel1.offset: 0 13;
@@ -148,10 +184,12 @@ group { name: "e/widgets/about/main";
             rel2.relative: 1.0 0.0;
             FIXED_SIZE(75, 75)
             offscale;
+            // Logo color is themeable.
             color_class: "/fg/normal/about/logo";
          }
       }
       ////////////////////////////////////////////////////////////////
+      // Displays the main title text "Enlightenment".
       part { name: "e.text.title"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -160,6 +198,7 @@ group { name: "e/widgets/about/main";
             rel2.offset: -1 13;
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 1.0;
+            // Positioned relative to the bottom of the 'logo' part.
             rel.to: "logo";
             color_class: "/fg/normal/text-heading";
             text { font: FNBD; size: 16;
@@ -171,6 +210,7 @@ group { name: "e/widgets/about/main";
          }
       }
       ////////////////////////////////////////////////////////////////
+      // Displays the version number.
       part { name: "e.text.version"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -179,6 +219,7 @@ group { name: "e/widgets/about/main";
             rel2.offset: -1 13;
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 1.0;
+            // Positioned relative to the bottom of the 'e.text.title' part.
             rel.to: "e.text.title";
             color_class: "/fg/normal/text-heading-sub";
             text { font: FN; size: 10;
@@ -190,6 +231,8 @@ group { name: "e/widgets/about/main";
          }
       }
       ////////////////////////////////////////////////////////////////
+// This macro simplifies the creation of multiple decorative triangle parts.
+// It takes a name, size, and horizontal alignment as parameters.
 #define TRI(_name, _size, _align) \
       part { name: _name; \
          scale: 1; \
@@ -203,6 +246,7 @@ group { name: "e/widgets/about/main";
             offscale; \
          } \
       }
+      // Instances of the triangle macro, creating a varied background pattern.
       TRI("t1", 127, 0.5)
       TRI("t2", 83,  0.2)
       TRI("t3", 163, 0.9)
@@ -213,10 +257,13 @@ group { name: "e/widgets/about/main";
       TRI("t8", 141, 0.1)
       TRI("t9", 75,  0.6)
       ////////////////////////////////////////////////////////////////
+      // Shadow effect for the close button.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Relative to the 'base' part to appear behind it.
             rel.to: "base";
+            // A macro for applying a standard small window shadow.
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal";
             offscale;
@@ -229,10 +276,12 @@ group { name: "e/widgets/about/main";
             color_class: "/shadow/pressed";
          }
       }
+      // The main clickable area of the close button.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: -6 -6;
+            // Sized and positioned relative to the button's label.
             rel1.to: "e.text.label";
             rel2.offset: 5 5;
             rel2.to: "e.text.label";
@@ -246,6 +295,7 @@ group { name: "e/widgets/about/main";
             color_class: "/bg/pressed/button";
          }
       }
+      // The text label for the close button.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -268,25 +318,30 @@ group { name: "e/widgets/about/main";
             color_class: "/fg/pressed/button";
          }
       }
+      // When the left mouse button is pressed on 'base', all button parts switch to the "clicked" state.
       program { signal: "mouse,down,1*"; source: "base";
          action: STATE_SET "clicked" 0.0;
          target: "e.text.label";
          target: "base";
          target: "shadow";
       }
+      // When the left mouse button is released, all parts return to the "default" state.
       program { signal: "mouse,up,1"; source: "base";
          action: STATE_SET "default" 0.0;
          target: "e.text.label";
          target: "base";
          target: "shadow";
       }
+      // A click on the 'base' part emits a signal to close the window.
       program { signal: "mouse,clicked,1*"; source: "base";
          action: SIGNAL_EMIT "e,action,close" "";
       }
+      // When the window gains focus, the 'lines' part changes to its "focused" state.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "lines";
       }
+      // When the window loses focus, the 'lines' part returns to its "default" state.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "lines";

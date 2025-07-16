@@ -1,74 +1,101 @@
+// This group defines the theme for a text scroller widget.
+// It inherits base properties from "efl/scroller" and adds custom features
+// like validation and focus glows.
 group { "efl/text/scroller";
    inherit: "efl/scroller";
    data.item: "version" "123";
    parts {
+      // The background part of the text scroller.
+      // It uses a color class for theming, ensuring consistency across the UI.
       part { name: "bg";
          description { state: "default" 0.0;
             color_class: "/bg/normal/entry";
          }
       }
+      // A rectangle part for displaying a glow effect to indicate validation status.
+      // It's placed after the main background and does not interact with mouse events.
       part { name: "validation_glow"; type: RECT; mouse_events: 0;
          insert_after: "efl.background";
          description { state: "default" 0.0;
+            // The default state is transparent, making the glow invisible.
+            // color: 0 0 0 0 (#00000000)
             color: 0 0 0 0; // no cc
          }
+         // State for successful validation, applies a "pass" color class.
          description { state: "pass" 0.0;
             color_class: "/bg/selected/entry/validate-pass";
          }
+         // State for failed validation, applies a "fail" color class.
          description { state: "fail" 0.0;
             color_class: "/bg/selected/entry/validate-fail";
          }
       }
+      // This program is triggered by the "validation,default,fail" signal from the application code.
+      // It sets the state of "validation_glow" to "fail", showing the failure feedback.
       program { name: "validation_fail";
          signal: "validation,default,fail";
          source: "efl";
          action: STATE_SET "fail" 0.0;
          target: "validation_glow";
       }
+      // Triggered by "validation,default,pass", this program sets the state of "validation_glow" to "pass".
       program { name: "validation_pass";
          signal: "validation,default,pass";
          source: "efl";
          action: STATE_SET "pass" 0.0;
          target: "validation_glow";
       }
+      // This program turns off the validation glow by setting its state back to "default" (transparent).
       program { name: "validation_off";
          signal: "validation,default";
          source: "efl";
          action: STATE_SET "default" 0.0;
          target: "validation_glow";
       }
+      // This part creates a glow effect when the text area is focused. It's a non-interactive rectangle.
+      // 'insert_before: "efl.content"' ensures it appears above the background but below the actual text content.
+      // 'scale: 1' enables smooth scaling animations.
       part { name: "glow"; type: RECT; mouse_events: 0;
          insert_before: "efl.content";
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "bg";
+            // Positions the glow at the bottom edge of the background.
             rel1.relative: 0.0 1.0;
             color_class: "/bg/selected/entry/focus";
+            // Initially transparent and invisible.
+            // color: 255 255 255 0 (#FFFFFF00)
             color: 255 255 255 0; // no cc
             visible: 0;
             offscale;
          }
+         // "focused" state makes the glow visible and colored, creating the highlight effect.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 0 -3;
+            // Fully opaque white. color: 255 255 255 255 (#FFFFFFFF)
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // Shows the focus highlight with a decelerating transition when the widget gets focus.
       program { signal: "efl,action,focus_highlight,show"; source: "efl";
          action: STATE_SET "focused" 0.0;
          transition: DECELERATE 0.3;
          target: "glow";
       }
+      // Hides the focus highlight when the widget loses focus.
       program { signal: "efl,action,focus_highlight,hide"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.3;
          target: "glow";
       }
+      // The main content area for the text. It's a SWALLOW part, meaning it can host other UI components.
       part { name: "efl.content"; type: SWALLOW;
          scale: 1;
          clip_to: "clipper";
          description { state: "default" 0.0;
+            // Positioned between the icon and extra parts, with some padding.
             rel1.to: "efl.icon";
             rel1.relative: 1.0 0.0;
             rel1.offset: 2 2;
@@ -78,6 +105,7 @@ group { "efl/text/scroller";
             offscale;
          }
       }
+      // A SWALLOW part for an icon, typically on the left. Initially invisible.
       part { name: "efl.icon"; type: SWALLOW;
          scale: 1;
          clip_to: "clipper";
@@ -90,6 +118,7 @@ group { "efl/text/scroller";
             align: 1.0 0.5;
             offscale;
          }
+         // When made visible, it shifts into view from the left.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 2 2;
@@ -98,14 +127,17 @@ group { "efl/text/scroller";
             align: 0.0 0.5;
          }
       }
+      // Shows the icon part.
       program { signal: "efl,action,show,icon"; source: "efl";
          action: STATE_SET "visible" 0.0;
          target: "efl.icon";
       }
+      // Hides the icon part.
       program { signal: "efl,action,hide,icon"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "efl.icon";
       }
+      // A SWALLOW part for extra content, typically on the right side. Initially invisible.
       part { name: "efl.extra"; type: SWALLOW;
          scale: 1;
          clip_to: "clipper";
@@ -118,6 +150,7 @@ group { "efl/text/scroller";
             align: 0.0 0.5;
             offscale;
          }
+         // When made visible, it shifts into view from the right.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             rel1.offset: -3 2;
@@ -126,14 +159,17 @@ group { "efl/text/scroller";
             align: 1.0 0.5;
          }
       }
+      // Shows the extra content part.
       program { signal: "efl,action,show,end"; source: "efl";
          action: STATE_SET "visible" 0.0;
          target: "efl.extra";
       }
+      // Hides the extra content part.
       program { signal: "efl,action,hide,end"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "efl.extra";
       }
+      // An overlay layer, useful for things like popups or other content that should appear on top.
       part { name: "efl.overlay"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -143,10 +179,14 @@ group { "efl/text/scroller";
    }
 }
 
+// This group defines a theme for a single-line text scroller, commonly used for text entry fields.
+// It includes custom scrollbars, background, content areas, and visual feedback for focus and validation.
 group { "efl/text/single/scroller";
    data.item: "version" "123";
+   // This data item signals that the widget should use a focus highlight effect.
    data.item: "focus_highlight" "on";
    parts {
+      // Base for the vertical scrollbar, invisible by default. It likely serves as a container or anchor.
       part { name: "sb_vbar_base"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -154,6 +194,8 @@ group { "efl/text/single/scroller";
             visible: 0;
          }
       }
+      // Draggable part for the vertical scrollbar. It is confined to 'sb_vbar_base'.
+      // Although invisible, it handles the logic for vertical dragging.
       part { name: "efl.draggable.vertical_bar"; type: RECT;
          dragable.x: 0 0 0;
          dragable.y: 1 1 0;
@@ -167,6 +209,7 @@ group { "efl/text/single/scroller";
             visible: 0;
          }
       }
+      // Base for the horizontal scrollbar. Similar to its vertical counterpart, it is invisible.
       part { name: "sb_hbar_base"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -174,6 +217,8 @@ group { "efl/text/single/scroller";
             visible: 0;
          }
       }
+      // Draggable part for the horizontal scrollbar, confined to 'sb_hbar_base'.
+      // This handles the horizontal scrolling logic.
       part { name: "efl.draggable.horizontal_bar"; type: RECT;
          dragable.x: 1 1 0;
          dragable.y: 0 0 0;
@@ -309,17 +354,24 @@ group { "efl/text/single/scroller";
          }
       }
    }
+   // This block groups programs that control the behavior of various parts within the group.
+   // This organizational style contrasts with defining programs alongside their target parts,
+   // grouping all dynamic behaviors together for clarity.
    programs {
+      // Activates the focus glow with a quick transition.
       program { signal: "efl,action,focus_highlight,show"; source: "efl";
          action: STATE_SET "focused" 0.0;
          transition: DECELERATE 0.2;
          target: "glow";
       }
+      // Deactivates the focus glow.
       program { signal: "efl,action,focus_highlight,hide"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.3;
          target: "glow";
       }
+      // The following programs manage the validation glow, which are identical in function
+      // to those in the "efl/text/scroller" group, providing visual feedback for input validation.
       program { name: "validation_fail";
          signal: "validation,default,fail";
          source: "efl";
@@ -341,10 +393,14 @@ group { "efl/text/single/scroller";
    }
 }
 
+// This group styles the text cursor, defining its appearance and blinking animation.
+// It's a fundamental part of any text entry widget.
 group { "efl/text/cursor";
    data.item: "version" "123";
    min: 1 0;
    parts {
+      // The cursor itself, a rectangle styled with a color class.
+      // It blinks by toggling between "default" (invisible) and "visible" states.
       part { name: "cursor"; type: RECT;
          mouse_events: 0;
          scale: 1;
@@ -359,6 +415,9 @@ group { "efl/text/cursor";
             visible: 1;
          }
       }
+      // A clipper part used to hide the cursor. This is a clever way to handle cursor visibility
+      // during text selection; making the clipper invisible effectively hides the cursor,
+      // as the cursor is clipped to it.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "cursor";
@@ -371,10 +430,12 @@ group { "efl/text/cursor";
       }
    }
    programs {
+      // When text selection changes, the clipper becomes hidden, which in turn hides the cursor.
       program { signal: "selection,changed"; source: "efl.text";
          action: STATE_SET "hidden" 0.0;
          target: "clipper";
       }
+      // When selection is cleared or reset, the cursor reappears.
       program { signal: "selection,cleared"; source: "efl.text";
          action: STATE_SET "default" 0.0;
          target: "clipper";
@@ -383,6 +444,8 @@ group { "efl/text/cursor";
          action: STATE_SET "default" 0.0;
          target: "clipper";
       }
+      // The following programs manage the cursor's blinking behavior.
+      // When the widget gains focus, it stops any ongoing animations and starts the show/hide cycle.
       program { signal: "efl,action,focus"; source: "efl";
          action: ACTION_STOP;
          target: "cursor_show";
@@ -411,6 +474,9 @@ group { "efl/text/cursor";
          action: STATE_SET "default" 0.0;
          target: "cursor";
       }
+      // The cursor blinking animation is a cycle of programs. 'cursor_show' makes the cursor visible,
+      // then 'cursor_show_timer' waits for a duration before triggering 'cursor_hide'. 'cursor_hide'
+      // fades out the cursor and 'cursor_hide_timer' waits before triggering 'cursor_show' again.
       program { name: "cursor_show";
          action: STATE_SET "visible" 0.0;
          target: "cursor";
@@ -433,6 +499,8 @@ group { "efl/text/cursor";
    }
 }
 
+// This group defines the visual style for selected text.
+// It consists of a single rectangle that uses a color class for theming.
 group { "efl/text/selection";
    data.item: "version" "123";
    parts {
@@ -444,13 +512,17 @@ group { "efl/text/selection";
    }
 }
 
+// This group defines the style for anchor tags (like hyperlinks) within the text.
+// It creates an underline effect for the anchor.
 group { "efl/text/anchor";
    data.item: "version" "123";
    parts {
+      // This part is the visual representation of an anchor, an underline bar.
       part { name: "bar"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/fg/normal/entry/anchor";
+            // A thin bar positioned at the bottom of the anchor's geometry.
             fixed: 0 1;
             rel1.relative: 0.0 1.0;
             rel1.offset: -1 -1;
@@ -461,8 +533,12 @@ group { "efl/text/anchor";
    }
 }
 
+// Defines the basic properties for text rendering, such as font and color.
+// It also handles guide text (placeholder text) styling and basic state changes.
 group { "efl/text";
    data.item: "version" "123";
+   // This data block specifies default text properties.
+   // Using color classes (cc:) allows for theme-wide color changes.
    data {
       item: "font.name" "Sans";
       item: "font.size" "10";
@@ -478,6 +554,7 @@ group { "efl/text";
          description { state: "default" 0.0;
          }
       }
+      // SWALLOW part to hold the actual text block object.
       part { name: "efl.text"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -491,6 +568,7 @@ group { "efl/text";
             inherit: "default" 0.0;
          }
       }
+      // SWALLOW part for guide text (e.g., placeholder).
       part { name: "efl.text_guide"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -505,10 +583,12 @@ group { "efl/text";
       }
    }
    programs {
+      // Sets initial focus to the text part when the widget is loaded.
       program { signal: "load"; source: "";
          action: FOCUS_SET;
          target: "efl.text";
       }
+      // These programs toggle the state of the text part between enabled and disabled.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "efl.text";
@@ -527,6 +607,10 @@ group { "efl/text";
          target: "efl.guide";
       }
       #endif
+      // The script in this program plays a random key-tap sound on keydown.
+      // It's a nice bit of flair for user feedback.
+      // snprintf creates a program name like "key-down1", "key-down2", etc.
+      // and run_program executes it.
       program { signal: "entry,keydown"; source: "efl.text";
          script {
             new buf[32];
@@ -534,6 +618,7 @@ group { "efl/text";
             run_program(get_program_id(buf));
          }
       }
+      // These programs are targets for the script above, each playing a different sound sample.
       program { name: "key-down1";
          action: PLAY_SAMPLE "key-tap1" 1.0 INPUT;
       }
@@ -552,9 +637,12 @@ group { "efl/text";
    }
 }
 
+// This group defines a magnifier widget, which shows a zoomed-in view of the text
+// to help with precise cursor placement, especially on touch screens.
 group { "efl/text/magnifier";
    data.item: "version" "123";
    parts {
+      // A shadow effect for the magnifier, using a WIN_SHADOW macro for styling.
       part { name: "shadow"; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bg";
@@ -566,6 +654,7 @@ group { "efl/text/magnifier";
             visible: 0;
          }
       }
+      // The background of the magnifier window.
       part { name: "bg"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -580,6 +669,7 @@ group { "efl/text/magnifier";
             visible: 0;
          }
       }
+      // SWALLOW part that will contain the magnified text content.
       part { name: "efl.content"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bg";
@@ -590,6 +680,7 @@ group { "efl/text/magnifier";
          }
       }
    }
+   // Programs to show and hide all parts of the magnifier simultaneously.
    programs {
       program { signal: "efl,action,show,magnifier"; source: "efl";
          action: STATE_SET "default" 0.0;
@@ -606,10 +697,13 @@ group { "efl/text/magnifier";
    }
 }
 
+// This group and the following one ("efl/text/handler/end") define the draggable handles
+// that appear at the start and end of a text selection.
 group { "efl/text/handler/start";
    data.item: "version" "123";
    images.image: "handle_pick_up_left.png" COMP;
    parts {
+      // The visual part of the handle, using an image.
       part { name: "base"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -624,6 +718,7 @@ group { "efl/text/handler/start";
             visible: 1;
          }
       }
+      // A swallow part for potential future content within the handle.
       part { name: "elm.swallow.content"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -634,10 +729,13 @@ group { "efl/text/handler/start";
             visible: 1;
          }
       }
+      // An invisible rectangle that serves as the event-sensitive area for dragging the handle.
+      // It's larger than the visual handle to provide an easier touch target.
       part { name: "event"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // color: 0 0 0 0 (#00000000)
             color: 0 0 0 0; // no cc
             min: 32 32;
             visible: 0;
@@ -648,6 +746,7 @@ group { "efl/text/handler/start";
          }
       }
    }
+   // Programs to show and hide all parts of the handle.
    programs {
       program { signal: "efl,handler,show"; source: "efl";
          action: STATE_SET "visible" 0.0;
@@ -664,6 +763,8 @@ group { "efl/text/handler/start";
    }
 }
 
+// Defines the handle for the end of a text selection. It's functionally identical to the
+// start handle but uses a right-pointing image.
 group { "efl/text/handler/end";
    data.item: "version" "123";
    images.image: "handle_pick_up_right.png" COMP;
@@ -728,6 +829,11 @@ group { "efl/text/handler/end";
 // Tanya - Latvia
 // http://lazycrazy.deviantart.com/
 // http://lazycrazy.deviantart.com/art/Very-Emotional-Emoticons-144461621
+//
+// The following groups define various emoticons that can be displayed in the text.
+// Each group is a simple wrapper for an image, associating a name (like "angry")
+// with a specific image file (like "emo-angry.png"). The `nomouse` property on the
+// "icon" part means it won't react to mouse events.
 group { "efl/text/emoticon/angry"; data.item: "version" "123"; images.image:
    "emo-angry.png" COMP; parts { part { "icon"; nomouse; desc { "default"; max: 64 64; image.normal:
             "emo-angry.png"; } } } }

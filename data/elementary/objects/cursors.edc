@@ -2,24 +2,31 @@
 // CURSOR
 /////////////////////////////////////////////////////////////////////////////
 collections {
+   // A simple 30x30 cursor named "elm/cursor/hand2/default".
+   // This cursor is a solid green square.
    group { name: "elm/cursor/hand2/default";
        min: 30 30;
        max: 30 30;
+       // The 'hotspot' of the cursor is at (0,0), the top-left corner.
        data {
            item: "hot_x" "0";
            item: "hot_y" "0";
        }
       parts {
+         // The 'base' part is the visual representation of the cursor.
          part { name: "base";
             type: RECT;
+            // It does not handle mouse events itself.
             mouse_events: 0;
             description { state: "default" 0.0;
+               // The cursor is solid green (#00FF00).
                color: 0 255 0 255;
             }
          }
       }
    }
 
+   // An animated 30x30 cursor that continuously transitions between red and blue.
    group { name: "elm/cursor/hand3/default";
        min: 30 30;
        max: 30 30;
@@ -28,29 +35,38 @@ collections {
            item: "hot_y" "0";
        }
       parts {
+         // The 'base' part has two states for the animation.
          part { name: "base";
             type: RECT;
             mouse_events: 0;
+            // The 'default' state is red (#FF0000).
             description { state: "default" 0.0;
                color: 255 0 0 255;
             }
+            // A second state 'blue' is defined for the animation. Color is blue (#0000FF).
             description { state: "blue" 0.0;
                color: 0 0 255 255;
             }
          }
       }
+      // The programs section defines the animation logic.
       programs {
+	 // On "load" signal, this program starts, which in turn triggers the "go_blue" program.
 	 program { name: "load";
 	    signal: "load";
 	    source: "";
             after: "go_blue";
          }
+	 // This program changes the state of the 'base' part to "blue" over 1 second.
+	 // It's a keyframe in a looping animation. After it finishes, it calls "go_red".
 	 program { name: "go_blue";
 	    action: STATE_SET "blue" 0.0;
 	    transition: LINEAR 1;
 	    target: "base";
 	    after: "go_red";
 	 }
+	 // This program transitions the 'base' part back to the "default" (red) state.
+	 // After completing, it calls "go_blue", creating an infinite loop.
 	 program { name: "go_red";
 	    action: STATE_SET "default" 0.0;
 	    transition: LINEAR 1;
@@ -60,6 +76,7 @@ collections {
       }
    }
 
+   // A semi-transparent red cursor.
    group { name: "elm/cursor/hand3/transparent";
        min: 30 30;
        max: 30 30;
@@ -68,18 +85,23 @@ collections {
            item: "hot_y" "0";
        }
       parts {
+         // Base part, a white (#FFFFFF) background that does not receive events.
          part { name: "base";
             type: RECT;
             mouse_events: 0;
             description { state: "default" 0.0;
+               // The color is semi-transparent red (#FF0000 with 120/255 alpha).
                color: 255 0 0 120;
             }
          }
       }
    }
 
+   // This group is a layout for testing mouse event handling. It's split
+   // vertically into two parts: one that receives events and one that does not.
    group { name: "test/layout/events";
       parts {
+         // This part covers the left half of the layout and is set to receive mouse events.
          part { name: "events";
             type: RECT;
             mouse_events: 1;
@@ -88,6 +110,7 @@ collections {
                rel2.relative: 0.5 1;
             }
          }
+         // This part covers the right half and does not receive mouse events.
          part { name: "noevents";
             type: RECT;
             mouse_events: 0;
@@ -99,8 +122,12 @@ collections {
       }
    }
 
+   // A layout for testing event propagation on different parts.
+   // It consists of four quadrants over a white background, with event
+   // handling enabled only for the top two quadrants.
    group { name: "test/layout/noevents";
       parts {
+         // A white (#FFFFFF) background that receives mouse events.
          part { name: "base";
             type: RECT;
             mouse_events: 0;
@@ -108,6 +135,7 @@ collections {
                color: 255 255 255 255;
             }
          }
+         // Top-left quadrant, blue (#0000FF), receives mouse events.
          part { name: "top-left";
             type: RECT;
             mouse_events: 1;
@@ -117,6 +145,7 @@ collections {
                color: 0 0 255 255;
             }
          }
+         // Top-right quadrant, cyan (#00FFFF), also receives mouse events.
          part { name: "top-right";
             type: RECT;
             mouse_events: 1;
@@ -126,6 +155,7 @@ collections {
                color: 0 255 255 255;
             }
          }
+         // Bottom-left quadrant, magenta (#FF00FF), does not receive mouse events.
          part { name: "bottom-left";
             type: RECT;
             mouse_events: 0;
@@ -135,6 +165,7 @@ collections {
                color: 255 0 255 255;
             }
          }
+         // Bottom-right quadrant, yellow (#FFFF00), also does not receive mouse events.
          part { name: "bottom-right";
             type: RECT;
             mouse_events: 0;
@@ -147,9 +178,14 @@ collections {
       }
    }
 
+   // Another test layout with four quadrants on a black background. Here, the
+   // background also listens for events, to test event propagation.
+   // This group has an alias "test/layout/parts2", so it can be referenced by either name.
    group { name: "test/layout/parts";
       alias: "test/layout/parts2";
       parts {
+         // The base layer is a black (#000000) rectangle that receives mouse events.
+         // This is useful for testing if events "pass through" parts that have mouse_events disabled.
          part { name: "base";
             type: RECT;
             mouse_events: 1;
@@ -157,6 +193,7 @@ collections {
                color: 0 0 0 255;
             }
          }
+         // Top-left quadrant, blue (#0000FF), receives events.
          part { name: "top-left";
             type: RECT;
             mouse_events: 1;
@@ -166,6 +203,7 @@ collections {
                color: 0 0 255 255;
             }
          }
+         // Top-right quadrant, cyan (#00FFFF), receives events.
          part { name: "top-right";
             type: RECT;
             mouse_events: 1;
@@ -175,6 +213,8 @@ collections {
                color: 0 255 255 255;
             }
          }
+         // Bottom-left quadrant, magenta (#FF00FF), does not receive events.
+         // Mouse events in this area will be handled by the 'base' part.
          part { name: "bottom-left";
             type: RECT;
             mouse_events: 0;
@@ -184,6 +224,8 @@ collections {
                color: 255 0 255 255;
             }
          }
+         // Bottom-right quadrant, yellow (#FFFF00), does not receive events.
+         // Events here will also go to the 'base' part.
          part { name: "bottom-right";
             type: RECT;
             mouse_events: 0;
@@ -196,6 +238,7 @@ collections {
       }
    }
 
+   // A layout for testing SWALLOW parts, which are containers for other objects.
    group { name: "test/layout/swallow";
       parts {
          part { name: "base";
@@ -205,6 +248,8 @@ collections {
                color: 255 255 255 255;
             }
          }
+         // A SWALLOW part in the upper area of the layout. SWALLOW parts act as
+         // placeholders where other Evas objects can be "swallowed" (embedded).
          part { name: "swallow1";
             type: SWALLOW;
             mouse_events: 1;
@@ -213,6 +258,8 @@ collections {
                rel2.relative: 0.9 0.5;
             }
          }
+         // A second SWALLOW part in the lower area. This allows for complex layouts
+         // where parts of the UI are managed by external code.
          part { name: "swallow2";
             type: SWALLOW;
             mouse_events: 1;

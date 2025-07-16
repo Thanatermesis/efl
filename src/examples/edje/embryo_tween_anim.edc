@@ -1,8 +1,19 @@
 collections {
+   // The main group contains all the UI elements and logic for the animation.
    group { name: "main";
+      // This script block contains Embryo script code for controlling the animation.
+      // Embryo is a small, C-like scripting language used by Edje.
       script {
+         // Global variables used across script functions to manage animation state.
+         // g_duration: Controls the speed of the animation.
+         // g_stopslide: A flag to signal when the animation should be stopped.
+         // g_timer_id, g_anim_id: Store identifiers for running timers and animations,
+         // allowing them to be cancelled later.
          public g_duration = 0, g_stopslide, g_timer_id, g_anim_id, toggle=0;
 
+         // This function is called repeatedly by an 'anim' call to update the animation frame by frame.
+         // It tweens the "move" part from its "slide_end" state to its "slide_begin" state.
+         // The 'pos' argument (0.0 to 1.0) represents the current position in the animation timeline.
          public slide_to_end_anim(val, Float:pos) {
             new stopflag;
             new id;
@@ -10,12 +21,16 @@ collections {
             stopflag = get_int(g_stopslide);
             duration = get_float(g_duration);
             if (stopflag == 1) return;
+            // set_tween_state_anim smoothly transitions the "move" part between two states.
+            // ACCEL creates an acceleration effect, making the animation start slowly and speed up.
             set_tween_state_anim(PART:"move","slide_end", 0.0, "slide_begin", 0.0, ACCEL , pos);
             if (pos >= 1.0) {
+               // Once the animation is complete (pos >= 1.0), it triggers the reverse animation.
                id = anim(duration, "slide_to_start_anim", 1);
                set_int(g_timer_id, id);
             }
          }
+         // This function is the callback for the return animation, moving from "slide_begin" to "slide_end".
          public slide_to_start_anim(val, Float:pos) {
             new stopflag;
             new id;
@@ -23,12 +38,15 @@ collections {
             stopflag = get_int(g_stopslide);
             duration = get_float(g_duration);
             if (stopflag == 1) return;
-            set_tween_state_anim(PART:"move","slide_begin", 0.0, "slide_end", 0.0, DECEL , pos); 
+            // DECEL creates a deceleration effect, making the animation slow down as it approaches the end.
+            set_tween_state_anim(PART:"move","slide_begin", 0.0, "slide_end", 0.0, DECEL , pos);
             if (pos >= 1.0) {
+               // When the return animation finishes, it starts the forward animation again, creating a loop.
                id = anim(duration, "slide_to_end_anim", 1);
                set_int(g_timer_id, id);
             }
          }
+         // This function initiates the animation from the current position towards the "end" state.
          public slide_to_end() {
             new stopflag;
             new id;
@@ -39,21 +57,25 @@ collections {
             id = anim(duration, "slide_to_end_anim", 1);
             set_int(g_anim_id, id);
          }
+         // Resets the "move" part to its starting position and then triggers the animation to the end.
          public slide_to_begin() {
             new stopflag;
             new id;
             stopflag = get_int(g_stopslide);
             if (stopflag == 1) return;
             set_state(PART:"move", "slide_begin", 0.0);
+            // After a 0.5s delay, it starts the animation towards the end.
             id = timer(0.5, "slide_to_end", 1);
             set_int(g_timer_id, id);
          }
+         // This function initializes and starts the entire animation sequence.
          public start_slide() {
             set_int(g_stopslide, 0);
             set_float(g_duration, 1.3);
             set_state(PART:"move", "slide_begin", 0.0);
             slide_to_end();
          }
+         // Stops any ongoing animations and timers, and resets the "move" part to its default state.
          public stop_slide() {
             new id;
             set_int(g_stopslide, 1);
@@ -64,13 +86,16 @@ collections {
             set_state(PART:"move", "default", 0.0);
          }
       }
+      // The 'parts' block defines all the visual components of the UI.
       parts {
+         // A white (#FFFFFFFF) background rectangle that fills the entire layout.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
+         // A red (#FF0000FF) text label that acts as the trigger for starting the animation.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
@@ -83,6 +108,7 @@ collections {
                }
             }
          }
+         // A fixed-size red (#FF0000FF) rectangle on the left, serving as a visual marker for the animation's start path.
          part { name: "rect1";
             type: RECT;
             description { state: "default" 0.0;
@@ -93,6 +119,7 @@ collections {
                align: 0.1 0.2;
             }
          }
+         // A fixed-size green (#00FF00FF) rectangle on the right, serving as a visual marker for the animation's end path.
          part { name: "rect2";
             type: RECT;
             description { state: "default" 0.0;
@@ -103,6 +130,8 @@ collections {
                align: 0.9 0.2;
             }
          }
+         // This is an invisible rectangle that defines the animation track. It stretches horizontally
+         // between "rect1" and "rect2", providing a reference path for the "move" part.
          part { name: "rect";
             type: RECT;
             description { state: "default" 0.0;
@@ -116,10 +145,13 @@ collections {
                }
             }
          }
+         // The blue (#0000FFFF) rectangle that animates across the screen. Its movement is the primary
+         // visual effect of this Edje object.
          part {
             name: "move";
             type: RECT;
             description {
+               // The default state places the "move" part at the beginning of the animation track, near "rect1".
                state: "default" 0.0;
                align: 0.0 0.0;
                min: 30 30;
@@ -135,10 +167,14 @@ collections {
                   relative: 1.0 1.0;
                }
             }
+            // "slide_end" state: One of the two states used for tweening. It inherits the properties
+            // of the "default" state, serving as an endpoint for the animation logic.
             description {
                state: "slide_end" 0.0;
                inherit: "default" 0.0;
             }
+            // "slide_begin" state: The other state for tweening. It positions the "move" part
+            // at the end of the animation track, near "rect2".
             description {state: "slide_begin" 0.0;
                inherit: "default" 0.0;
                align: 1.0 1.0;
@@ -153,15 +189,20 @@ collections {
             }
          }
       }
+      // The 'programs' block defines reactions to events (signals).
       programs {
+         // This program listens for a "mouse,down,1" signal (left mouse button click) on the "label" part.
          program {signal: "mouse,down,1";
             source: "label";
             script{
+               // When triggered, it calls the 'start_slide' function to begin the animation.
                start_slide();
             }
          }
+         // This program can be triggered programmatically from the application code by its name, "go_left".
          program { name: "go_left";
             script{
+               // When run, it calls the 'stop_slide' function to halt the animation.
                stop_slide();
             }
          }

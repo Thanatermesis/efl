@@ -1,67 +1,106 @@
+// This group defines the default style for an "inwin" (internal window).
+// It provides a modal-like container with a background dimmer, shadow,
+// and a content area.
 group { name: "elm/win/inwin/default";
+   // The image used for the shadow, 'COMP' means it's compressed.
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // This part is a background rectangle that dims the parent window content.
+      // 'mouse_events: 1' makes it intercept mouse clicks, acting as a modal barrier.
       part { name: "bg"; type: RECT; mouse_events: 1;
          description { state: "default" 0.0;
+            // The color class allows theming of the dimmer.
             color_class: "/dim/normal/inwin";
+            // By default, the background is fully transparent (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // When visible, it becomes opaque white (#FFFFFFFF), dimming the background.
             color: 255 255 255 255; // no cc
          }
       }
+      // This part acts as a container for the shadow effect. It is manipulated
+      // by the WIN_SHAD macro below.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
+            // Its position is relative to '_sh1', a part created inside the WIN_SHAD macro.
             rel.to: "_sh1";
             color_class: "/shadow/normal/inwin";
          }
       }
+      // The WIN_SHAD macro creates a shadow effect around the 'base' part using the
+      // 'win_shad_flat.png' image. The numeric parameters define the border
+      // dimensions (left, right, top, bottom) and alpha level for the shadow.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // The 'base' part is the main background for the inwin content area.
       part { name: "base"; type: RECT;
+         // 'scale: 1' allows this part to be smoothly scaled.
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/bg/normal/inwin";
+            // 'offscale' ensures the part does not scale down to an invisible size.
             offscale;
+            // It's positioned relative to the content area, but with negative offsets,
+            // making it slightly larger to create a visible border.
             rel.to: "elm.swallow.content";
             rel1.offset: -8 -8;
             rel2.offset: 7 7;
          }
       }
+      // This is the container for the actual content of the inwin. 'SWALLOW' type
+      // means that external Evas objects can be placed inside this part.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets define the padding within the group.
             rel1.offset: 40 40;
             rel2.offset: -41 -41;
             offscale;
          }
       }
    }
+   // Programs define dynamic behavior based on signals.
    programs {
+      // This program handles the "show" action for the inwin.
       program { name: "show";
+         // It triggers on the "elm,action,show" signal from the "elm" source.
          signal: "elm,action,show";
          source: "elm";
+         // It changes the state of the 'bg' part to "visible".
          action: STATE_SET "visible" 0.0;
+         // The transition creates a 0.5-second deceleration animation (fade-in).
          transition: DECELERATE 0.5;
          target: "bg";
       }
+      // This program handles the "hide" action.
       program { name: "hide";
+         // Triggered by the "elm,action,hide" signal.
          signal: "elm,action,hide";
          source: "elm";
+         // It resets the 'bg' part to its "default" (transparent) state.
          action: STATE_SET "default" 0.0;
+         // This creates a 0.5-second fade-out animation.
          transition: DECELERATE 0.5;
          target: "bg";
       }
    }
 }
 
+// This group defines a "minimal" style for the inwin, which is centered
+// in the parent window. It inherits the base properties from the default style.
 group { name: "elm/win/inwin/minimal";
    inherit: "elm/win/inwin/default";
    parts {
+      // Here, we override the 'elm.swallow.content' part to change its layout.
       part { name: "elm.swallow.content";
          type: SWALLOW;
          description { state: "default" 0.0;
+            // 'fixed: 1 1' prevents the part's size from being influenced by its content's minimum size.
             fixed: 1 1;
+            // These relative alignments center the content area horizontally and vertically
+            // within its container. The size of the content area will be determined
+            // by the size of the content it holds.
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
          }
@@ -69,13 +108,19 @@ group { name: "elm/win/inwin/minimal";
    }
 }
 
+// This group defines a "minimal_vertical" style. It's similar to the minimal
+// style but is designed for content that should span the full width of the parent
+// while being vertically centered.
 group { name: "elm/win/inwin/minimal_vertical";
    inherit: "elm/win/inwin/default";
    parts {
+      // Again, we override 'elm.swallow.content'.
       part { name: "elm.swallow.content";
          type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
+            // These alignments make the content area stretch to the full width (0.0 to 1.0)
+            // of its container, while remaining vertically centered (0.5 to 0.5).
             rel1.relative: 0.0 0.5;
             rel2.relative: 1.0 0.5;
          }

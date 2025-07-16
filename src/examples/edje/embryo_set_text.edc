@@ -1,17 +1,24 @@
+// Defines a collection of groups, which are the building blocks of an Edje interface.
 collections {
+   // This group, named "main", serves as the primary layout container for our UI elements.
    group { name: "main";
       parts {
+         // A simple rectangle part named "bg", used as the background.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Sets the color to solid white (#FFFFFFFF).
                color: 255 255 255 255;
             }
          }
+         // A text part that will display interactive text.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Sets the text color to solid black (#000000FF).
                color: 0 0 0 255;
                text {
+                  // The initial text to display.
                   text: "Click me.";
                   font: "Sans";
                   size: 12;
@@ -19,19 +26,24 @@ collections {
             }
          }
       }
+      // 'programs' define the interactive behavior of the group by linking signals to Embryo scripts.
       programs {
+         // This program handles the mouse down event on the "label".
          program {
             signal: "mouse,down,1";
             source: "label";
             script {
-               set_text(PART:"label", "Clicked!"); 
+               // When the left mouse button is pressed on "label", its text is changed.
+               set_text(PART:"label", "Clicked!");
             }
          }
+         // This program handles the mouse up event, resetting the text.
          program {
             signal: "mouse,up,1";
             source: "label";
             script {
-               set_text(PART:"label", "Click me."); 
+               // Reverts the label's text when the mouse button is released.
+               set_text(PART:"label", "Click me.");
             }
          }
       }

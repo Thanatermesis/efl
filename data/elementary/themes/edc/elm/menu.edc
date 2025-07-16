@@ -1,11 +1,18 @@
+// Defines the default appearance and behavior of a standard menu item.
+// This group serves as the base for other menu item types.
 group { name: "elm/menu/item/default";
+   // Script block to handle state changes from C code.
+   // These public variables can be accessed and modified externally.
    script {
       public menu_text_visible; //0:hide (default), 1:visible
       public menu_disable; //0:enable, 1:disable
    }
    parts {
+      // A rectangle that serves as the background for the item.
+      // It's invisible by default and becomes visible when the item is active (selected).
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Uses a color class for theming the selected background.
             color_class: "/bg/selected/menu/item/base";
             visible: 0;
          }
@@ -17,7 +24,9 @@ group { name: "elm/menu/item/default";
             inherit:  "default" 0.0;
          }
       }
+      // A swallow part to hold an icon. It's positioned on the left.
       part { name: "elm.swallow.content"; type: SWALLOW; mouse_events:  0;
+         // The icon is clipped by the 'disabler' part, which is used to grey out the item.
          clip_to: "disabler";
          scale: 1;
          description { state: "default" 0.0;
@@ -29,6 +38,7 @@ group { name: "elm/menu/item/default";
             rel2.relative: 0.0 1.0;
             offscale;
          }
+         // This state makes the icon area invisible when no icon is set.
          description { state: "noicon" 0.0;
             inherit: "default" 0.0;
             visible: 0;
@@ -37,6 +47,8 @@ group { name: "elm/menu/item/default";
       // XXX: check/radio goes next (right of) content, no radio/check handle
       // XXX: need to handle no text?
       // XXX: need arrowspace on/off based on submenus in menu
+      // A spacer to reserve space for a submenu arrow, ensuring consistent alignment
+      // for all menu items, whether they have a submenu or not.
       part { name: "arrowspace"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -50,69 +62,87 @@ group { name: "elm/menu/item/default";
             offscale;
          }
       }
+      // The text label for the menu item.
       part { name: "elm.text"; type: TEXT; mouse_events:  0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned to the right of the icon.
             rel1.to_x: "elm.swallow.content";
             rel1.relative: 1.0 0.0;
             rel1.offset: 4 4;
+            // And to the left of the arrow space.
             rel2.to_x: "arrowspace";
             rel2.offset: -5 -5;
             rel2.relative: 0.0 1.0;
+            // Themed color for normal text.
             color_class: "/fg/normal/menu/item/text";
             offscale;
             text { font: FN; size: 10;
                min: 1 1;
-               ellipsis: -1;
+               ellipsis: -1; // Ellipsis enabled if text overflows.
                align: 0.0 0.5;
                text_class: "menu_item";
             }
          }
          description { state: "active" 0.0;
             inherit: "default" 0.0;
+            // Themed color for selected text.
             color_class: "/fg/selected/menu/item/text";
          }
          description { state: "disabled" 0.0;
             inherit:  "default" 0.0;
+            // Themed color for disabled text.
             color_class: "/fg/disabled/menu/item/text";
          }
       }
+      // A transparent rectangle that captures all mouse events for the item.
+      // This allows the item to be interactive while keeping other parts non-interactive.
       part { name: "event"; type: RECT;
+         // This flag prevents mouse down/up events from being processed if the
+         // pointer is held down for an extended period, which is useful for
+         // avoiding accidental clicks when scrolling or dragging.
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000 Transparent
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
             visible: 0;
          }
       }
+      // A rectangle used to visually disable the item. It sits on top of other parts.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF Fully transparent (acts as a clipping area).
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 64; // no cc
+            // Semi-transparent white to give a disabled look.
+            color: 255 255 255 64; // #FFFFFF40
          }
       }
    }
    programs {
+      // When the mouse enters the item, emit a signal to activate it and run the "selected" program to highlight it.
       program { signal: "mouse,in"; source: "event";
          action: SIGNAL_EMIT "elm,action,activate" "elm";
          after: "selected";
       }
+      // When the mouse leaves, run the "unselected" program to remove the highlight.
       program { signal: "mouse,out"; source: "event";
 //         action: SIGNAL_EMIT "elm,action,inactivate" "elm";
          after: "unselected";
       }
+      // Highlight the item on mouse down.
       program { signal: "mouse,down,1"; source: "event";
          after: "selected";
       }
+      // When the item is clicked, emit a "click" signal.
       program {
          signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // These programs react to external signals to control text visibility via the script variables.
       program { signal: "elm,state,text,visible"; source: "elm";
          script {
             set_int(menu_text_visible, 1);
@@ -127,6 +157,7 @@ group { name: "elm/menu/item/default";
 //            set_state(PART:"elm.text2", "default", 0.0);
          }
       }
+      // These programs show or hide the icon area based on external signals.
       program { signal: "elm,state,icon,visible"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.content";
@@ -135,18 +166,21 @@ group { name: "elm/menu/item/default";
          action: STATE_SET "noicon" 0.0;
          target: "elm.swallow.content";
       }
+      // Named program to apply the "selected" state.
       program { name: "selected";
          signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "active" 0.0;
          target: "base";
          target: "elm.text";
       }
+      // Named program to revert to the "unselected" state.
       program { name: "unselected";
          signal: "elm,state,unselected"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "elm.text";
       }
+      // These programs manage the enabled/disabled visual states of the entire item.
       program { signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -164,31 +198,40 @@ group { name: "elm/menu/item/default";
    }
 }
 
+// This group defines a menu item that has a submenu.
+// It inherits all properties from the default menu item and adds an arrow.
 group { name: "elm/menu/item_with_submenu/default";
    inherit: "elm/menu/item/default";
 //   alias: "elm/menu/main_menu_submenu/default";
    parts {
+      // An arrow image to indicate the presence of a submenu.
       part { name: "arrow";
          description { state: "default" 0.0;
             min: 15 15;
             max: 15 15;
+            // The arrow is placed inside the 'arrowspace' spacer from the parent group.
             rel.to: "arrowspace";
             image.normal: "i-arrow-r";
+            // Themed color for the arrow.
             color_class: "/fg/normal/menu/item/arrow";
          }
          description { state: "active" 0.0;
             inherit: "default" 0.0;
+            // Themed color for the arrow when the item is selected.
             color_class: "/fg/selected/menu/item/arrow";
          }
       }
    }
    programs {
+      // These programs from the parent group are extended to also target the arrow,
+      // so it changes color along with the text when selected/unselected.
       program { name: "selected";
          target: "arrow";
       }
       program { name: "unselected";
          target: "arrow";
       }
+      // When the mouse enters, emit a signal to open the submenu.
       program { signal: "mouse,in"; source: "event";
          action: SIGNAL_EMIT "elm,action,open" "elm";
       }
@@ -199,14 +242,17 @@ group { name: "elm/menu/item_with_submenu/default";
    }
 }
 
+// Defines a separator used to divide groups of items in a menu.
 group { name: "elm/menu/separator/default";
    parts {
+      // A simple rectangle acting as a horizontal line.
       part { name: "separator"; type: RECT;
          scale;
          description { state: "default" 0.0;
             rel1.offset: 0 10;
             rel2.offset: -1 -11;
             min: 0 1;
+            // Themed color for the separator.
             color_class: "/fg/normal/separator/menu";
             offscale;
          }
@@ -214,7 +260,11 @@ group { name: "elm/menu/separator/default";
    }
 }
 
+// Defines a menu item for the main menu bar that opens a submenu.
+// NOTE: This group is very similar to "elm/menu/item/default" but is
+// not inherited. It's tailored for top-level menu bar items.
 group { name: "elm/menu/main_menu_submenu/default";
+   // Script block to handle state changes from C code.
    script {
       public menu_text_visible; //0:hide (default), 1:visible
       public menu_disable; //0:enable, 1:disable
@@ -321,9 +371,12 @@ group { name: "elm/menu/main_menu_submenu/default";
 //         action: SIGNAL_EMIT "elm,action,inactivate" "elm";
          after: "unselected";
       }
+      // Highlight the item on mouse down.
       program { signal: "mouse,down,1"; source: "event";
          after: "selected";
       }
+      // In contrast to a regular menu item, clicking down on a main menu item
+      // also emits a "click" signal, which typically opens the menu.
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
@@ -379,9 +432,12 @@ group { name: "elm/menu/main_menu_submenu/default";
 }
 
 //In the hover used by the menu only the bottom part is used.
+// This group defines the appearance of the popup (hover) that contains a menu.
+// It includes a shadow and a background, and is designed to dismiss when clicked outside.
 group { name: "elm/hover/base/menu/default";
    images.image: "win_shad_angle.png" COMP;
    parts {
+      // A swallow part to control the offset of the entire hover.
       part { name: "elm.swallow.offset"; type: SWALLOW;
          description { state: "default" 0.0;
             align: 0.0 0.0;
@@ -390,6 +446,7 @@ group { name: "elm/hover/base/menu/default";
             rel2.relative: 0.0 0.0;
          }
       }
+      // A swallow part to control the size of the hover content.
       part { name: "elm.swallow.size"; type: SWALLOW;
          description { state: "default" 0.0;
             align: 0.0 0.0;
@@ -398,9 +455,11 @@ group { name: "elm/hover/base/menu/default";
             rel1.relative: 1.0 1.0;
          }
       }
+      // A full-size, transparent rectangle to catch clicks outside the menu content,
+      // which are used to dismiss the menu.
       part { name: "base"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000 Transparent
          }
       }
       part { name: "elm.swallow.slot.left"; type: SWALLOW;
@@ -418,10 +477,12 @@ group { name: "elm/hover/base/menu/default";
             inherit: "default" 0.0;
          }
       }
+      // A clipping rectangle that is animated to show/hide the menu.
+      // Its visibility state controls the clipped content.
       part { name: "bottomclip"; type: RECT;
          scale;
          description { state: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00 Fully transparent, so clipped content is not visible.
             rel1.offset: -200 -200;
             rel2.offset: 199 199;
             offscale;
@@ -429,10 +490,12 @@ group { name: "elm/hover/base/menu/default";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF Opaque, making clipped content visible.
          }
       }
+      // Macro for creating a window shadow.
       WIN_SHAD("bg", "shadow", "win_shad_angle.png", 21, 21, 14, 28, 0.5)
+      // The shadow part, clipped by 'bottomclip'.
       part { name: "shadow"; type: RECT;
          clip_to: "bottomclip";
          description { state: "default" 0.0;
@@ -442,6 +505,7 @@ group { name: "elm/hover/base/menu/default";
             color_class: "/shadow/normal/menu";
          }
       }
+      // The background of the menu, clipped by 'bottomclip'.
       part { name: "bg"; type: RECT; mouse_events: 0;
          clip_to: "bottomclip";
          description { state: "default" 0.0;
@@ -450,6 +514,8 @@ group { name: "elm/hover/base/menu/default";
          }
       }
 
+      // The main content area where the menu items (e.g., a box widget) are placed.
+      // Swallow part where the actual menu items (e.g., a box with menu items) are placed.
       part { name: "elm.swallow.slot.bottom"; type: SWALLOW;
          clip_to: "bottomclip";
          description { state: "default" 0.0;
@@ -474,15 +540,21 @@ group { name: "elm/hover/base/menu/default";
       }
    }
    programs {
+      // When the user clicks on the base (i.e., outside the menu content),
+      // it emits a signal to dismiss the menu.
       program { signal: "mouse,up,*"; source: "base";
          action: SIGNAL_EMIT "elm,action,dismiss" "elm";
       }
+      // When a "show" signal is received, animate the 'bottomclip' to the "visible" state,
+      // revealing the menu with a decelerating transition.
       program { signal: "elm,action,slot,bottom,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2;
          target: "bottomclip";
          target: "elm.swallow.slot.bottom";
       }
+      // When a "hide" signal is received, animate the 'bottomclip' back to the "default" state,
+      // hiding the menu.
       program { signal: "elm,action,slot,bottom,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;
@@ -494,6 +566,9 @@ group { name: "elm/hover/base/menu/default";
 
 //In the hover used by the submenu only the bottom part is used
 //and no part should interact except the bottom area
+// This defines the hover for a submenu. It inherits from the main menu hover
+// but modifies the 'base' part to prevent it from dismissing the entire menu
+// chain when clicked outside a submenu's content area.
 group { name: "elm/hover/base/submenu/default";
    inherit: "elm/hover/base/menu/default";
    parts {
@@ -501,15 +576,21 @@ group { name: "elm/hover/base/submenu/default";
          repeat_events: 1;
       }
       //here we don't catch events like the hover does
+      // The 'base' part is overridden to be invisible and non-interactive.
+      // This is crucial because in a submenu, we don't want an outer click
+      // to be caught by this hover's base, which would prevent the main menu
+      // from being dismissed correctly.
       part { name: "base"; type: RECT; repeat_events: 1;
          description { state: "visible" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000 Transparent
             visible: 0;
          }
       }
    }
 }
 
+// Defines the hover for a main menu bar. Unlike a popup menu, this usually
+// appears as a bar at the top of a window.
 group { name: "elm/hover/base/main_menu/default";
    parts {
       part { name: "elm.swallow.offset"; type: SWALLOW;
@@ -531,6 +612,7 @@ group { name: "elm/hover/base/main_menu/default";
             rel1.offset: -1 -2;
          }
       }
+      // Background for the menu bar itself.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_y: "bottom";
@@ -538,6 +620,8 @@ group { name: "elm/hover/base/main_menu/default";
             color_class: "/bg/normal/menu/bar";
          }
       }
+      // A container for the menu items, clipped by 'bottomclip'.
+      // It's invisible by default.
       part { name: "bottom"; type: RECT;
          clip_to: "bottomclip";
          description { state: "default" 0.0;
@@ -559,6 +643,7 @@ group { name: "elm/hover/base/main_menu/default";
       }
    }
    programs {
+      // Program to show the menu content with a decelerating animation.
       program { name: "bottomshow";
          signal: "elm,action,slot,bottom,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
@@ -568,6 +653,8 @@ group { name: "elm/hover/base/main_menu/default";
    }
 }
 
+// This group defines the hover for a submenu that drops down from a main menu bar.
+// It is visually similar to a standard menu popup, including the shadow.
 group { name: "elm/hover/base/main_menu_submenu/default";
    images.image: "win_shad_angle.png" COMP;
    parts {
@@ -636,11 +723,15 @@ group { name: "elm/hover/base/main_menu_submenu/default";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // When visible, the submenu is offset downwards by 6 pixels,
+            // creating a small gap between it and the main menu bar.
             rel1.offset: 0 6;
             rel2.offset: -1 6;
             align: 0.5 0.0;
          }
       }
+      // This part is likely used for some interaction logic, possibly to
+      // handle pointer events in the gap between the menu bar and the submenu.
       part { name: "pop"; type: RECT; mouse_events: 1;
          repeat_events:1;
          description { state: "default" 0.0;
@@ -661,14 +752,18 @@ group { name: "elm/hover/base/main_menu_submenu/default";
       }
    }
    programs {
+      // When the user clicks on the base (i.e., outside the menu content),
+      // it emits a signal to dismiss the menu.
       program { signal: "mouse,up,*"; source: "base";
          action: SIGNAL_EMIT "elm,action,dismiss" "elm";
       }
+      // Program to show the submenu popup.
       program { signal: "elm,action,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2;
          target: "bottomclip";
       }
+      // Program to hide the submenu popup.
       program { signal: "elm,action,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.5;

@@ -1,24 +1,51 @@
+// Defines the style for a horizontal separator, a key element for visually
+// dividing content sections.
 group { name: "elm/separator/horizontal/default";
    parts {
+      // The 'base' part is a simple rectangle, chosen for performance as it's
+      // more efficient for drawing solid colors than an image.
       rect { name: "base";
          scale: 1;
          description { state: "default" 0.0;
+            // Sets the minimum size to 1x1 pixels, ensuring visibility.
             min: 1 1;
+            // Limits the separator's height to 1 pixel while allowing its
+            // width to expand indefinitely, which is essential for a
+            // horizontal line.
             max: 99999 1;
+            // The offsets define padding around the separator line.
+            // rel1 provides 4px padding from the top and left edges.
+            // rel2 provides 5px padding from the bottom and right edges.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // Assigns a color from the theme's color class definition.
+            // Using a color class allows for easy theming without changing this code.
+            // For example, the color might be defined as #0000007F (black at 50% opacity).
             color_class: "/fg/normal/separator/horizontal";
+            // 'offscale' prevents the Edje global scaling factor from affecting
+            // this part. This ensures the separator remains a crisp 1-pixel line
+            // regardless of the application's scale setting.
             offscale;
          }
       }
    }
 }
+
+// Defines the style for a vertical separator.
+// It inherits its base properties from the horizontal separator, demonstrating
+// efficient code reuse. Only the properties that differ are overridden.
 group { name: "elm/separator/vertical/default";
    inherit: "elm/separator/horizontal/default";
    parts {
+      // This modifies the inherited 'base' part for a vertical orientation.
       part { name: "base";
          description { state: "default" 0.0;
+            // This is the key change from the horizontal separator.
+            // It constrains the width to 1 pixel and allows the height to expand,
+            // effectively rotating the separator.
             max: 1 99999;
+            // Uses a different color class, specific to vertical separators,
+            // for distinct visual styling.
             color_class: "/fg/normal/separator/vertical";
          }
       }

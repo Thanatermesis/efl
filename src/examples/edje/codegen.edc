@@ -1,31 +1,55 @@
+// Collections are the root of an EDC file, containing one or more groups.
 collections {
 
+   // A group defines a single UI component. It can have parts, scripts, and programs.
    group {
 
+      // The name used to reference this group from the C code.
       name: "example_group";
+      // Sets the minimum size of the group to 50x50 pixels.
       min: 50 50;
 
+      // Styles define reusable properties for parts, especially for text.
+      // This helps maintain a consistent look and feel.
       styles {
+         // Defines a style for textblocks.
          style {
+            // Unique name for this style.
             name: "textblock_style";
+            // 'base' sets the default appearance for the text.
+            // Here it defines font, size, color (#660000), and word wrapping.
             base: "font=Sans font_size=22 color=#600 wrap=word";
+            // 'tag' defines markup for styling parts of the text.
+            // 'br' tag will be replaced with a newline.
             tag:  "br" "\n";
+            // 'hilight' and 'b' tags will make the text bold.
             tag:  "hilight" "+ font_weight=Bold";
             tag:  "b" "+ font_weight=Bold";
+            // 'tab' tag will be replaced with a tab character.
             tag:  "tab" "\t";
          }
       }
+      // 'parts' are the building blocks of the UI within a group.
+      // They can be visible elements like text and rectangles, or containers.
       parts {
+         // This part is a TEXT part, used to display text.
          part {
             name: "part_one";
             type: TEXT;
+            // The API allows C code to interact with this part using the name "part_one".
             api: "part_one";
             description {
                min: 50 50;
                state: "default" 0.0;
+               // Sets the color of the text to blue (RGBA: 0, 0, 255, 255 or #0000FF).
                color: 0 0 255 255; /* blue */
+               // 'rel1' and 'rel2' define the part's position and size relative to its container.
+               // This part occupies the full width and top 30% of the group's height.
+               // rel1.relative: top-left corner (0% from left, 0% from top).
                rel1.relative: 0.0 0.0;
+               // rel2.relative: bottom-right corner (100% from left, 30% from top).
                rel2.relative: 1.0 0.3;
+               // 'text' block defines text properties for this part.
                text {
                   font: "arial";
                   size: 22;
@@ -33,18 +57,24 @@ collections {
                }
             }
          }
+         // This part is a SWALLOW part, which acts as a placeholder for other Evas objects.
+         // External Evas objects can be "swallowed" into this part from C code.
          part {
             name: "part_two";
             type: SWALLOW;
+            // The API name "part_two" and description "The swallow" can be used to identify this part.
             api: "part_two" "The swallow";
             description {
                min: 50 50;
                state: "default" 0.0;
+               // This part is positioned below part_one, occupying the area from
+               // x: 0% to 30% and y: 30% to 60% of the container.
                rel1.relative: 0.0 0.3;
                rel2.relative: 0.3 0.6;
             }
          }
 
+         // This part is a BOX container, used to arrange child elements.
          part {
             name: "part_three";
             type: BOX;
@@ -52,18 +82,25 @@ collections {
             description {
                state: "default" 0.0;
                box {
+                  // 'vertical_homogeneous' layout arranges children vertically,
+                  // giving each child an equal amount of space.
                   layout: "vertical_homogeneous";
                }
+               // This box is positioned in the bottom-left of the container,
+               // from x: 0% to 50% and y: 60% to 100%.
                rel1.relative: 0.0 0.6;
                rel2.relative: 0.5 1.0;
             }
          }
+         // This part is a TABLE container, for arranging children in a grid.
          part {
             name: "part_four";
             type: TABLE;
             api: "part_four" "The TABLE";
             description {
                state: "default" 0.0;
+               // Positioned in the bottom-right of the container,
+               // from x: 50% to 100% and y: 60% to 100%.
                rel1.relative: 0.5 0.6;
                rel2.relative: 1.0 1.0;
             }
@@ -71,11 +108,19 @@ collections {
 
       }
 
+      // 'programs' define the dynamic behavior of the group.
+      // They respond to signals (events) and execute actions.
       programs {
+         // This program defines an interaction when the mouse moves.
          program {
             name: "part_below.hovered";
+            // This program is triggered by the "mouse,move" signal.
             signal: "mouse,move";
+            // The signal must originate from the "part_one" part.
             source: "part_one";
+            // When triggered, this action emits a new signal "mouse,over"
+            // with "part_below" as its source. This can be used to chain
+            // events or notify external code.
             action: SIGNAL_EMIT "mouse,over" "part_below";
             api: "part_below_over" "mouse over";
          }

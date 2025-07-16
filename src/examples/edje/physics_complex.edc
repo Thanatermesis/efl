@@ -1,60 +1,83 @@
 collections {
 
+   // Defines images used in the collection.
+   // 'COMP' flag indicates that the image data should be stored compressed,
+   // which is ideal for reducing file size, especially for photos or complex graphics.
    images {
       image: "bubble-blue.png" COMP;
    }
 
+   // This group demonstrates a simple physics simulation with two interacting objects.
+   // It defines their physical properties, appearances, and behaviors through states
+   // and programs that trigger state changes.
    group {
       name: "example_group";
 
       parts {
+         // A simple white background that fills the entire container.
+         // 'physics_body: NONE' ensures it does not participate in the physics simulation.
          part {
             name: "background";
             type: RECT;
             physics_body: NONE;
             description {
                state: "default" 0.0;
+               // Color: #FFFFFFFF (white)
                color: 255 255 255 255; /* white */
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }
          }
 
+         // A red box with rigid body physics, allowing it to collide with other objects.
+         // It has two states: 'default' and 'heavier', which alter its appearance and physical properties.
          part {
             name: "red_box";
             type: RECT;
             physics_body: RIGID_BOX;
             description {
                state: "default" 0.0;
+               // Color: #FF0000FF (light red)
                color: 255 0 0 255; /* light red */
                rel1.relative: 0.45 0.1;
                rel2.relative: 0.55 0.2;
                aspect: 1 1;
                physics {
+                  // Standard mass and high restitution for a 'bouncy' effect.
                   mass: 10.8;
                   restitution: 0.85;
                   friction: 1.0;
+                  // light_on makes this part a source of light for other parts with 'use_light' enabled.
                   light_on: 1;
                }
             }
+            // The 'heavier' state is triggered by a program.
             description {
                state: "heavier" 0.0;
                inherit: "default" 0.0;
+               // Color: #780000FF (dark red)
                color: 120 0 0 255; /* dark red */
                physics {
+                  // Increased mass and no restitution make it heavy and not bouncy.
                   mass: 30;
                   restitution: 0;
+                  // Linear and angular damping to slow down motion over time.
                   damping: 0.4 0.2;
+                  // Time until the object goes to sleep (stops simulating) if its velocity is low.
                   sleep: 18 13.4;
                }
             }
          }
 
+         // This part is intended as a shadow for 'red_box'.
+         // It's not a physical object. Its vertical position is linked to 'red_box'
+         // using 'to_y', making it move up and down along with the box.
          part {
             name: "box_shadow";
             type: RECT;
             description {
                state: "default" 0.0;
+               // Color: #00000078 (translucent black)
                color: 0 0 0 120;
                rel1 {
                   to_y: "red_box";
@@ -67,6 +90,8 @@ collections {
             }
          }
 
+         // A blue circle using an image, with sphere physics.
+         // 'RIGID_SPHERE' is more efficient for circular objects than a box-based approximation.
          part {
             name: "blue_circle";
             type: IMAGE;
@@ -80,22 +105,30 @@ collections {
                   normal: "bubble-blue.png";
                }
                physics {
+                  // When set to 0, the physics body's initial position is synced with the part's visual position.
                   ignore_part_pos: 0;
+                  // Pre-defined material with properties of iron (high density, low restitution).
                   material: IRON;
                }
             }
+            // The 'left' state, also triggered by a program, moves the circle and changes its physics.
             description {
                state: "left" 0.0;
                inherit: "default" 0.0;
                rel1.relative: 0 0.1;
                rel2.relative: 0.25 0.3;
                physics {
+                  // 'CUSTOM' material allows for defining specific physical properties.
                   material: CUSTOM;
+                  // Overrides the default material's density, making it very heavy.
                   density: 40;
                }
             }
          }
 
+         // An invisible floor that acts as a boundary for the physics simulation.
+         // 'BOUNDARY_BOTTOM' creates an impassable line at the bottom of the container,
+         // preventing objects from falling out of the view.
          part {
             name: "floor";
             type: RECT;
@@ -104,13 +137,17 @@ collections {
                state: "default" 0.0;
                visible: 0;
                physics {
+                  // High restitution makes objects bounce off the floor energetically.
                   restitution: 0.9;
                }
             }
          }
       }
 
+      // Programs define interactions and animations by changing part states in response to signals.
       programs {
+         // On "load", after a 2-second delay ('in: 2 0;'), this program changes the 'red_box'
+         // to its "heavier" state. The transition is animated linearly over 1.5 seconds.
          program {
             name: "change_box";
             signal: "load";
@@ -120,6 +157,9 @@ collections {
             target: "red_box";
          }
 
+         // The following two programs create a continuous animation loop for 'blue_circle'.
+         // The loop starts 3 seconds after "load", then perpetually switches the circle
+         // between its "left" and "default" states every 3 seconds using the 'after' property.
          program {
             name: "change_circle";
             signal: "load";

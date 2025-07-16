@@ -1,9 +1,12 @@
 collections {
+   // This group defines a layout with three rectangular parts that animate
+   // between two states, creating a continuous visual effect.
    group {
       name: "animations_group";
       min: 100 80;
 
       parts {
+         // Part one is a black rectangle, initially positioned on the left side of the container.
          part {
             name: "part_one";
             type: RECT;
@@ -11,62 +14,80 @@ collections {
             description {
                min: 50 50;
                state: "default" 0.0;
-               color: 0 0 0 255; /* black */
+               // The default state is a vertical rectangle occupying the left third of the container.
+               color: 0 0 0 255; // black - #000000FF
                rel1.relative: 0.0 0.0;
                rel2.relative: 0.33 1.0;
             }
             description {
                state: "invert" 1.0;
                inherit: "default" 0.0;
+               // In the 'invert' state, it transforms into a horizontal rectangle
+               // at the top. 'inherit' is used to copy properties from the
+               // "default" state, reducing code duplication.
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 0.33;
             }
          }
 
          part {
+            // Part two is a yellow rectangle, initially in the middle.
             name: "part_two";
             type: RECT;
             scale: 1;
             description {
                min: 50 50;
                state: "default" 0.0;
-               color: 255 255 0 255; /* yellow */
+               // In its default state, it is a vertical rectangle in the middle.
+               color: 255 255 0 255; // yellow - #FFFF00FF
                rel1.relative: 0.33 0.0;
                rel2.relative: 0.66 1.0;
             }
             description {
                state: "invert" 1.0;
                inherit: "default" 0.0;
+               // In the 'invert' state, it becomes a horizontal rectangle at the bottom.
                rel1.relative: 0.0 0.66;
                rel2.relative: 1.0 1.0;
             }
          }
 
          part {
+            // Part three is a red rectangle, initially on the right.
             name: "part_three";
             type: RECT;
             description {
                state: "default" 0.0;
-               color: 255 0 0 255; /* red */
+               // In its default state, it is a vertical rectangle on the right.
+               color: 255 0 0 255; // red - #FF0000FF
                rel1.relative: 0.66 0.0;
                rel2.relative: 1.0 1.0;
             }
             description {
                state: "invert" 1.0;
                inherit: "default" 0.0;
+               // In the 'invert' state, it moves to the middle as a horizontal rectangle.
                rel1.relative: 0.0 0.33;
                rel2.relative: 1.0 0.66;
             }
          }
       }
 
+      // The 'programs' section defines the logic that drives the animations.
+      // They respond to signals and orchestrate state changes in the parts.
       program {
+         // This program is triggered automatically on layout load.
+         // After a 2-second delay, it starts the main animation loop
+         // by calling 'animation,state1'.
          signal: "load";
          source: "";
          in: 2.0 0.0;
          after: "animation,state1";
       }
       program {
+         // This program transitions all parts to the 'invert' state over 0.6 seconds.
+         // The 'LINEAR' transition ensures a constant speed.
+         // Once finished, it chains to 'animation,state2' to reverse the effect.
          name: "animation,state1";
          in: 1.0 0.0;
          action: STATE_SET "invert" 1.0;
@@ -77,6 +98,9 @@ collections {
          after: "animation,state2";
       }
       program {
+         // This program transitions all parts back to their 'default' state.
+         // By calling 'animation,state1' afterwards, it creates an infinite loop,
+         // ensuring the animation repeats continuously.
          name: "animation,state2";
          in: 1.0 0.0;
          action: STATE_SET "default" 0.0;

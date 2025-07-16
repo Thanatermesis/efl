@@ -1,5 +1,9 @@
 ///////////////////////////////////////////////////////////////////////////////
+// This group defines the base layout for the Segment Control widget.
+// It mainly serves as a container that sets the minimum size for the widget.
 group { name: "elm/segment_control/base/default";
+   // Defines for segment item types, states, and statuses.
+   // These are used in the script to manage the visual state of segment items.
    #define SEGMENT_TYPE_SINGLE 1
    #define SEGMENT_TYPE_LEFT 2
    #define SEGMENT_TYPE_MIDDLE 3
@@ -10,17 +14,28 @@ group { name: "elm/segment_control/base/default";
    #define SEGMENT_STATUS_ENABLED 0
    #define SEGMENT_STATUS_DISABLED 1
    parts {
+      // "bg" is a transparent rectangle that establishes the widget's minimum
+      // dimensions. It doesn't respond to mouse events, acting purely as a
+      // size-defining background layer.
       part { name: "bg"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Transparent background color: #00000000
             color: 0 0 0 0; // no cc
             min: 160 24;
          }
       }
    }
 }
+// This group defines the appearance and behavior of a single item within the
+// Segment Control. It handles various states like position (left, right,
+// middle, single), user interaction (normal, pressed, selected), and status
+// (enabled, disabled).
 group { name: "elm/segment_control/item/default";
    parts {
+      // This part is the main background of the segment item. It's normally
+      // hidden and becomes visible with a specific color and shape depending
+      // on its state and position within the control.
       part { name: "segment"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -79,6 +94,9 @@ group { name: "elm/segment_control/item/default";
             visible: 1;
          }
       }
+      // "disabler" is an overlay that visually indicates the item is disabled.
+      // It is placed on top of the "segment" part and is only visible when the
+      // item's state is disabled.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "segment";
@@ -90,16 +108,24 @@ group { name: "elm/segment_control/item/default";
             visible: 1;
          }
       }
+      // "icon_disabler" is a specific overlay for the icon, making it
+      // semi-transparent when the item is disabled. This provides a clear
+      // visual cue that the icon is inactive.
       part { name: "icon_disabler"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "segment";
+            // Fully opaque white color: #FFFFFFFF
             color: 255 255 255 255; // no cc
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // Semi-transparent white color (25% opacity): #FFFFFF40
             color: 255 255 255 64; // no cc
          }
       }
+      // "elm.swallow.icon" is a container for the item's icon. The application
+      // can place an Evas object (like an image) here. It is clipped by
+      // "icon_disabler" to apply the disabled effect on the icon.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          scale: 1;
          clip_to: "icon_disabler";
@@ -129,6 +155,10 @@ group { name: "elm/segment_control/item/default";
             min: 16 16;
          }
       }
+      // "elm.text" displays the label of the segment item. It's positioned
+      // next to the icon and its color changes based on the item's state.
+      // It does not receive mouse events to allow clicks to pass through to
+      // the underlying parts.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -159,11 +189,17 @@ group { name: "elm/segment_control/item/default";
       }
    }
    programs {
+      // The script block contains Embryo script code that runs within the Edje
+      // object. This script manages the complex state logic of the segment item.
       script {
+         // These public variables store the state of the segment item. They can be
+         // modified by programs in response to signals.
          public seg_type; // Single, Left, Middle, Right.
          public seg_state; // Normal/Default, Pressed, Selected.
          public seg_status; // Enabled/Default, Disabled
 
+         // This function is the core of the state management. It reads the public
+         // variables and applies the corresponding visual states to the various parts.
          public update_state() {
             new type = get_int(seg_type);
             new state = get_int(seg_state);
@@ -218,6 +254,9 @@ group { name: "elm/segment_control/item/default";
             }
          }
       }
+      // This program listens for the "elm,type,segment,single" signal and updates
+      // the seg_type variable, then calls update_state() to refresh the visuals.
+      // This is how the C code communicates the item's position to the theme.
       program { signal: "elm,type,segment,single"; source: "elm";
          script { set_int(seg_type, SEGMENT_TYPE_SINGLE); update_state(); }
       }
@@ -230,6 +269,8 @@ group { name: "elm/segment_control/item/default";
       program { signal: "elm,type,segment,right"; source: "elm";
          script { set_int(seg_type, SEGMENT_TYPE_RIGHT); update_state(); }
       }
+      // This program updates the item's state to "normal" (not pressed or
+      // selected) when it receives the "elm,state,segment,normal" signal.
       program { signal: "elm,state,segment,normal"; source: "elm";
          script { set_int(seg_state, SEGMENT_STATE_NORMAL); update_state(); }
       }
@@ -239,14 +280,20 @@ group { name: "elm/segment_control/item/default";
       program { signal: "elm,state,segment,selected"; source: "elm";
          script { set_int(seg_state, SEGMENT_STATE_SELECTED); update_state(); }
       }
+      // This program handles the disabled state for the item.
       program { signal: "elm,state,disabled"; source: "elm";
          script { set_int(seg_status, SEGMENT_STATUS_DISABLED); update_state(); }
       }
       program { signal: "elm,state,enabled"; source: "elm";
          script { set_int(seg_status, SEGMENT_STATUS_ENABLED); update_state(); }
       }
+      // The following programs manage the layout when the icon and text
+      // visibility changes. This allows the item to adapt its appearance,
+      // for example, showing only an icon or an icon with text.
       program { signal: "elm,state,text,visible"; source: "elm";
          script { new st[31]; new Float:vl;
+            // When text becomes visible, this ensures the icon is in "visible"
+            // mode, which includes padding for the text, rather than "icononly" mode.
             get_state(PART:"elm.swallow.icon", st, 30, vl);
             if (!strcmp(st, "icononly"))
               set_state(PART:"elm.swallow.icon", "visible", 0.0);
@@ -254,6 +301,8 @@ group { name: "elm/segment_control/item/default";
       }
       program { signal: "elm,state,text,hidden"; source: "elm";
          script { new st[31]; new Float:vl;
+            // When text is hidden, this switches the icon to "icononly" mode,
+            // which centers the icon within the item.
             get_state(PART:"elm.swallow.icon", st, 30, vl);
             if (!strcmp(st, "visible"))
               set_state(PART:"elm.swallow.icon", "icononly", 0.0);
@@ -262,6 +311,8 @@ group { name: "elm/segment_control/item/default";
       }
       program { signal: "elm,state,icon,visible"; source: "elm";
          script { new st[31]; new Float:vl;
+            // When the icon becomes visible, check if text is also visible.
+            // If so, use "visible" state for the icon, otherwise "icononly".
             get_state(PART:"elm.text", st, 30, vl);
             if ((!strcmp(st, "normal")) || (!strcmp(st, "selected")))
               set_state(PART:"elm.swallow.icon", "visible", 0.0);
@@ -269,11 +320,14 @@ group { name: "elm/segment_control/item/default";
               set_state(PART:"elm.swallow.icon", "icononly", 0.0);
          }
       }
+      // Hides the icon by setting its state to "default", which makes it invisible.
       program { signal: "elm,state,icon,hidden"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "elm.swallow.icon";
       }
    }
+   // It's good practice to undefine macros after they are used to avoid
+   // potential conflicts with other EDC files.
    #undef SEGMENT_TYPE_SINGLE
    #undef SEGMENT_TYPE_LEFT
    #undef SEGMENT_TYPE_MIDDLE

@@ -1,3 +1,19 @@
+// This EDC file defines a set of simple icons using a preprocessor macro.
+// The ICON macro is a template for creating a complete Edje group for each icon,
+// which is an efficient way to define many similar objects.
+//
+// The macro takes one argument, `_name`, which is the base name for the icon.
+// For each `_name`, it generates an 'images' block to load the corresponding PNG file
+// and a 'collections' block with a 'group' that can be instantiated as a UI element.
+// `COMP` compresses the image data within the final EDJ file.
+//
+// The group contains a single IMAGE 'part' named "icon".
+// - `mouse_events: 0;` makes this part non-interactive, purely for display.
+// - `align: 0.5 0.5;` centers the image within its allocated area.
+// - `aspect: 1.0 1.0;` enforces a square aspect ratio.
+// - `aspect_preference: VERTICAL;` ensures the image scales to fit the container's
+//   height, adjusting its width to maintain the aspect ratio. This is key for
+//   visual consistency across different layouts.
 #define ICON(_name)                                         \
 images { image: "ico_"_name".png" COMP; }                   \
 collections { group { name: "ico_"_name;                    \
@@ -10,6 +26,8 @@ collections { group { name: "ico_"_name;                    \
                image.normal: "ico_"_name".png";             \
 }}}}}
 
+// The following lines use the ICON macro to generate the actual Edje groups
+// for each of the specified icon names.
 ICON("anchorblock")
 ICON("anchorview")
 ICON("bubble")

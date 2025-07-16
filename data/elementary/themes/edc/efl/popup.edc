@@ -69,17 +69,25 @@ Group: efl/alert_popup/left_button (@since 1.23)
   Signal: efl,text,set
   Signal: efl,text,unset
 */
+// This group defines the basic layout and appearance of a popup.
+// It consists of a shadow, a base rectangle, and two swallow parts for the background and content.
 group { "efl/popup";
    data.item: "version" "123";
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // A rectangle part used as a base for the shadow effect.
+      // It is positioned relative to "_sh1", which is defined within the WIN_SHAD macro.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
             color_class: "/shadow/normal/frame";
          }
       }
+      // The WIN_SHAD macro creates a window shadow effect using an image.
+      // It defines several parts internally to create the shadow illusion.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // This is the main rectangle for the popup body.
+      // `offscale` is used to prevent scaling from distorting the border.
       rect { "base";
          scale;
          desc { "default";
@@ -90,11 +98,15 @@ group { "efl/popup";
             offscale;
          }
       }
+      // This swallow part is for the popup's background.
+      // Any object set here will be displayed as the background, sized relative to the "base" part.
       swallow { "efl.background"; required;
          desc { "default";
             rel.to: "base";
          }
       }
+      // This swallow part is for the popup's main content.
+      // It is placed on top of the background with a small padding.
       swallow { "efl.content"; required;
          scale;
          desc { "default";
@@ -107,6 +119,9 @@ group { "efl/popup";
    }
 }
 
+// This group extends the basic popup to create an alert-style popup.
+// It includes a title area, a content area, and a button area.
+// The layout is more complex to accommodate these additional elements.
 group { "efl/alert_popup";
    data.item: "version" "123";
    images.image: "win_shad_flat.png" COMP;
@@ -133,6 +148,8 @@ group { "efl/alert_popup";
             rel.to: "base";
          }
       }
+      // The content area is positioned between the title and button areas.
+      // Its vertical positioning is relative to 'title_bg' (top) and 'efl.buttons' (bottom).
       swallow { "efl.content"; required;
          scale;
          desc { "default";
@@ -147,6 +164,8 @@ group { "efl/alert_popup";
             offscale;
          }
       }
+      // This rectangle serves as the background for the title.
+      // It is initially of zero height and expands when the title becomes visible.
       rect { "title_bg";
          scale;
          desc { "default";
@@ -162,6 +181,8 @@ group { "efl/alert_popup";
             min: 0 24;
          }
       }
+      // The textblock for the popup's title. It's hidden by default.
+      // The 'popup_title_style_ellipsis' style ensures that long text is truncated with an ellipsis.
       textblock { "efl.text.title"; required;
          scale;
          desc { "default";
@@ -180,6 +201,8 @@ group { "efl/alert_popup";
             vis;
          }
       }
+      // The area where action buttons are placed.
+      // It's located at the bottom of the popup and is initially of zero height.
       swallow { "efl.buttons"; required;
          scale;
          desc { "default";
@@ -200,17 +223,25 @@ group { "efl/alert_popup";
          }
       }
    }
+   // Programs define the dynamic behavior of the popup.
+   // They react to signals and change the state of parts.
    programs {
+      // When the "efl,title,visible,on" signal is received, this program changes the state
+      // of "title_bg" and "efl.text.title" to "title_visible", making the title area appear.
       program { signal: "efl,title,visible,on"; source: "efl";
          action: STATE_SET "title_visible" 0.0;
          target: "title_bg";
          target: "efl.text.title";
       }
+      // When "efl,title,visible,off" is received, it reverts the title parts to their
+      // default state, effectively hiding the title area.
       program { signal: "efl,title,visible,off"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "title_bg";
          target: "efl.text.title";
       }
+      // This program makes the button area visible by changing the state of "efl.buttons"
+      // to "button_visible" upon receiving the "efl,buttons,visible,on" signal.
       program { signal: "efl,buttons,visible,on"; source: "efl";
          action: STATE_SET "button_visible" 0.0;
          target: "efl.buttons";
@@ -218,10 +249,16 @@ group { "efl/alert_popup";
    }
 }
 
+// The backwall group defines a background layer for popups, often used to dim the
+// underlying content and handle clicks outside the popup to dismiss it.
+// It is aliased to "efl/alert_popup/backwall", allowing it to be used in both contexts.
 group { "efl/popup/backwall";
    data.item: "version" "123";
    alias: "efl/alert_popup/backwall";
    parts {
+      // The base rectangle for the backwall.
+      // The color_class "/dim/normal/hover" typically provides a semi-transparent dark color
+      // to dim the content behind the popup.
       rect { "base";
          desc { "default";
             color_class: "/dim/normal/hover";
@@ -231,6 +268,8 @@ group { "efl/popup/backwall";
             hid;
          }
       }
+      // This swallow part holds the popup itself.
+      // It is hidden by default and becomes visible when content is set.
       swallow { "efl.content"; required;
          scale;
          desc { "default";
@@ -245,6 +284,9 @@ group { "efl/popup/backwall";
             vis;
          }
       }
+      // An invisible rectangle that covers the entire backwall.
+      // Its purpose is to capture mouse clicks, allowing the popup to be dismissed
+      // by clicking outside of it. The color 0 0 0 0 (fully transparent black) makes it invisible.
       rect { "block";
          desc { "default";
             rel.to: "base";
@@ -254,22 +296,28 @@ group { "efl/popup/backwall";
    }
 
    programs {
+      // When content is set, this program makes the popup visible and hides the backwall base.
       program { signal: "efl,content,set"; source: "efl";
          action: STATE_SET "content_visible" 0.0;
          target: "base";
          target: "efl.content";
       }
+      // When content is unset, this program reverts the parts to their default state.
       program { signal: "efl,content,unset"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "efl.content";
       }
+      // When the "block" rectangle is clicked, it emits a signal "efl,action,click".
+      // This is typically used by the popup logic to dismiss itself.
       program { signal: "mouse,clicked,1"; source: "block";
          action: SIGNAL_EMIT "efl,action,click" "efl";
       }
    }
 }
 
+// This group defines a layout for a single button in an alert popup.
+// The button fills the entire available area.
 group { "efl/alert_popup/button_layout1";
    data.item: "version" "123";
    parts {
@@ -278,9 +326,12 @@ group { "efl/alert_popup/button_layout1";
    }
 }
 
+// Defines a layout for two buttons in an alert popup, arranged horizontally.
 group { "efl/alert_popup/button_layout2";
    data.item: "version" "123";
    parts {
+      // A spacer part used as a divider between the two buttons.
+      // It's positioned at the horizontal center and has a minimum width of 5.
       spacer { "div1";
          desc { "default";
             rel1.relative: 0.5 0.5;
@@ -288,12 +339,14 @@ group { "efl/alert_popup/button_layout2";
             min: 5 5;
          }
       }
+      // The first button, positioned to the left of the divider.
       swallow { "efl.button1"; required;
          desc { "default";
             rel2.to_x: "div1";
             rel2.relative: 0.0 1.0;
          }
       }
+      // The second button, positioned to the right of the divider.
       swallow { "efl.button2"; required;
          desc { "default";
             rel1.to_x: "div1";
@@ -303,9 +356,11 @@ group { "efl/alert_popup/button_layout2";
    }
 }
 
+// Defines a layout for three buttons in an alert popup, arranged horizontally.
 group { "efl/alert_popup/button_layout3";
    data.item: "version" "123";
    parts {
+      // First spacer, positioned at one-third of the width.
       spacer { "div1";
          scale;
          desc { "default";
@@ -314,6 +369,7 @@ group { "efl/alert_popup/button_layout3";
             min: 4 4;
          }
       }
+      // Second spacer, positioned at two-thirds of the width.
       spacer { "div2";
          scale;
          desc { "default";
@@ -322,12 +378,14 @@ group { "efl/alert_popup/button_layout3";
             min: 4 4;
          }
       }
+      // The first button, positioned to the left of the first divider.
       swallow { "efl.button1"; required;
          desc { "default";
             rel2.to_x: "div1";
             rel2.relative: 0.0 1.0;
          }
       }
+      // The second button, positioned between the two dividers.
       swallow { "efl.button2"; required;
          desc { "default";
             rel1.to_x: "div1";
@@ -336,6 +394,7 @@ group { "efl/alert_popup/button_layout3";
             rel2.relative: 0.0 1.0;
          }
       }
+      // The third button, positioned to the right of the second divider.
       swallow { "efl.button3"; required;
          desc { "default";
             rel1.to_x: "div2";
@@ -345,6 +404,10 @@ group { "efl/alert_popup/button_layout3";
    }
 }
 
+// These groups define different styles of buttons for alert popups.
+// They all inherit from "efl/button", which provides the base functionality and appearance.
+// This allows for creating specialized button types (e.g., for left, right, or center positions)
+// that can be styled differently in a theme.
 group { "efl/alert_popup/left_button";
    inherit: "efl/button";
    data.item: "version" "123";

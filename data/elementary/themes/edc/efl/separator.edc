@@ -1,25 +1,45 @@
+// Defines the style for a horizontal separator widget.
+// This group is designed to draw a thin horizontal line with some padding.
 group { name: "efl/separator/horizontal";
    data.item: "version" "124";
    parts {
+      // 'base' is a rectangle that serves as the visible separator line.
       rect { name: "base";
+         // Enables smooth scaling of the separator if the window is resized.
          scale: 1;
          description { state: "default" 0.0;
+            // Sets the minimum size to 1x1 pixels, ensuring it's never invisible.
             min: 1 1;
+            // Sets the maximum width to a large value and the height to 1 pixel,
+            // effectively creating a thin horizontal line.
             max: 99999 1;
+            // Offsets define padding around the separator.
+            // rel1.offset moves the top-left corner by 4 pixels right and 4 down.
+            // rel2.offset moves the bottom-right corner by 5 pixels left and 5 up
+            // from the container's edge. This results in a 4-pixel padding on all sides.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // Assigns a color from the theme's color palette. The actual color
+            // value is defined in a separate color class definition file.
             color_class: "/fg/normal/separator/horizontal";
          }
       }
    }
 }
+// Defines the style for a vertical separator widget.
 group { name: "efl/separator/vertical";
    data.item: "version" "124";
+   // It inherits all properties from the horizontal separator and modifies
+   // them to create a vertical line. This reduces code duplication.
    inherit: "efl/separator/horizontal";
    parts {
+      // Modifies the 'base' part inherited from "efl/separator/horizontal".
       part { name: "base";
          description { state: "default" 0.0;
+            // Overrides the maximum size to have a width of 1 pixel and a large height,
+            // creating a thin vertical line. The min size of 1x1 is inherited.
             max: 1 99999;
+            // Uses a specific color from the theme for vertical separators.
             color_class: "/fg/normal/separator/vertical";
          }
       }

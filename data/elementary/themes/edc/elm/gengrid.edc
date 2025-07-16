@@ -1,14 +1,31 @@
+// Defines the visual style for a gengrid group index item.
+// It inherits all its properties from the genlist group index item,
+// ensuring visual consistency between list and grid views for group headers.
 group { name: "elm/gengrid/item/group_index/default";
    inherit: "elm/genlist/item/group_index/default";
 }
 
+// This group defines the default appearance and behavior of a standard gengrid item.
+// It includes support for text, an icon, and selection highlighting.
 group { name: "elm/gengrid/item/default/default";
+   // Data items provide metadata to the Elementary code.
+   // "selectraise": when an item is selected, it's raised to the top of its layer.
    data.item: "selectraise" "on";
+   // "focusraise": when an item gets focus, it's raised to the top.
    data.item: "focusraise" "on";
+   // "texts": specifies which part is the main text part.
    data.item: "texts" "elm.text";
+   // "contents": lists the swallow parts available for content.
    data.item: "contents" "elm.swallow.icon elm.swallow.end";
    parts {
 //---------------------------------------------------------------------------
+// Macro for the base parts of an item, including background and event handling.
+// Using a macro helps reduce code duplication across different item styles.
+// It defines:
+// - "event": a transparent rectangle to capture mouse events.
+// - "base": the main background, with support for an "odd" state for striped lists.
+// - "sel_base": a selection highlight rectangle.
+// It also includes programs to handle "odd/even", "selected/unselected", and "disabled/enabled" states.
 #define BASEP() \
    part { name: "event"; type: RECT; \
       description { state: "default" 0.0; \
@@ -61,6 +78,10 @@ group { name: "elm/gengrid/item/default/default";
       action: STATE_SET "default" 0.0; \
       target: "event"; \
    }
+// Macro for parts that should be on top of everything else.
+// It defines "event_block", a transparent rectangle that becomes visible
+// when the item is disabled, which blocks mouse events from reaching underlying
+// parts. It also includes programs to toggle visibility on "disabled/enabled" states.
 #define TOPP() \
    part { name: "event_block"; type: RECT; \
       description { state: "default" 0.0; \
@@ -84,15 +105,19 @@ group { name: "elm/gengrid/item/default/default";
       BASEP()
 
       //##//
+      // The main text part of the grid item.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 0 1;
+            // Positioned at the bottom of the item.
             rel1.relative: 0.0 1.0;
             rel1.offset: 4 -5;
             rel2.offset: -5 -5;
             color_class: "/fg/normal/grid/item";
             align: 0.5 1.0;
+            // `offscale` prevents scaling from affecting offsets and padding,
+            // maintaining a consistent look at different UI scales.
             offscale;
             text { font: FN; size: 10;
                min: 0 1;
@@ -109,6 +134,8 @@ group { name: "elm/gengrid/item/default/default";
             color_class: "/fg/disabled/grid/item";
          }
       }
+      // These programs switch the state of the text part based on
+      // selection and enabled status.
       program { signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "selected" 0.0;
          target: "elm.text";
@@ -117,6 +144,8 @@ group { name: "elm/gengrid/item/default/default";
          action: STATE_SET "default" 0.0;
          target: "elm.text";
       }
+      // The disabled/enabled signals also affect the "icon_area" part,
+      // changing its state simultaneously with the text.
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "elm.text";
@@ -128,21 +157,31 @@ group { name: "elm/gengrid/item/default/default";
          target: "icon_area";
       }
       //##//
+      // This is a rectangular area that defines the space for icons.
+      // It is not visible itself but acts as a container and clipping mask.
       part { name: "icon_area"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: 4 4;
+            // The bottom of this part is attached to the top of "elm.swallow.pad",
+            // positioning it right above the text part.
             rel2.to_y: "elm.swallow.pad";
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 -5;
+            // Opaque white (#FFFFFFFF)
             color: 255 255 255 255; // no cc
             offscale;
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // Semi-transparent white (#FFFFFF40) for the disabled state.
             color: 255 255 255 64; // no cc
          }
       }
+      // This is a SWALLOW part, but it's used as a spacer. Its height is fixed
+      // to 1 pixel, and it's positioned relative to the text part, creating
+      // a small gap between the icon area and the text. This is a common
+      // technique for fine-tuning layout without using invisible rectangles.
       part { name: "elm.swallow.pad"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -156,17 +195,21 @@ group { name: "elm/gengrid/item/default/default";
             offscale;
          }
       }
+      // Swallow part for the main icon. It fills the "icon_area" and is
+      // clipped by it. Content is provided by the application.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          clip_to: "icon_area";
          description { state: "default" 0.0;
             rel.to: "icon_area";
          }
       }
+      // Swallow part for an optional end icon (e.g., a checkbox or badge).
       part { name: "elm.swallow.end"; type: SWALLOW;
          scale: 1;
          clip_to: "icon_area";
          description { state: "default" 0.0;
             min: ICMIN ICMIN;
+            // Aligned to the top-right of the icon area.
             align: 1.0 0.0;
             rel.to: "icon_area";
             rel1.relative: 1.0 0.0;
@@ -182,11 +225,16 @@ group { name: "elm/gengrid/item/default/default";
    }
 }
 
+// This group provides a gengrid item style that supports rich text formatting
+// using TEXTBLOCK. It is similar to the "default" style but allows for markup
+// in the item's text.
 group { name: "elm/gengrid/item/default_style/default";
    data.item: "selectraise" "on";
    data.item: "focusraise" "on";
    data.item: "texts" "elm.text";
    data.item: "contents" "elm.swallow.icon elm.swallow.end";
+   // Defines a style for the TEXTBLOCK part. This allows using tags like
+   // <br> or <b> in the text string to apply formatting.
    styles.style {    name: "gengrid_style";
       base: "font="FN" font_size=10 align=left color=cc:/fg/normal/list/item text_class=list_item ellipsis=1.0";
       tag: "br" "\n";
@@ -216,6 +264,8 @@ group { name: "elm/gengrid/item/default_style/default";
       BASEP()
 
       //##//
+      // This part is a TEXTBLOCK, which allows for styled text, unlike a
+      // simple TEXT part. It uses the styles defined above.
       part { name: "elm.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -315,6 +365,11 @@ group { name: "elm/gengrid/item/default_style/default";
    }
 }
 
+// Macro to define an image set. An image set can contain multiple versions
+// of an image at different sizes. Edje will automatically choose the most
+// appropriate image file based on the size of the part using the image.
+// This is useful for providing different levels of detail or optimized
+// assets for various display scales.
 #define IC(_NAME, _ICON) \
    set { name: _NAME; \
       image {image: _ICON"-060.png" COMP; size: 31 31 60000 60000; } \
@@ -324,20 +379,27 @@ group { name: "elm/gengrid/item/default_style/default";
 IC("ic-arrow-u", "arrow-u")
 #undef IC
 
+// A specialized item style used for navigating "up" in a hierarchy.
+// It inherits from the default item and replaces the standard icon area
+// with a fixed "up arrow" icon.
 group { name: "elm/gengrid/item/up/default";
    inherit: "elm/gengrid/item/default/default";
    parts {
+      // The original icon_area is hidden because this style provides its own icon.
       part { name: "icon_area"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
          }
       }
+      // This part displays the "up arrow" icon.
       part { name: "up";
          insert_after: "elm.swallow.pad";
          scale: 1;
          description { state: "default" 0.0;
             min: 30 30; max: 30 30;
             aspect: 1.0 1.0; aspect_preference: BOTH;
+            // It's positioned relative to the (now hidden) icon_area,
+            // which is a common way to reuse layout logic.
             rel.to: "icon_area";
             image.normal: "ic-arrow-u";
             color_class: "/fg/normal/grid/item";
@@ -370,11 +432,15 @@ group { name: "elm/gengrid/item/up/default";
    }
 }
 
+// This style is for an item that represents an album or folder, capable of
+// showing a preview of its contents. It features a 2x2 grid of swallow parts
+// for thumbnails, which are only shown when the "have_files" state is active.
 group { name: "elm/gengrid/item/album-preview/default";
    data.item: "selectraise" "on";
    data.item: "focusraise" "on";
    data.item: "texts" "elm.text";
    data.item: "contents" "elm.swallow.icon.1 elm.swallow.icon.2 elm.swallow.icon.3 elm.swallow.icon.4";
+   // Declares a custom state that can be controlled by the application.
    data.item: "states" "have_files";
 
    parts {
@@ -434,8 +500,10 @@ group { name: "elm/gengrid/item/album-preview/default";
             rel2.offset: -5 -5;
             offscale;
             color: 255 255 255 255; // no cc
+            // The icon area is invisible by default.
             visible: 0;
          }
+         // A "visible" state is defined to show the icon area.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             color: 255 255 255 255; // no cc
@@ -447,6 +515,8 @@ group { name: "elm/gengrid/item/album-preview/default";
             visible: 1;
          }
       }
+      // When the application signals that the item "has files", the icon_area
+      // is transitioned to its "visible" state, showing the thumbnail grid.
       program { signal: "elm,state,have_files,active"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "icon_area";
@@ -464,6 +534,8 @@ group { name: "elm/gengrid/item/album-preview/default";
             offscale;
          }
       }
+      // A SPACER part used to define a smaller, centered region within
+      // "icon_area". The four preview icons will be placed relative to this.
       part { name: "icon_area2"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "icon_area";
@@ -471,6 +543,8 @@ group { name: "elm/gengrid/item/album-preview/default";
             rel2.relative: 0.7  0.7;
          }
       }
+      // A background folder icon that is always visible, on top of which the
+      // previews will be displayed.
       part { name: "folder";
          insert_after: "elm.swallow.pad";
          description { state: "default" 0.0;
@@ -479,6 +553,9 @@ group { name: "elm/gengrid/item/album-preview/default";
             image.normal: "i-folder";
          }
       }
+      // These four swallow parts form a 2x2 grid for album content previews.
+      // They are positioned relative to "icon_area2" to create the grid layout.
+      // This is the top-left quadrant.
       part { name: "elm.swallow.icon.1"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_area";
          description { state: "default" 0.0;
@@ -488,6 +565,7 @@ group { name: "elm/gengrid/item/album-preview/default";
             rel2.relative: 0.5  0.5;
          }
       }
+      // Top-right quadrant.
       part { name: "elm.swallow.icon.2"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_area";
          description { state: "default" 0.0;
@@ -497,6 +575,7 @@ group { name: "elm/gengrid/item/album-preview/default";
             rel2.relative: 1.0  0.5;
          }
       }
+      // Bottom-left quadrant.
       part { name: "elm.swallow.icon.3"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_area";
          description { state: "default" 0.0;
@@ -506,6 +585,7 @@ group { name: "elm/gengrid/item/album-preview/default";
             rel2.relative: 0.5  1.0;
          }
       }
+      // Bottom-right quadrant.
       part { name: "elm.swallow.icon.4"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_area";
          description { state: "default" 0.0;
@@ -541,12 +621,16 @@ group { name: "elm/gengrid/item/album-preview/default";
    }
 }
 
+// A style for thumbnail items. It features a distinct background that changes
+// with selection state, including a subtle animation.
 group { name: "elm/gengrid/item/thumb/default";
    data.item: "selectraise" "on";
    data.item: "focusraise" "on";
    data.item: "texts" "elm.text";
    data.item: "contents" "elm.swallow.icon elm.swallow.end";
    parts {
+      // This is the main background part for the thumbnail, sized slightly
+      // larger than the icon area to create a border effect.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -566,6 +650,9 @@ group { name: "elm/gengrid/item/thumb/default";
             visible: 0;
          }
       }
+      // This part is used to create an animated selection highlight.
+      // In its default (unselected) state, it is collapsed at the bottom.
+      // When selected, it expands to fill the 'base' part's area.
       part { name: "base2"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -573,6 +660,7 @@ group { name: "elm/gengrid/item/thumb/default";
             color_class: "/bg/selected/grid/item";
             offscale;
          }
+         // In the selected state, its top edge aligns with the top of the 'base' part.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             rel1.to_y: "base";
@@ -600,6 +688,8 @@ group { name: "elm/gengrid/item/thumb/default";
       }
       program { signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "selected" 0.0;
+         // The transition property creates a smooth animation over 0.2 seconds
+         // as the part changes state, giving a "wipe" effect for selection.
          transition: DECELERATE 0.2;
          target: "base2";
       }

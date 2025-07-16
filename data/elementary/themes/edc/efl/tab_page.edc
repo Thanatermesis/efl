@@ -1,14 +1,25 @@
+// Defines the layout for a single tab page. This group is intended to be
+// used as a container for the content of each tab in a tab widget.
 group { "efl/tab_page";
+   // Custom data item, here defining a version for this EDC theme.
+   // This can be used by the application logic if needed.
    data.item: "version" "123";
    parts {
+      // A base spacer part that fills the entire group area.
+      // It serves as a reference for positioning other parts.
+      // The 'scale' property allows this part to be resized with its container.
       spacer { "base";
          scale;
          desc { "default";
          }
       }
+      // A swallow part that acts as a placeholder for the actual content
+      // of the tab page. The application will place its widgets here.
       swallow { "efl.content";
          scale;
          desc { "default";
+            // This makes the swallow part occupy the same space as the 'base' spacer,
+            // effectively filling the entire group.
             rel.to: "base";
          }
       }

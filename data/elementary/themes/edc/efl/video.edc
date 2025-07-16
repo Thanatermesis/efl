@@ -1,41 +1,72 @@
+// This group defines the theme for a video player widget. It manages the visual
+// representation of video playback, using a clipper part for background and
+// state visualization, and a swallow part to host the actual video content.
+// The 'programs' section orchestrates state changes based on video events.
 group { name: "efl/video";
    data.item: "version" "123";
    parts {
+      // This part serves as a background and a clipping rectangle for the video. Its
+      // state changes are used to visually indicate the video's playback status.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
+            // In the "default" state (video playing), the background is white (#FFFFFF),
+            // showing the video without any tint.
             color: 255 255 255 255; // no cc
          }
          description { state: "darker" 0.0;
+            // In the "darker" state (video loaded, paused, or ended), the background is
+            // gray (#808080), which dims the video content.
             color: 128 128 128 255; // no cc
          }
       }
+      // This is a SWALLOW part, a container where the actual video object from the
+      // application code will be placed. The name 'efl.video' is a convention
+      // for parts that are targeted by specific UI components.
       part { name: "efl.video"; type: SWALLOW;  mouse_events: 1;
+         // It is clipped by the "clipper" part, so it will not be visible
+         // outside of the clipper's area.
          clip_to: "clipper";
          description { state: "default" 0.0;
+            // Enforces that the video maintains its aspect ratio, fitting within
+            // the available space, which is important for displaying video correctly
+            // without distortion.
             aspect: 1.0 1.0; aspect_preference: BOTH;
          }
       }
    }
+   // The 'programs' section defines the dynamic behavior of the widget.
+   // These programs listen for signals and trigger state changes in the parts.
    programs {
+      // Triggered when the video file is loaded but not yet playing.
       program {
          signal: "efl,video,load"; source: "efl";
+         // It sets the 'clipper' part to the "darker" state, dimming the video area.
          action: STATE_SET "darker" 0.0;
          target: "clipper";
       }
+      // Triggered when video playback starts.
       program {
          signal: "efl,video,play"; source: "efl";
+         // Switches the 'clipper' to the "default" state (white background).
+         // The change is animated over 0.2 seconds with a sinusoidal curve for a smooth effect.
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.2 CURRENT;
          target: "clipper";
       }
+      // Triggered when the video playback reaches the end.
       program {
          signal: "efl,video,end"; source: "efl";
+         // Dims the video area by setting the 'clipper' to the "darker" state
+         // with a 0.5-second transition.
          action: STATE_SET "darker" 0.0;
          transition: SINUSOIDAL 0.5 CURRENT;
          target: "clipper";
       }
+      // Triggered when video playback is paused.
       program {
          signal: "efl,video,pause"; source: "efl";
+         // Also dims the video area, but with a longer 0.7-second transition,
+         // possibly to make the pause action feel less abrupt.
          action: STATE_SET "darker" 0.0;
          transition: SINUSOIDAL 0.7 CURRENT;
          target: "clipper";

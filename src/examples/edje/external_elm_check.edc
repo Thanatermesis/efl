@@ -1,11 +1,15 @@
 collections {
+   // Defines a custom icon named "icon_green". This group can be sourced by other parts.
    /* this groups is used as custom icon */
    group { name: "icon_green";
       parts {
          part { name: "icon_green";
             type: RECT;
             description { state: "default" 0.0;
+               // Sets the color to solid green (RGBA: 0, 255, 0, 255 or #00FF00FF).
                color: 0 255 0 255;
+               // Enforces a square aspect ratio. When the container is resized,
+               // the height will dictate the width to maintain the square shape.
                aspect: 1 1;
                aspect_preference: VERTICAL;
             }
@@ -13,51 +17,70 @@ collections {
       }
    }
 
+   // This is the main layout group for the window content.
    group { name: "main";
+      // Sets the minimum size of the layout to 200x300 pixels.
       /* set a min window size */
       min: 200 300;
-      
+
+      // Declares that this Edje group will use external parts from the "elm" (Elementary) module.
+      // This is necessary to embed Elementary widgets within the Edje layout.
       /* tell edje that we are going to use elementary external parts */
       externals {
          external: "elm";
       }
 
       parts {
+         // A background rectangle that fills the entire window area.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Sets the color to solid white (RGBA: 255, 255, 255, 255 or #FFFFFFFF).
                color: 255 255 255 255;
             }
          }
 
+         // A text part for the title. It is white on a white background, so
+         // it is only visible because of the shadow effect.
          part { name: "title";
             type: TEXT;
+            // Applies a soft shadow effect to the text for better readability.
             effect: SOFT_SHADOW;
             description { state: "default" 0.0;
+               // Text color is white (#FFFFFFFF).
                color: 255 255 255 255;
+               // Shadow color ('color3') is a semi-transparent gray (#46464646).
                color3: 70 70 70 70;
                text {
                   text: "Elementary Checks";
                   font: "Sans";
                   size: 16;
+                  // Aligns the text to be horizontally centered (0.5) and vertically at the top (0.0).
                   align: 0.5 0.0;
                }
             }
          }
 
+         // An Elementary check widget embedded as an EXTERNAL part.
          /* EXTERNAL elementary check with a label */
          part { name: "check1";
             type: EXTERNAL;
+            // Specifies the source of the external widget.
             source: "elm/check";
             description { state: "default" 0;
+               // Position and size are defined by two relative points (rel1, rel2).
                rel1 {
+                  // Top-left corner offset from the parent's top-left.
                   offset: 5 35;
                }
                rel2 {
+                  // Bottom-right corner relative to parent's top-left, with an offset.
                   relative: 1.0 0.0;
                   offset: -6 60;
                }
+               // Parameters passed to the Elementary widget.
                params {
+                  // Sets the text label for the check.
                   string: "label" "Label only";
                }
             }
@@ -68,18 +91,23 @@ collections {
             type: EXTERNAL;
             source: "elm/check";
             description { state: "default" 0;
+               // Positions this check relative to "check1" using the 'to' property.
                rel1 {
+                  // Aligns the top of "check2" to the bottom of "check1" with a 5px offset.
                   to: "check1";
                   relative: 0.0 1.0;
                   offset: 0 5;
                }
                rel2 {
+                  // Aligns the right and bottom edges relative to "check1", effectively placing
+                  // this check just below "check1" and giving it the same width.
                   to: "check1";
                   relative: 1.0 2.0;
                   offset: -1 5;
                }
                params {
                   string: "label" "Label + standard icon";
+                  // Sets a standard icon from the icon theme. "home" is a common freedesktop icon.
                   string: "icon" "home";
                }
             }
@@ -90,6 +118,7 @@ collections {
             type: EXTERNAL;
             source: "elm/check";
             description { state: "default" 0;
+               // This check is positioned below "check2".
                rel1 {
                   to: "check2";
                   relative: 0.0 1.0;
@@ -102,16 +131,19 @@ collections {
                }
                params {
                   string: "label" "Label + custom icon";
+                  // Sets the icon to the custom "icon_green" group defined earlier in this file.
                   string: "icon" "icon_green";
                }
             }
          }
-         
-         /* EXTERNAL elementary check with just a custom icon */
+
+         // An elementary check with only an icon, no label.
+         /* EXTERNAL elementary check with just a standard icon */
          part { name: "check4";
             type: EXTERNAL;
             source: "elm/check";
             description { state: "default" 0;
+               // Positioned below "check3".
                rel1 {
                   to: "check3";
                   relative: 0.0 1.0;
@@ -123,16 +155,19 @@ collections {
                   offset: -1 5;
                }
                params {
+                  // Uses the standard "home" icon.
                   string: "icon" "home";
                }
             }
          }
-         
+
+         // An elementary check with only a custom icon, no label.
          /* EXTERNAL elementary check with just a custom icon */
          part { name: "check5";
             type: EXTERNAL;
             source: "elm/check";
             description { state: "default" 0;
+               // Positioned below "check4".
                rel1 {
                   to: "check4";
                   relative: 0.0 1.0;
@@ -144,26 +179,41 @@ collections {
                   offset: -1 5;
                }
                params {
+                  // Uses the custom "icon_green" part as its icon.
                   string: "icon" "icon_green";
                }
             }
          }
       }
 
+      // Programs define dynamic behaviors, responding to signals or running after delays.
+      // This section creates an infinite animation loop that toggles the state of each
+      // check widget in sequence.
       programs {
+         // This program starts the animation loop.
          /* on edje load start the programs loop */
          program {
+            // It is triggered by the "load" signal, which is emitted when the Edje object is created.
             signal: "load";
+            // After being triggered, it starts the "loop1" program.
             after: "loop1";
          }
 
          /* wait 0.2, toggle the state of check1, trigger next prog */
+         // This is the first step in the animation chain.
          program { name: "loop1";
+            // 'in' defines a delay before the program runs. Here, it waits for 0.2 seconds.
             in: 0.2 0.0;
+            // The 'script' block contains Embryo code that runs when the program is triggered.
+            // Embryo is a small, C-like scripting language for Edje.
             script {
+               // This script toggles the boolean "state" parameter of the "check1" part.
+               // It reads the current state, inverts it, and sets it back. For a check
+               // widget, changing the "state" parameter toggles it between checked and unchecked.
                external_param_set_bool(PART:"check1", "state",
                         !external_param_get_bool(PART:"check1", "state"));
             }
+            // After this program finishes, it triggers the "loop2" program, continuing the chain.
             after: "loop2";
          }
 
@@ -196,7 +246,7 @@ collections {
             }
             after: "loop5";
          }
-         
+
          /* wait 0.2, toggle the state of check5, restart from the first prog */
          program { name: "loop5";
             in: 0.2 0.0;
@@ -204,6 +254,8 @@ collections {
                external_param_set_bool(PART:"check5", "state",
                         !external_param_get_bool(PART:"check5", "state"));
             }
+            // After toggling "check5", it triggers "loop1", closing the loop and
+            // making the animation repeat indefinitely.
             after: "loop1";
          }
       }

@@ -1,23 +1,37 @@
+// This file is designed for EFL version 1.22. It ensures that the EDC
+// compiler (edje_cc) can correctly parse and compile the theme, maintaining
+// compatibility and preventing issues with newer or older versions of EFL.
 efl_version: 1 22;
 
 collections {
+   // This group defines a reusable UI component that includes a TEXTBLOCK part.
+   // It's a self-contained element that can be sourced by other groups.
    group {
       styles {
+         // Defines a text style for use within this group. Styles allow for
+         // consistent typography and coloring of text elements.
          style {
             name: "some style";
+            // The 'base' property sets the font, size, and color.
+            // color=#0f0 corresponds to bright green (#00FF00).
             base: "font=Vera font_size=14 color=#0f0";
          }
       }
       name: "some group with textblock";
       parts {
+         // A part is a single element within the group's layout.
          part {
             name: "textblock";
             type: TEXTBLOCK;
             description {
                state: "default";
                text {
+                  // Uses the 'some style' defined above to render the text.
                   style: "some style";
                   text: "Hello World!";
+                  // 'min' and 'max' are set to 1, which means the textblock's size
+                  // will be determined by its content's natural size. Using 1 for
+                  // min/max is a common way to say "use the calculated size".
                   min: 1 1;
                   max: 1 1;
                }
@@ -26,16 +40,24 @@ collections {
       }
    }
 
+   // This group defines a simple rectangle shape.
+   // It serves as a basic building block that can be reused in other,
+   // more complex groups.
    group {
       name: "rect";
 
       parts {
+         // This part is a solid-color rectangle.
          part {
             name: "rect";
             type: RECT;
             description {
                state: "default";
+               // Defines the color of the rectangle.
+               // RGBA: 255 0 0 255, which is opaque red (#FF0000FF).
                color: 255 0 0 255;
+               // 'min' and 'max' are both set to 10x10 pixels, giving the
+               // rectangle a fixed size.
                max: 10 10;
                min: 10 10;
             }
@@ -43,29 +65,46 @@ collections {
       }
    }
 
+   // This group demonstrates how to compose a layout by sourcing other groups.
+   // Sourcing allows for modular design and reuse of components. The name
+   // 'broken alignment' suggests that the parts within this group might not
+   // align as expected, possibly due to conflicting size properties.
    group {
       name: "broken alignment";
 
       parts {
+         // This part embeds the 'rect' group.
          part {
             name: "sourced group top right";
             type: GROUP;
             source: "rect";
             description {
                state: "default";
+               // 'min: SOURCE' makes this part's minimum size equal to the
+               // minimum size of the sourced group ('rect'), which is 10x10.
                min: SOURCE;
+               // 'max: 0 0' prevents this part from expanding beyond its minimum
+               // size. This combination fixes the size to the source's minimum.
                max: 0 0;
+               // 'align: 1.0 0.0' aligns the part to the top-right corner
+               // of its container.
                align: 1.0 0.0;
             }
          }
+         // This part embeds the 'some group with textblock' group.
          part {
             name: "sourced group top left";
             type: GROUP;
             source: "some group with textblock";
             description {
                state: "default";
+               // The minimum size is inherited from the textblock's content.
+               // Since the source's size is determined by its text content,
+               // this part will resize to fit the text.
                min: SOURCE;
+               // 'max: 0 0' prevents this part from expanding beyond its minimum size.
                max: 0 0;
+               // 'align: 0.0 0.0' aligns the part to the top-left corner.
                align: 0.0 0.0;
             }
          }

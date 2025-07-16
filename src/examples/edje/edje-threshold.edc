@@ -1,4 +1,7 @@
 collections {
+   // This group demonstrates how to use the 'threshold' property in dragable parts.
+   // It sets up two draggable objects, one for horizontal and one for vertical movement,
+   // each confined to a specific area and associated with a threshold part.
    group {
       name: "main";
       parts {
@@ -7,6 +10,8 @@ collections {
             name: background;
             mouse_events: 0;
             description {
+               // A black (#000000) background that fills the entire container.
+               // Mouse events are disabled as it's just a static backdrop.
                color: 0 0 0 255;
             }
          }
@@ -15,6 +20,8 @@ collections {
             name: "area/vertical";
             mouse_events: 0;
             description {
+               // A red (#FF0000) rectangle that defines the vertical dragging area.
+               // It is a 20-pixel wide column, centered horizontally.
                color: 255 0 0 255;
                align: 0.5 0;
                min: 20 30;
@@ -26,6 +33,8 @@ collections {
             name: "area/horizontal";
             mouse_events: 0;
             description {
+               // A red (#FF0000) rectangle that defines the horizontal dragging area.
+               // It is a 20-pixel high row, centered vertically.
                color: 255 0 0 255;
                align: 0 0.5;
                min: 30 20;
@@ -37,6 +46,10 @@ collections {
             name: "threshold/horizontal";
             mouse_events: 0;
             description {
+               // A blue (#0000FF) rectangle that serves as the drag threshold area.
+               // Dragging will only start if the mouse moves outside of this part.
+               // It is positioned relative to "drag/horizontal", creating a "halo"
+               // effect around it by being slightly larger.
                color: 0 0 255 255;
                rel1 {
                   to: "drag/horizontal";
@@ -53,13 +66,19 @@ collections {
             name: "drag/horizontal";
             mouse_events: 1;
             dragable {
+               // Confines dragging within the "area/horizontal" part.
                confine: "area/horizontal";
+               // Sets "threshold/horizontal" as the drag threshold. The drag won't
+               // start until the mouse pointer moves outside the bounds of the
+               // threshold part.
                threshold: "threshold/horizontal";
+               // Allows dragging only along the X-axis.
                x: 1 1 0;
                y: 0 0 0;
             }
             description {
                aspect: 1 1;
+               // A green (#00FF00) square.
                color: 0 255 0 255;
                min: 20 20;
                max: 20 20;
@@ -70,13 +89,21 @@ collections {
             name: "drag/vertical";
             mouse_events: 1;
             dragable {
+               // Confines dragging within the "area/vertical" part.
                confine: "area/vertical";
+               // The drag threshold is set to "threshold/horizontal". This demonstrates
+               // that the threshold part can be independent of the dragged part. To
+               // start dragging this vertical element, the cursor must first exit the
+               // area defined by "threshold/horizontal", which is around the
+               // "drag/horizontal" part.
                threshold: "threshold/horizontal";
+               // Allows dragging only along the Y-axis.
                x: 0 0 0;
                y: 1 1 0;
             }
             description {
                aspect: 1 1;
+               // A cyan (#00FFFF) square.
                color: 0 255 255 255;
                min: 20 20;
                max: 20 20;

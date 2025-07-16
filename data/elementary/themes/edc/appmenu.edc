@@ -1,48 +1,72 @@
+// This group defines the style for a single item within an application menu.
+// Data items are used to specify padding, which can be queried by the
+// application code to aid in layout calculations.
 group { name: "e/modules/appmenu/item";
    data.item: "padding_horizontal" "5";
    data.item: "padding_vertical"   "5";
    parts {
+      // The 'background' part is a rectangle used for highlighting the item.
+      // Mouse events are disabled for performance since the 'event_area' part
+      // handles them.
       part { name: "background"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/menu/item";
+            // By default, the background is not visible.
             visible: 0;
          }
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/menu/item";
+            // It becomes visible when the item is selected.
             visible: 1;
          }
       }
+      // Displays the item's label. It also ignores mouse events.
       part { name: "text"; type: TEXT; mouse_events: 0;
+         // Allows the text to scale with the system's font size settings.
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets provide padding inside the item.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
             color_class: "/fg/normal/menu/item";
             text { font: FN; size: 10;
+               // Ensures the part will not collapse if the text is empty.
                min: 1 1;
+               // An ellipsis (...) is added if the text overflows.
                ellipsis: -1;
                text_class: "label";
             }
+            // Prevents the part from resizing based on the text size,
+            // allowing 'ellipsis' to function correctly.
             offscale;
          }
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
+            // Text color changes when the item is selected.
             color_class: "/fg/selected/menu/item";
          }
       }
+      // A transparent rectangle covering the whole item to capture mouse events.
+      // This is more efficient than handling events on multiple visual parts.
       part { name: "event_area"; type: RECT;
          description { state: "default" 0.0;
+            // The color is fully transparent black (#00000000). A transparent
+            // part still receives events, unlike a part with 'visible: 0;'.
             color: 0 0 0 0; // no cc
          }
       }
    }
+   // Programs define the dynamic behavior, responding to signals with actions.
    programs {
+      // On mouse hover, set the 'background' and 'text' parts to the
+      // "selected" state, which makes the highlight visible.
       program { signal: "mouse,in"; source: "event_area";
          action: STATE_SET "selected" 0.0;
          target: "background";
          target: "text";
       }
+      // When the mouse leaves, revert to the "default" state.
       program { signal: "mouse,out"; source: "event_area";
          action: STATE_SET "default" 0.0;
          target: "background";

@@ -1,25 +1,46 @@
+// The 'efl/spin' group defines the visual style for a basic spinner widget.
+// It consists of a background and a text element to display the spinner's value.
 group { "efl/spin";
+   // Arbitrary data, can be used by the application for versioning or other metadata.
    data.item: "version" "123";
    parts {
+      // The "bg" part is a rectangle that serves as the base container for the spinner.
+      // It is transparent, allowing the widget to blend with its parent background.
       rect { "bg";
+         // Enables scaling of this part, allowing the spinner to be resized.
          scale;
          desc { "default";
+            // Sets the color to fully transparent (RGBA: 0, 0, 0, 0 or #00000000).
             color: 0 0 0 0; // no cc
          }
       }
+      // The "efl.text" part displays the spinner's value. The name "efl.text" is a
+      // convention indicating that this part is the primary target for text operations.
       text { "efl.text";
+         // This part ignores mouse events, passing them to underlying parts like "bg".
          nomouse;
+         // Enables scaling of the text part along with the widget.
          scale;
          desc { "default";
+            // Uses a color defined by the application's theme, promoting consistency.
             color_class: "/fg/normal/spinner/text";
             text { font: FN; size: 10;
+               // Ensures the text part has a minimum size, preventing it from disappearing.
                min: 1 1;
+               // Truncates text with an ellipsis (...) if it overflows the part's bounds.
                ellipsis: -1;
+               // Centers the text horizontally and vertically within the part.
                align: 0.5 0.5;
             }
+            // Positions this text part relative to the "bg" part.
             rel.to: "bg";
+            // The top-left corner is offset by 4 pixels from the top-left of "bg".
             rel1.offset: 4 4;
+            // The bottom-right corner is offset by -5 pixels from the bottom-right of "bg",
+            // creating a padding effect.
             rel2.offset: -5 -5;
+            // Ensures that the offsets (padding) remain fixed in pixels and do not scale
+            // with the widget's size, maintaining a consistent border.
             offscale;
          }
       }

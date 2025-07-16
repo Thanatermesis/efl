@@ -1,10 +1,14 @@
 collections {
 
+   // This group defines the main layout for the focus example. It demonstrates
+   // how focus can be handled for both parts and swallowed objects.
    group {
       name: "example/main";
       min: 400 400;
 
+      // The 'parts' block contains all the UI elements (widgets) of the group.
       parts {
+         // The background rectangle, non-interactive.
          part {
             name: "bg";
             type: RECT;
@@ -14,12 +18,14 @@ collections {
             }
          }
 
+         // A simple text part to serve as the title of the window.
          part {
             name: "title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Black color (#000000FF).
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -40,6 +46,8 @@ collections {
             }
          }
 
+         // An invisible rectangle part used as a container to layout the buttons.
+         // This helps in organizing and positioning the button parts relative to one another.
          part {
             name: "buttons";
             type: RECT;
@@ -48,10 +56,13 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.2 0.3;
                rel2.relative: 0.8 0.9;
+               // Transparent color (#FFFFFF00).
                color: 255 255 255 0;
             }
          }
 
+         // The first button is composed of two parts: 'button_bg,1' and 'button,1'.
+         // 'button_bg,1' is the visible background and the clickable area.
          part {
             name: "button_bg,1";
             type: RECT;
@@ -66,15 +77,21 @@ collections {
                   to: "buttons";
                   relative: 0.45 0.45;
                }
+               // Default color: a light gray (#C8C8C8FF).
                color: 200 200 200 255;
             }
             description {
                state: "focused" 0.0;
                inherit: "default" 0.0;
+               // Focused color: a reddish tint (#BE7878FF).
                color: 190 120 120 255;
             }
          }
 
+         // This is the actual part that will receive focus for the first button.
+         // It is a non-interactive rectangle placed inside 'button_bg,1'.
+         // Separating the focusable part from the clickable background is a
+         // common pattern to control focus behavior independently of mouse interaction.
          part {
             name: "button,1";
             type: RECT;
@@ -93,6 +110,7 @@ collections {
             }
          }
 
+         // The second button is identical in structure and behavior to the first one.
          part {
             name: "button_bg,2";
             type: RECT;
@@ -134,6 +152,7 @@ collections {
             }
          }
 
+         // The third button also has a background part for interaction and visuals.
          part {
             name: "button_bg,3";
             type: RECT;
@@ -157,6 +176,9 @@ collections {
             }
          }
 
+         // 'button,3' is a SWALLOW part, which means it can host an external
+         // Evas object. This demonstrates focusing a swallowed object, which
+         // uses a different mechanism (FOCUS_OBJECT) than focusing a part.
          part {
             name: "button,3";
             type: SWALLOW;
@@ -174,6 +196,8 @@ collections {
             }
          }
 
+         // The fourth button is identical to the third, using a SWALLOW part
+         // for its focusable content.
          part {
             name: "button_bg,4";
             type: RECT;
@@ -215,16 +239,24 @@ collections {
          }
       }
 
+      // The 'programs' block defines the application's logic and interactivity.
+      // They respond to signals (like mouse clicks or focus changes) and
+      // execute actions.
       programs {
+         // When the background of the first button is clicked, this program sets
+         // focus on the 'button,1' part. FOCUS_SET is used for parts defined in EDC.
          program {
             name: "button,clicked,1";
             signal: "mouse,clicked,1";
             source: "button_bg,1";
             action: FOCUS_SET;
             target: "button,1";
+            // After setting part focus, it runs 'unfocus,objects' to ensure any
+            // focused SWALLOW object loses focus, ensuring mutual exclusivity.
             after: "unfocus,objects";
          }
 
+         // Same logic for the second button.
          program {
             name: "button,clicked,2";
             signal: "mouse,clicked,1";
@@ -234,20 +266,28 @@ collections {
             after: "unfocus,objects";
          }
 
+         // This program is used to remove focus from any currently focused
+         // SWALLOW object. Since no target is specified, it applies globally
+         // to any focused object within the layout.
          program {
             name: "unfocus,objects";
             action: FOCUS_OBJECT;
          }
 
+         // For the third button, a click triggers FOCUS_OBJECT on the SWALLOW
+         // part 'button,3'. This is for focusing external Evas objects.
          program {
             name: "button,clicked,3";
             signal: "mouse,clicked,1";
             source: "button_bg,3";
             action: FOCUS_OBJECT;
             target: "button,3";
+            // After setting object focus, it runs 'unset,part' to ensure any
+            // focused EDC part loses focus, ensuring mutual exclusivity.
             after: "unset,part";
          }
 
+         // Same logic for the fourth button.
          program {
             name: "button,clicked,4";
             signal: "mouse,clicked,1";
@@ -257,11 +297,16 @@ collections {
             after: "unset,part";
          }
 
+         // This program is used to remove focus from any currently focused part.
+         // By using FOCUS_SET without a target, it clears focus from any part
+         // that might have it.
          program {
             name: "unset,part";
             action: FOCUS_SET;
          }
 
+         // When 'button,1' gains focus, change the state of 'button_bg,1'
+         // to "focused", which changes its color. This provides visual feedback.
          program {
             name: "button,focused,1";
             signal: "focus,part,in";
@@ -270,6 +315,7 @@ collections {
             target: "button_bg,1";
          }
 
+         // The same state-change logic for focus and unfocus is applied to buttons 2, 3, and 4.
          program {
             name: "button,focused,2";
             signal: "focus,part,in";
@@ -294,6 +340,7 @@ collections {
             target: "button_bg,4";
          }
 
+         // When 'button,1' loses focus, revert 'button_bg,1' to its "default" state.
          program {
             name: "button,unfocused,1";
             signal: "focus,part,out";

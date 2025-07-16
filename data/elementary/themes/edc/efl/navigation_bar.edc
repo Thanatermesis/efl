@@ -1,24 +1,36 @@
 //Efl.Ui.Navigation_Bar Themes
+// This group defines the main theme for the navigation bar widget.
+// It orchestrates the layout of the back button, title, and content on the left/right sides.
 group { "efl/navigation_bar";
    data.item: "version" "123";
+   // Defines text styles used within the navigation bar.
    styles {
       style { name: "navigation_bar_text";
+         // Sets default properties: font, size, class, alignment, color from a color class,
+         // text truncation (ellipsis), and word-wrapping.
          base: "font="FNBD" font_size=10 text_class=label align=center color=cc:/fg/normal/navigation/title ellipsis=1.0 wrap=mixed";
+         // Defines HTML-like tags for rich text formatting.
          tag: "br" "\n";
          tag: "hilight" "+ font="FNBD" text_class=label_light";
          tag: "b" "+ font="FNBD" text_class=label_light";
+         // 'whitecolor' tag provides a solid white color (#FFFFFF), bypassing color classes.
          tag: "whitecolor" "+ color=#fff"; // no cc
          tag: "tab" "\t";
       }
    }
    parts {
+      // 'base' is an invisible spacer that fills the entire widget area, serving as a
+      // reference for positioning other parts.
       spacer { "base";
          desc { "default";
          }
       }
+      // This swallow part is a container for the back button, which is hidden by default.
       swallow { "efl.back_button";
          scale;
          desc { "default";
+            // Initially, the button has no size and is hidden ('hid'). This prevents it from
+            // affecting the layout until it's explicitly made visible.
             fixed: 1 0;
             min: 0 0;
             max: 0 -1;
@@ -29,11 +41,14 @@ group { "efl/navigation_bar";
          }
          desc { "visible";
             inherit: "default";
+            // In the 'visible' state, the button acquires a fixed width of 40 pixels,
+            // making it appear on the left side of the bar.
             min: 40 20;
             max: 40 -1;
             vis;
          }
       }
+      // A swallow part for placing custom content on the left, next to the back button area.
       swallow { "efl.left_content";
          scale;
          desc { "default";
@@ -44,6 +59,7 @@ group { "efl/navigation_bar";
             max: 40 -1;
          }
       }
+      // A swallow part for placing custom content on the far right of the bar.
       swallow { "efl.right_content";
          scale;
          desc { "default";
@@ -54,8 +70,12 @@ group { "efl/navigation_bar";
             max: 40 -1;
          }
       }
+      // This spacer cleverly defines the area for the title text. It is positioned
+      // dynamically between the left-side and right-side content.
       spacer { "text_base";
          desc { "default";
+            // By default, it spans from the right edge of the back button's area
+            // to the left edge of the right content's area.
             rel1.to: "efl.back_button";
             rel1.relative: 1.0 0.0;
             rel2.to: "efl.right_content";
@@ -63,30 +83,43 @@ group { "efl/navigation_bar";
          }
          desc { "left_content";
             inherit: "default";
+            // If left_content is present, this state ensures the title area starts to its right,
+            // overriding the default dependency on the back button.
             rel1.to: "efl.left_content";
             rel1.relative: 1.0 0.0;
          }
       }
+      // The main title text of the navigation bar.
       textblock { "efl.text";
          scale;
          desc { "default";
+            // It is positioned to fill the 'text_base' spacer and uses the defined text style.
             rel.to: "text_base";
             text.style: "navigation_bar_text";
          }
       }
+      // Programs define dynamic behaviors triggered by signals from the application code.
       programs {
+         // When the "efl,state,back_button,visible" signal is emitted, this program
+         // transitions the 'efl.back_button' part to its "visible" state.
          program { signal: "efl,state,back_button,visible"; source: "efl";
             action: STATE_SET "visible" 0.0;
             target: "efl.back_button";
          }
+         // This program hides the back button by reverting it to the "default" state
+         // (which is defined as hidden) on the "efl,state,back_button,hidden" signal.
          program { signal: "efl,state,back_button,hidden"; source: "efl";
             action: STATE_SET "default" 0.0;
             target: "efl.back_button";
          }
+         // If left content is added, the "efl,state,left_content,set" signal triggers this
+         // program, which changes 'text_base' to its "left_content" state to adjust the title's position.
          program { signal: "efl,state,left_content,set"; source: "efl";
             action: STATE_SET "left_content" 0.0;
             target: "text_base";
          }
+         // When left content is removed, this program reverts 'text_base' to its "default" state
+         // on the "efl,state,left_content,unset" signal.
          program { signal: "efl,state,left_content,unset"; source: "efl";
             action: STATE_SET "default" 0.0;
             target: "text_base";
@@ -95,13 +128,19 @@ group { "efl/navigation_bar";
    }
 }
 
+// This group defines the specific theme for the back button used in the navigation bar.
 group { name: "efl/navigation_bar/back_button";
+   // It inherits the appearance and behavior from the standard 'efl/button' theme.
    inherit: "efl/button";
    data.item: "version" "123";
    parts {
+      // An arrow icon is added to the button to visually indicate "back" functionality.
       image { name: "icon_arrow_left";
+         // It's inserted before the button's main content (like a text label).
          insert_before: "efl.content";
          desc { "default";
+            // The 'i-arrow-l' image is sourced from the theme's image file and its color
+            // is set via a color class, allowing for consistent theming.
             image.normal: "i-arrow-l";
             color_class: "/fg/normal/navigation/back/arrow";
          }

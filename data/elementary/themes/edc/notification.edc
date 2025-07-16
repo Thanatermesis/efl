@@ -1,6 +1,10 @@
+// This group defines the notification logo, which is typically used for
+// notifications that don't have a specific application icon.
 group { name: "e/modules/notification/logo";
    images.image: "exclam.png" COMP;
    parts {
+      // A spacer part to enforce a minimum size for the logo area.
+      // This ensures that the logo maintains a consistent size of 40x40 pixels.
       part { name: "spacer"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -8,11 +12,15 @@ group { name: "e/modules/notification/logo";
             max: 40 40;
          }
       }
+      // The base part displays the exclamation mark icon.
+      // It has mouse events disabled as it is purely decorative.
       part { name: "base"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "exclam.png";
+            // Both aspect preferences ensure the icon is not distorted.
             aspect: (56/160) (56/160); aspect_preference: BOTH;
+            // The color of the icon is defined by a theme-wide color class.
             color_class: "/fg/normal/notification/logo";
             fixed: 1 1;
          }
@@ -20,10 +28,17 @@ group { name: "e/modules/notification/logo";
    }
 }
 
+// This group defines the main layout for notification popups. It includes
+// areas for an icon, title, body text, and action buttons. It is the
+// primary interface for displaying notifications.
 group { name: "e/modules/notification/main";
    images.image: "win_shad_flat.png" COMP;
+   // Provides C code with the maximum size for application icons.
    data.item: "app_icon_max" "40 40";
    styles {
+      // Defines a style for the notification's text content, allowing for
+      // rich text formatting using tags like 'b' for bold and 'i' for italic.
+      // This is used by the TEXTBLOCK parts to render formatted messages.
       style { name: "notification_style";
          base: "font="FN" font_size=10 align=left color=cc:/fg/normal/notification/text wrap=word text_class=notification_body";
          tag:  "subject"  "+ text_class=module_large color=cc:/fg/normal/notification/text/subject align=center";
@@ -38,28 +53,38 @@ group { name: "e/modules/notification/main";
    }
 
    parts {
+      // A rectangle part for the shadow, colored by a color class.
+      // This serves as a fallback if image-based shadows are not used.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
             color_class: "/shadow/normal/notification";
          }
       }
+      // This macro creates the window shadow parts using the specified image.
+      // It enhances the visual appearance by adding depth to the notification window.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // The main background rectangle of the notification.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets define the padding within the notification window.
             rel1.offset: 32 32;
             rel2.offset: -33 -33;
+            // The background color is defined by a theme color class.
             color_class: "/bg/normal/notification";
+            // Disables scaling to prevent blurring of the part.
             offscale;
          }
       }
+      // Clipping rectangle for the title to prevent it from overlapping the close button.
       part { name: "titleclip"; type: RECT;
          description { state: "default" 0.0;
             rel2.to_x: "notification.event.close";
             rel2.relative: 0.0 1.0;
          }
       }
+      // Clipping rectangle for the body of the notification.
       part { name: "bodyclip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -67,6 +92,8 @@ group { name: "e/modules/notification/main";
             min: 220 80;
          }
       }
+      // A swallow part that acts as a placeholder for the application icon.
+      // The C code will place the application's icon into this part.
       part { name: "notification.swallow.app_icon"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -82,6 +109,9 @@ group { name: "e/modules/notification/main";
             offscale;
          }
       }
+      // This invisible textblock is used to calculate the required size for the
+      // notification message content without actually displaying it.
+      // Its visibility is set to 0.
       part { name: "message"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          entry_mode: EDITABLE;
@@ -100,6 +130,8 @@ group { name: "e/modules/notification/main";
             rel2.to_y: "notification.swallow.actions";
             rel2.relative: 1.0 0.0;
             text { style: "notification_style";
+               // The text_source property links this part to the visible textblock,
+               // ensuring that geometry calculations are based on the actual message.
                text_source: "notification.textblock.message";
                min: 0 1;
             }
@@ -107,9 +139,12 @@ group { name: "e/modules/notification/main";
             offscale;
          }
       }
+      // The visible textblock part that displays the notification message.
+      // It is clipped by 'bodyclip' to ensure it stays within the layout bounds.
       part { name: "notification.textblock.message"; type: TEXTBLOCK;
          clip_to: "bodyclip";
          scale: 1;
+         // Editable and explicit selection modes allow the user to interact with the text.
          entry_mode: EDITABLE;
          select_mode: EXPLICIT;
          multiline: 1;
@@ -130,6 +165,7 @@ group { name: "e/modules/notification/main";
             offscale;
          }
       }
+      // Swallow part for an optional desktop environment icon.
       part { name: "notification.swallow.desktop_icon"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -146,6 +182,8 @@ group { name: "e/modules/notification/main";
             offscale;
          }
       }
+      // The text part for the notification title.
+      // It is clipped by 'titleclip' to avoid drawing over other elements.
       part { name: "notification.text.title"; type: TEXT; mouse_events: 0;
          clip_to: "titleclip";
          scale: 1;
@@ -169,6 +207,8 @@ group { name: "e/modules/notification/main";
          }
       }
 
+      // A swallow part that holds action buttons (e.g., 'Reply', 'Dismiss').
+      // It is invisible by default and becomes visible when actions are available.
       part { name: "notification.swallow.actions"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -180,6 +220,7 @@ group { name: "e/modules/notification/main";
             offscale;
             visible: 0;
          }
+         // The 'visible' state makes the part and its content appear.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             visible: 1;
@@ -187,6 +228,7 @@ group { name: "e/modules/notification/main";
          }
       }
 
+      // The visual representation of the close button.
       part { name: "close";
          scale: 1;
          description { state: "default" 0.0;
@@ -197,11 +239,14 @@ group { name: "e/modules/notification/main";
             fixed: 1 1;
             color_class: "/fg/normal/notification/button/close";
          }
+         // Provides visual feedback when the button is pressed.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/pressed/notification/button/close";
          }
       }
+      // An invisible rectangle that serves as the clickable area for the close button.
+      // This makes it easier for users to hit the target.
       part { name: "notification.event.close"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -212,6 +257,7 @@ group { name: "e/modules/notification/main";
             rel2.offset: -13 12;
             align: 1.0 0.0;
             min: 15 15;
+            // Transparent color (RGBA: 0, 0, 0, 0) and no color class.
             color: 0 0 0 0; // no cc
             fixed: 1 1;
             offscale;
@@ -219,24 +265,35 @@ group { name: "e/modules/notification/main";
       }
    }
    programs {
+      // When the close button area is pressed (mouse down), it changes the 'close'
+      // part's state to "selected" to provide visual feedback.
       program { signal: "mouse,down,1"; source: "notification.event.close";
          action: STATE_SET "selected" 0.0;
          target: "close";
       }
+      // When the mouse button is released, it reverts the 'close' part's state
+      // back to "default".
       program { signal: "mouse,up,1"; source: "notification.event.close";
          action: STATE_SET "default" 0.0;
          target: "close";
       }
+      // When the close button is clicked, it emits a "notification,close" signal,
+      // which is handled by the C code to close the notification.
       program { signal: "mouse,clicked,1"; source: "notification.event.close";
          action: SIGNAL_EMIT "notification,close" "theme";
       }
+      // Clicking anywhere on the notification body emits a "notification,find"
+      // signal. This could be used to focus the associated application.
       program { signal: "mouse,clicked,1"; source: "base";
          action: SIGNAL_EMIT "notification,find" "theme";
       }
+      // When the C code emits "e,state,actions,show", this program makes the
+      // action buttons container visible.
       program { signal: "e,state,actions,show"; source: "e";
          action: STATE_SET "visible" 0.0;
          target: "notification.swallow.actions";
       }
+      // Hides the action buttons container when "e,state,actions,hide" is emitted.
       program { signal: "e,state,actions,hide"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "notification.swallow.actions";
@@ -270,8 +327,12 @@ group { name: "e/modules/notification/main";
    }
 }
 
+// This group defines the appearance and behavior of an individual action button,
+// which is designed to be swallowed into the 'notification.swallow.actions' part
+// of the main notification layout.
 group { name: "e/modules/notification/action";
    parts {
+      // The text label for the action button.
       part { name: "e.text.label"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -284,28 +345,34 @@ group { name: "e/modules/notification/action";
             }
             offscale;
          }
+         // Changes color when the button is pressed for visual feedback.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/pressed/notification/text/title";
          }
       }
+      // Invisible rectangle serving as the clickable area for the action.
       part { name: "event"; type: RECT;
          scale : 1;
          description { state: "default" 0.0;
+            // Fully transparent color.
             color: 0 0 0 0; // no cc
             min: 40 20;
          }
       }
    }
    programs {
+      // Changes the label's state to "selected" on mouse down.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "selected" 0.0;
          target: "e.text.label";
       }
+      // Reverts the label's state to "default" on mouse up.
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
          target: "e.text.label";
       }
+      // When clicked, emits a signal to the C code indicating an action was triggered.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "e,action,clicked" "e";
       }

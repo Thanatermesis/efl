@@ -16,66 +16,107 @@
 
 collections {
 
+   // The 'images' block is used to declare all raster image files that will be
+   // used in the EDC. Using this block allows Edje to preload and cache these
+   // images, which can improve performance.
    images {
+      // 'image' specifies a path to an image file and an optional compression
+      // method. COMP indicates that the image will be compressed.
       image: "bubble-blue.png" COMP;
    }
 
+   // The 'group' block defines a collection of parts and programs that form a
+   // single UI component. This 'example_group' will contain all the visual
+   // elements and their physics properties.
    group {
       name: "example_group";
 
+      // The 'parts' block contains all the individual components of this group.
+      // Each part represents a visual element like a rectangle, image, or text.
       parts {
+         // This part serves as the background of the scene.
          part {
             name: "background";
+            // 'RECT' defines the part as a simple rectangle.
             type: RECT;
+            // 'physics_body: NONE;' ensures this part is ignored by the physics engine.
+            // This is crucial for static elements like backgrounds that should not move.
             physics_body: NONE;
             description {
                state: "default" 0.0;
+               // Defines the color as white (#FFFFFFFF).
                color: 255 255 255 255; /* white */
+               // These properties make the rectangle fill its container entirely.
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }
          }
 
+         // This part represents a red box that will be affected by physics.
          part {
             name: "red_box";
             type: RECT;
+            // 'RIGID_BOX' defines the physics body as a rectangular shape.
+            // This makes the part interact with other physics objects as a solid box.
             physics_body: RIGID_BOX;
             description {
                state: "default" 0.0;
+               // Defines the color as red (#FF0000FF).
                color: 255 0 0 255; /* red */
+               // Initial position and size of the box.
                rel1.relative: 0.75 0.1;
                rel2.relative: 0.95 0.3;
+               // 'aspect' forces the part to maintain a 1:1 aspect ratio (a square).
                aspect: 1 1;
+               // The 'physics' block defines physical properties of the body.
                physics {
+                  // 'restitution' controls the "bounciness" of the object. 0.85 means
+                  // it will retain 85% of its velocity after a collision.
                   restitution: 0.85;
                }
             }
          }
 
+         // This part represents a blue circle that will also be affected by physics.
          part {
             name: "blue_circle";
+            // 'IMAGE' type allows displaying an image.
             type: IMAGE;
+            // 'RIGID_SPHERE' defines the physics body as a spherical shape, which is
+            // more appropriate for a circular image to ensure realistic collisions.
             physics_body: RIGID_SPHERE;
             description {
                state: "default" 0.0;
+               // Initial position and size of the circle.
                rel1.relative: 0.25 0.1;
                rel2.relative: 0.45 0.3;
                aspect: 1 1;
+               // Specifies which image to use for this part, referencing the one
+               // declared in the 'images' block.
                image {
                   normal: "bubble-blue.png";
                }
             }
          }
 
+         // This part acts as an invisible floor for the scene.
          part {
             name: "floor";
             type: RECT;
+            // 'BOUNDARY_BOTTOM' creates a static, immovable boundary at the bottom
+            // of the container. It's an efficient way to create floors or walls.
             physics_body: BOUNDARY_BOTTOM;
             description {
                state: "default" 0.0;
+               // 'visible: 0;' makes the part invisible. It will still participate
+               // in the physics simulation.
                visible: 0;
                physics {
+                  // 'restitution' on a boundary affects the bounciness of objects
+                  // colliding with it.
                   restitution: 0.92;
+                  // 'friction' determines how much an object's movement is slowed
+                  // when sliding along this surface.
                   friction: 0.6;
                }
             }

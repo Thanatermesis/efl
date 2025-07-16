@@ -1,20 +1,26 @@
+// This group defines the main container for tags, providing a background and layout structure.
 group { "efl/tags";
    data.item: "version" "123";
    data.item: "horizontal_pad" 0;
    data.item: "vertical_pad" 0;
    data.item: "closed_height" 0;
    parts {
+      // A transparent background rectangle that serves as the base for positioning other elements.
       rect { "bg";
          desc { "default";
+            // The color is fully transparent (RGBA: 0, 0, 0, 0), making it invisible but usable for layout.
             color: 0 0 0 0; // no cc
          }
       }
+      // A swallow part, which is a placeholder for an external Evas object to be used as a background.
       swallow { "efl.background";
          scale;
          desc { "default";
             rel.to: "bg";
          }
       }
+      // A swallow part that acts as a container for the tag elements themselves.
+      // External objects (like a box widget) will be placed here.
       swallow { "efl.box";
          desc { "default";
             rel.to: "bg";
@@ -23,78 +29,109 @@ group { "efl/tags";
    }
 }
 
+// This group defines a simple text label, typically used for displaying static text within the tags container.
 group { "efl/tags/label";
    data.item: "version" "123";
    parts {
+      // The main text part for the label.
       text { "efl.text";
+         // This part does not react to mouse events, allowing events to pass through to elements behind it.
          nomouse;
          scale;
          desc { "default";
             color_class: "/fg/normal/multibuttonentry/text";
             text { font: FNBD; size: 10;
                min: 1 1;
+               // An ellipsis (...) will be added at the end of the text if it overflows the available space.
                ellipsis: -1;
                text_class: "tags_label";
             }
+            // Defines padding of 4px on top/left and 5px on bottom/right.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // The 'offscale' property prevents the text from being scaled, even if the parent object is scaled.
+            // This ensures the text remains readable at a fixed size.
             offscale;
          }
       }
    }
 }
 
+// This group defines a tag that functions as a button, complete with a label, a delete icon,
+// and visual feedback for different states like pressed, focused, and disabled.
 group { "efl/tags/btn";
    data.item: "version" "123";
 
+   // Styles define reusable text properties that can be applied to textblock parts.
    styles {
+      // This style sets the default appearance for text within the tag button.
       style { name: "efl_tags_textblock_style";
+         // The base style defines font, alignment, size, and color.
+         // 'ellipsis=1.0' truncates text that doesn't fit, adding '...' at the end.
+         // The color #fff (white) is hardcoded here.
          base: "font="FN" align=0.5 font_size=10 color=#fff text_class=tags_item ellipsis=1.0"; // no cc
          tag: "br" "\n";
          tag: "ps" "ps";
+         // The 'hilight' and 'b' tags use a bold font (FNBD) to emphasize text.
          tag: "hilight" "+ font="FNBD; // no cc
          tag: "b" "+ font="FNBD;
          tag: "tab" "\t";
       }
    }
 
+   // Scripts allow for more complex logic using the Embryo scripting language.
    script {
+      // A public variable to track the button's disabled state. 'public' means it can be accessed
+      // from the C application code. It's used to prevent actions when the button is disabled.
       public disabled = 0;
    }
 
    parts {
+      // This rectangle forms the main background of the button.
       rect { "base";
          scale: 1;
          desc { "default";
             color_class: "/bg/normal/multibuttonentry/button";
+            // Padding to ensure the background is slightly larger than the content.
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // 'offscale' ensures that the button's corners and borders are not distorted by scaling.
             offscale;
          }
          desc { "pressed";
+            // The color class used when the button is being pressed.
             color_class: "/bg/pressed/multibuttonentry/button";
          }
       }
+      // A rectangle part used as a visual indicator (glow) when the button is focused.
+      // It's a thin bar at the bottom of the button.
       part { name: "glow"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
+            // Positions the glow effect at the bottom of the 'base' rectangle.
             rel1.offset: 0 -1;
             rel1.relative: 0.0 1.0;
             align: 0.5 1.0;
             color_class: "/bg/selected/multibuttonentry/button/bar";
+            // The glow is invisible by default.
             visible: 0;
          }
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // When focused, the glow becomes visible and has a minimum height of 5 pixels.
             min: 0 5;
             visible: 1;
          }
       }
+      // An image part for the 'close' (delete) icon.
       image { "close";
+         // It doesn't receive mouse events directly; the 'del' rectangle below handles them.
          nomouse;
          desc { "default";
+            // Uses a themed icon named "i-close".
             image.normal: "i-close";
             rel.to: "del";
+            // A fixed size of 15x15 pixels.
             min: 15 15;
             max: 15 15;
             fixed: 1 1;
@@ -109,20 +146,25 @@ group { "efl/tags/btn";
             color_class: "/fg/pressed/multibuttonentry/button/delete";
          }
       }
+      // An invisible rectangle that serves as the clickable area for the delete button.
+      // This provides a larger, more user-friendly target for clicks than the small 'close' icon itself.
       rect { "del";
          scale;
          desc { "default";
             fixed: 1 0;
             min: 15 15;
             align: 1.0 0.5;
+            // Positioned on the right side of the 'base' part.
             rel.to: "base";
             rel1.relative: 1.0 0.0;
             rel1.offset: -5 4;
             rel2.offset: -5 -5;
+            // The color is fully transparent (RGBA: 0, 0, 0, 0), making it invisible.
             color: 0 0 0 0; // no cc
             offscale;
          }
       }
+      // A textblock part to display the tag's label.
       textblock { "efl.btn.text";
          nomouse;
          scale;
@@ -131,6 +173,8 @@ group { "efl/tags/btn";
                min: 1 1;
                ellipsis: -1;
             }
+            // The text is positioned relative to 'base' and 'del' parts to ensure it doesn't overlap
+            // with the delete button area.
             rel1.offset: 4 4;
             rel1.to: "base";
             rel2.to_x: "del";
@@ -151,45 +195,60 @@ group { "efl/tags/btn";
          }
       }
    }
+   // Programs define the interactive behavior of the group by responding to signals.
    programs {
+      // When the 'base' part is clicked, this program runs.
       program { signal: "mouse,clicked,1"; source: "base";
          script {
+            // It checks the 'disabled' variable. If the button is not disabled,
+            // it emits a "clicked" signal, which the application can listen for.
             if (get_int(disabled) == 0) {
                emit("clicked", "");
             }
          }
       }
+      // When the widget's state changes to "default" (e.g., on initialization),
+      // the 'glow' part's state is also set to "default" (making it invisible).
       program { signal: "efl,state,default"; source: "efl";
          action: STATE_SET "default";
          target: "glow";
       }
+      // When the widget receives focus, the 'glow' part's state is set to "focused", making it visible.
       program { signal: "efl,state,focused"; source: "efl";
          action: STATE_SET "focused";
          target: "glow";
       }
+      // When the widget is enabled, reset the text state and the 'disabled' variable.
       program { signal: "efl,state,enabled"; source: "efl";
          script {
             set_state(PART:"efl.btn.text", "default", 0.0);
             set_int(disabled , 0);
          }
       }
+      // When the widget is disabled, this script runs.
       program { signal: "efl,state,disabled"; source: "efl";
          script {
             new st[31];
             new Float: vl;
+            // It checks if the 'glow' part is currently in the "focused" state.
             get_state(PART:"glow", st, 30, vl);
             if (!strcmp(st, "focused"))
+              // If it is focused, it resets the glow to its "default" (hidden) state.
               set_state(PART:"glow", "default", 0.0);
+            // Sets the text to its "disabled" state and updates the 'disabled' variable.
             set_state(PART:"efl.btn.text", "disabled", 0.0);
             set_int(disabled , 1);
          }
       }
+      // When the widget loses focus, hide the glow effect.
       program { signal: "efl,state,unfocused"; source: "efl";
          action: STATE_SET "default";
          target: "glow";
       }
+      // On mouse down on the 'base' of the button...
       program { signal: "mouse,down,1"; source: "base";
          script {
+            // ...if not disabled, set the visual state of the button elements to "pressed".
             if (get_int(disabled) == 0) {
                set_state(PART:"close", "pressed", 0.0);
                set_state(PART:"base", "pressed", 0.0);
@@ -197,8 +256,10 @@ group { "efl/tags/btn";
             }
          }
       }
+      // On mouse up on the 'base' of the button...
       program { signal: "mouse,up,1"; source: "base";
          script {
+            // ...if not disabled, revert the visual state of button elements to "default".
             if (get_int(disabled) == 0) {
                set_state(PART:"close", "default", 0.0);
                set_state(PART:"base", "default", 0.0);
@@ -206,13 +267,17 @@ group { "efl/tags/btn";
             }
          }
       }
+      // When the 'del' area is clicked, emit the "efl,deleted" signal.
+      // The application will catch this signal to delete the tag.
       program { signal: "mouse,clicked,1"; source: "del";
          action: SIGNAL_EMIT "efl,deleted" "efl";
       }
+      // On mouse down on the 'del' area, change the 'close' icon state to "clicked".
       program { signal: "mouse,down,1"; source: "del";
          action: STATE_SET "clicked";
          target: "close";
       }
+      // On mouse up, revert the 'close' icon state to "default".
       program { signal: "mouse,up,1"; source: "del";
          action: STATE_SET "default";
          target: "close";
@@ -220,6 +285,8 @@ group { "efl/tags/btn";
    }
 }
 
+// This group defines a simple text part for displaying a number, for example,
+// to show a count of hidden or additional tags.
 group { "efl/tags/number";
    data.item: "version" "123";
    parts {
@@ -231,6 +298,7 @@ group { "efl/tags/number";
             text { font: FN; size: 10;
                min: 1 1;
                ellipsis: -1;
+               // Text is centered both horizontally and vertically.
                align: 0.5 0.5;
                text_class: "tags_number";
             }

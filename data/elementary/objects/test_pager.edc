@@ -1,56 +1,85 @@
 collections {
+   // This group defines the main layout for the pager widget.
+   // It includes a background, a content area, and navigation buttons.
    group {
       name: "pager";
       parts {
+         // A transparent background rectangle that fills the entire group area.
+         // This is useful for capturing events without having a visible background.
          rect { "bg";
             desc { "default";
+               // Color: transparent (#00000000)
                color: 0 0 0 0;
             }
          }
+         // A swallow part that will hold the actual page content.
+         // External Evas objects can be "swallowed" into this part.
          swallow { "pager";
             desc { "default";
             }
          }
+         // Swallow part for the "previous" button.
+         // It's positioned on the left side, vertically centered.
          swallow { "prev_btn";
             desc { "default";
+               // These properties define a point 10px from the left and centered vertically.
                rel1.relative: 0.0 0.5;
                rel1.offset: 10 0;
                rel2.relative: 0.0 0.5;
                rel2.offset: 10 0;
+               // The part's left edge and vertical center are aligned to the point.
                align: 0.0 0.5;
+               // This gives the part a size, as its geometry is otherwise a single point.
                min: 30 30;
             }
          }
+         // Swallow part for the "next" button.
+         // Positioned on the right side, vertically centered, using the same technique as "prev_btn".
          swallow { "next_btn";
             desc { "default";
+               // The reference point is 10px from the right edge.
                rel1.relative: 1.0 0.5;
                rel1.offset: -10 0;
                rel2.relative: 1.0 0.5;
                rel2.offset: -10 0;
+               // The part's right edge (1.0) is aligned to the point.
                align: 1.0 0.5;
                min: 30 30;
             }
          }
       }
    }
+   // This group defines the layout for a single page within the pager.
+   // It consists of a background and several text parts for displaying information.
    group {
       name: "page";
       parts {
+         // A background rectangle. The color is not specified, so it will be
+         // white by default, or can be set from the application code.
          rect { "bg";
             desc { "default";
             }
          }
+         // The following four text parts are markers for the corners of the page.
+         // They are useful for debugging layout and alignment.
+
+         // Text part for the top-left corner.
          text { "tl";
             desc { "default";
+               // These properties pin the text part to the top-left corner.
                rel1.relative: 0 0;
                rel2.relative: 0 0;
                align: 0 0;
+               // Text color: black (#000000FF)
                color: 0 0 0 255;
                text { size: 10;
+                  // Ensures the text part is at least 1x1 pixels, making it always visible
+                  // even if the text content is empty.
                   min: 1 1;
                }
             }
          }
+         // Text part for the top-right corner.
          text { "tr";
             desc { "default";
                rel1.relative: 1 0;
@@ -62,6 +91,7 @@ collections {
                }
             }
          }
+         // Text part for the bottom-left corner.
          text { "bl";
             desc { "default";
                rel1.relative: 0 1;
@@ -73,6 +103,7 @@ collections {
                }
             }
          }
+         // Text part for the bottom-right corner.
          text { "br";
             desc { "default";
                rel1.relative: 1 1;
@@ -84,8 +115,11 @@ collections {
                }
             }
          }
+         // The main text part, centered in the page by default.
+         // This is where the primary content of the page is displayed.
          text { "text";
             desc { "default";
+               // Text color: black (#000000FF)
                color: 0 0 0 255;
                text { size: 20;
                }

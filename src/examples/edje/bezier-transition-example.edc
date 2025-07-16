@@ -1,21 +1,35 @@
 collections {
+   // This group defines the main layout and behavior of the animation example.
+   // It includes a script for custom animation logic, several parts for the UI,
+   // and a program to connect user interaction with the animation.
    group { name: "main";
+      // Embryo script for controlling the animation.
       script{
+        // This function is called repeatedly by the 'anim' action in the program below.
+        // It drives the animation of the "red_rect" part.
         public test(val, Float:pos)
           {
+             // set_state_anim applies a state with a specific animator.
+             // Here, it animates the "red_rect" part towards its "default" 1.0 state.
+             // The CUBIC_BEZIER animator creates a custom timing curve, defined by the
+             // following four float values, which can create effects like overshoot
+             // and anticipation, making the animation feel more natural.
              set_state_anim(PART:"red_rect", "default", 1.0, CUBIC_BEZIER, pos, 0.27, 1.29, 1, -0.25);
           }
       }
       parts {
+         // A white (#FFFFFFFF) background rectangle that fills the entire container.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
+         // A text label that acts as a clickable trigger for the animation.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Black text color (#000000FF).
                color: 0 0 0 255;
                text {
                   text: "Click me.";
@@ -25,25 +39,40 @@ collections {
                }
             }
          }
+         // The rectangle that will be animated. It has two states, "default" 0.0
+         // (start) and "default" 1.0 (end), defining its horizontal movement.
          part { name: "red_rect";
             type: RECT;
+            // The initial state of the rectangle.
             description { state: "default" 0.0;
+               // The rectangle is colored blue (#0000FFFF), not red as the name suggests.
                color: 0 0 255 255;
                max: 30 30;
+               // Placed near the left edge.
                align: 0.1 0.2;
             }
+            // The final state of the rectangle.
             description { state: "default" 1.0;
+               // It inherits properties from the initial state, so we only need to
+               // specify what changes.
                inherit: "default" 0.0;
                color: 0 0 255 255;
+               // Placed near the right edge.
                align: 0.9 0.2;
             }
          }
       }
       programs {
+         // This program block connects user input to actions.
          program {
+            // Triggers on a left mouse button down event ("mouse,down,1").
             signal: "mouse,down,1";
+            // The event must originate from the "label" part.
             source: "label";
             script {
+              // When triggered, this starts an animation over 5.5 seconds.
+              // It calls the 'test' script function repeatedly, which handles the
+              // state changes for the "red_rect" part.
               anim(5.5, "test", 1);
             }
          }

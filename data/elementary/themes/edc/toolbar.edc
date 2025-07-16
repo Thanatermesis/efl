@@ -1,20 +1,33 @@
+// This group defines the main toolbar widget, which serves as a container
+// for toolbar items. It includes a background, a content area, and
+// scroll arrows that appear when the content overflows.
 group { name: "e/widgets/toolbar";
    parts {
+      // The base part is a rectangle that provides the background for the toolbar.
+      // It is not interactive, as mouse_events is set to 0.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Sets the background using a theme-defined color class.
             color_class: "/bg/normal/toolbar";
          }
       }
+      // This is a clipper that constrains the visibility of child parts, such as
+      // the toolbar content. It is sized to match the "base" part.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
          }
       }
+      // A SWALLOW part that acts as a container for the application to place
+      // toolbar items into. Its content is clipped by the "clipper" part.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
          }
       }
+      // A draggable part used for horizontal scrolling of the toolbar content.
+      // `dragable.x: 1 1 0;` enables dragging only along the X-axis.
+      // It is confined to the "base" part and is initially invisible.
       part { name: "e.dragable.hbar"; mouse_events: 0;
          dragable.x: 1 1 0;
          dragable.y: 0 0 0;
@@ -24,6 +37,8 @@ group { name: "e/widgets/toolbar";
              visible: 0;
           }
        }
+      // This part is a clipper for the scroll arrows, controlling their overall
+      // visibility. The "hidden" state makes the arrows disappear when not needed.
       part { name: "arrow_clipper"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -32,6 +47,8 @@ group { name: "e/widgets/toolbar";
             visible: 0;
          }
       }
+      // This is the event rectangle for the left scroll arrow. It serves as the
+      // clickable area and provides visual feedback on interaction.
       part { name: "arrow1_ev"; type: RECT;
          scale: 1;
          clip_to: "arrow_clipper";
@@ -40,6 +57,7 @@ group { name: "e/widgets/toolbar";
             rel.to: "base";
             align: 0.0 0.5;
             color_class: "/dim/normal/toolbar/arrow";
+            // The FIXED_SIZE macro sets a fixed width and height for this part.
             FIXED_SIZE(23, 23)
          }
          description { state: "clicked" 0.0;
@@ -47,12 +65,15 @@ group { name: "e/widgets/toolbar";
             color_class: "/dim/pressed/toolbar/arrow";
          }
       }
+      // This part displays the left arrow icon itself. It is not interactive
+      // (`mouse_events: 0`) and is visually contained within "arrow1_ev".
       part { name: "arrow1"; mouse_events: 0;
          scale: 1;
          clip_to: "arrow_clipper";
          description { state: "default" 0.0;
             fixed: 1 1;
             rel.to: "arrow1_ev";
+            // "i-arrow-l" is an image from the theme's image collection.
             image.normal: "i-arrow-l";
             FIXED_SIZE(15, 15)
             color_class: "/fg/normal/toolbar/arrow";
@@ -62,6 +83,8 @@ group { name: "e/widgets/toolbar";
             color_class: "/fg/pressed/toolbar/arrow";
          }
       }
+      // The "arrow2_ev" and "arrow2" parts define the right scroll arrow,
+      // mirroring the structure and behavior of the left arrow parts.
       part { name: "arrow2_ev"; type: RECT;
          scale: 1;
          clip_to: "arrow_clipper";
@@ -94,6 +117,8 @@ group { name: "e/widgets/toolbar";
       }
    }
    programs {
+      // These programs control the visibility of the scroll arrows based on signals
+      // from the application. This allows showing arrows only when content overflows.
       program { signal: "e,action,show,hbar"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "arrow_clipper";
@@ -103,19 +128,27 @@ group { name: "e/widgets/toolbar";
          target: "arrow_clipper";
       }
 
+      // Implements the click-and-hold scrolling for the left arrow.
+      // On mouse down, a "prev" signal is sent and a repeating program is started.
       program { signal: "mouse,down,1*"; source: "arrow1_ev";
          action: SIGNAL_EMIT "e,action,prev" "e";
          after: "arrow1_repeat";
       }
+      // This program is a self-repeating timer that emits "prev" signals every
+      // 0.3 seconds for continuous scrolling while the mouse button is held down.
       program { name: "arrow1_repeat";
          action: SIGNAL_EMIT "e,action,prev" "e";
          in: 0.3 0.0;
          after: "arrow1_repeat";
       }
+      // Releasing the mouse button stops the repeating scroll action.
       program { signal: "mouse,up,1"; source: "arrow1_ev";
          action: ACTION_STOP;
          target: "arrow1_repeat";
       }
+      // These programs provide visual feedback for the left arrow click.
+      // On mouse down, the arrow parts change to the "clicked" state, and on
+      // mouse up, they revert to the "default" state.
       program { signal: "mouse,down,1*"; source: "arrow1_ev";
          action: STATE_SET "clicked" 0.0;
          target: "arrow1";
@@ -127,6 +160,8 @@ group { name: "e/widgets/toolbar";
          target: "arrow1_ev";
       }
 
+      // The programs for the right arrow ("arrow2_ev") mirror the functionality
+      // of the left arrow's programs, but emit "e,action,next" for scrolling forward.
       program { signal: "mouse,down,1*"; source: "arrow2_ev";
          action: SIGNAL_EMIT "e,action,next" "e";
          after: "arrow2_repeat";
@@ -153,8 +188,13 @@ group { name: "e/widgets/toolbar";
    }
 }
 
+// This group defines the appearance and behavior of a single item within the toolbar.
+// It handles states like "selected" or "noicon" and is designed to be
+// instantiated for each item in the toolbar.
 group { name: "e/widgets/toolbar/item";
    parts {
+      // This is the background of the toolbar item. It is invisible by default
+      // and becomes visible with a specific background color when selected.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/toolbar/base";
@@ -166,17 +206,22 @@ group { name: "e/widgets/toolbar/item";
             visible: 1;
          }
       }
+      // This SWALLOW part holds the item's icon, which is provided by the application.
+      // The layout places the icon above the text label.
       part { name: "e.swallow.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
             align: 0.5 0.5;
             rel1.relative: 0.0 0.0;
             rel1.offset: 4 4;
+            // The bottom of the icon is attached to the top of the "e.text.label" part.
             rel2.to_y: "e.text.label";
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 -5;
+            // offscale is an optimization to suspend scaling calculations when not visible.
             offscale;
          }
+         // The "noicon" state hides the part and adjusts layout if no icon is present.
          description { state: "noicon" 0.0;
             inherit: "default" 0.0;
             visible: 0;
@@ -185,6 +230,9 @@ group { name: "e/widgets/toolbar/item";
             rel2.offset: -5 -9;
          }
       }
+      // This is an invisible TEXT part used for text layout calculations and as a
+      // properties source for the visible "label2" part. This separation allows
+      // for more complex text effects and animations on the visible part.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -208,6 +256,8 @@ group { name: "e/widgets/toolbar/item";
             rel1.offset: 4 4;
          }
       }
+      // This is the visible TEXT part for the item's label.
+      // It uses "e.text.label" as its text_source, inheriting its text and properties.
       part { name: "label2"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -231,6 +281,8 @@ group { name: "e/widgets/toolbar/item";
             color_class: "/fg/selected/toolbar/text";
          }
       }
+      // A rectangle at the bottom of the item that serves as a selection indicator.
+      // It is invisible by default and becomes a visible bar when selected.
       part { name: "bar"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -248,9 +300,12 @@ group { name: "e/widgets/toolbar/item";
             inherit: "default" 0.0;
             visible: 1;
             rel1.offset: 0 -1;
+            // The bar is 5 pixels high in the "selected" state.
             min: 5 5;
          }
       }
+      // A transparent rectangle covering the entire item to capture mouse events.
+      // `ignore_flags: ON_HOLD;` prevents "hold" events, simplifying click handling.
       part { name: "event"; type: RECT;
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
@@ -259,6 +314,8 @@ group { name: "e/widgets/toolbar/item";
       }
    }
    programs {
+      // These programs react to signals to toggle the "noicon" state, which
+      // adjusts the layout when an item does not have an icon.
       program { signal: "e,icon,disabled"; source: "e";
          action: STATE_SET "noicon" 0.0;
          target: "e.swallow.icon";
@@ -271,6 +328,8 @@ group { name: "e/widgets/toolbar/item";
          target: "e.text.label";
          target: "label2";
       }
+      // These programs handle the visual state change for selection, triggered by
+      // the application. The transition is animated over 0.2 seconds.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          transition: ACCELERATE 0.2;
@@ -285,6 +344,7 @@ group { name: "e/widgets/toolbar/item";
          target: "base";
          target: "bar";
       }
+      // Emits a "click" signal to the application when the item is clicked.
       program { signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "e,action,click" "e";
       }

@@ -1,68 +1,95 @@
+// The main group for the color selector widget.
+// It orchestrates the display of color options and handles user interactions.
+// 'program_source: "elm"' allows this group to react to signals from the "elm" source.
+// 'nobroadcast' prevents signals from propagating up to parent objects.
 group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
    parts {
+      // A clipping rectangle to contain other parts within its bounds.
       rect { "clip"; }
+      // A fader rectangle that is active only in "remote" mode.
+      // It is used to dismiss the color selector.
       rect { "remote_fader";
          desc { hid;
             color_class: "/dim/normal/hover";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
          desc { "vis"; inherit;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
+            // This state is activated when the "elm,state,remote" signal is received.
             link.base: "elm,state,remote";
          }
+         // When clicked, this emits a signal to dismiss the color selector.
          program { signal: "mouse,down,1"; source: "remote_fader";
             action: SIGNAL_EMIT "elm,colorclass,dismiss" "elm";
          }
       }
+      // Background for the color list area.
       rect { "list_bg";
          desc {
             color_class: "/bg/normal/colorclass";
+            // Positions itself relative to the swallowed list content.
             rel.to: "elm.swallow.list";
          }
       }
+      // This is a container where external Evas objects can be placed (swallowed).
+      // It's intended to hold the list of color options.
       swallow { "elm.swallow.list";
          desc {}
          desc { "remote";
             rel1.relative: 0.1 0.1;
             rel2.relative: 0.9 0.9;
+            // The 'remote' state adjusts the layout when triggered by "elm,state,remote".
             link.base: "elm,state,remote";
          }
       }
+      // Fader rectangle to capture clicks outside the main content area and deactivate the color selector.
       rect { "fader";
          desc { hid;
             color_class: "/dim/normal/hover";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
          desc { "vis"; inherit; vis;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
+         // In "remote" mode, this fader is transparent but still active to catch mouse events.
          desc { "vis_remote"; inherit; vis;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
+         // On click, it emits a signal to deactivate the color selector.
          program { signal: "mouse,down,1"; source: "fader";
             action: SIGNAL_EMIT "elm,colorclass,deactivate" "elm";
          }
       }
+      // Main background of the popup.
       rect { "bg";
+         // 'scale' allows this part to be animated using scaling transformations.
          scale;
          desc { hid;
             rel1.offset: 40 40;
             rel2.offset: -41 -41;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
             color_class: "/bg/normal/colorclass";
+            // 'offscale' makes the part invisible by scaling it to zero,
+            // which is efficient for show/hide animations.
             offscale;
          }
          desc { "vis"; inherit;  vis;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
       }
+      // A clipper for the color selection area, itself clipped by the main "clip" part.
       rect { "colorclip"; clip: "clip";
          desc { align: 0 0;
             rel2.relative: 1 0;
+            // The bottom edge is aligned with the top of the reset button area, creating a vertical boundary.
             rel2.to_y: "elm.swallow.reset";
          }
       }
+      // Creates a public name "elm.swallow.colors" for the "colors" swallow part
+      // within the "colors" group below. This allows external code to access and
+      // swallow content into it.
       alias: "elm.swallow.colors" "colors:colors";
+      // This part is an instance of the "colorclass/colors" group, which contains the color swatches.
       group { "colors"; source: "colorclass/colors"; clip: "colorclip";
          scale;
          desc { hid; align: 0 0;
@@ -71,6 +98,7 @@ group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
             rel2.relative: 1.0 0.0;
+            // Its bottom is also tied to the reset button's swallow area.
             rel2.to_y: "elm.swallow.reset";
             fixed: 1 1;
          }
@@ -78,6 +106,7 @@ group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
             fixed: 1 1;
          }
       }
+      // Swallow part for a reset button. External code can place a button widget here.
       swallow { "elm.swallow.reset"; clip: "clip";
          scale;
          desc { hid; min: 40 24; max: 40 24;
@@ -93,20 +122,24 @@ group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
          desc { "vis"; inherit: "default"; vis;
          }
       }
+      // Background for a text display area.
       rect { "text_bg";
          desc { hid;
             color_class: "/bg/normal/colorclass/text";
+            // Initially collapsed to a point and transparent.
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
          desc { "vis"; inherit; vis;
+            // When visible, it expands to cover the list area.
             rel.to: "elm.swallow.list";
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
       }
+      // Text part, likely used for displaying status or information.
       text { "elm.text";
          scale;
          desc { hid;
@@ -115,44 +148,55 @@ group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
             rel2.relative: 0.9 0.9;
             text { font: FN; size: 10;
               min: 1 1;
+              // Ellipsis at the end of the text if it overflows horizontally.
               ellipsis: -1;
+              // Text fits horizontally but not vertically.
               fit: 1 0;
             }
          }
          desc { "vis"; inherit: "default"; vis; }
       }
+      // When "elm,state,info" is received, show the info text and its background.
       program { signal: "elm,state,info";
          action: STATE_SET "vis";
          transition: LINEAR 0.2;
          targets: "text_bg" "elm.text";
       }
+      // When "elm,state,loaded" is received, hide the info text.
       program { signal: "elm,state,loaded";
          action: STATE_SET "default";
          transition: LINEAR 0.2;
          targets: "text_bg" "elm.text";
       }
+      // Hides the main color selector elements.
       program { signal: "elm,colors,hide";
          action: STATE_SET "default";
          transition: LINEAR 0.2;
          targets: "fader" "colors" "elm.swallow.reset" "bg";
       }
+      // Shows the main color selector elements.
       program { signal: "elm,colors,show";
          transition: LINEAR 0.2;
          action: STATE_SET "vis";
          targets: "colors" "elm.swallow.reset" "bg";
       }
+      // Conditionally shows the fader.
+      // 'filter' ensures this program only runs if "remote_fader" is in its "default" state (i.e., not remote mode).
       program { signal: "elm,colors,show";
          transition: LINEAR 0.2;
          action: STATE_SET "vis";
          targets: "fader";
          filter: "remote_fader" "default";
       }
+      // Sets the fader to its remote state if "remote_fader" is visible (i.e., in remote mode).
       program { signal: "elm,colors,show";
          transition: LINEAR 0.2;
          action: STATE_SET "vis_remote";
          targets: "fader";
          filter: "remote_fader" "vis";
       }
+      // These programs catch selection signals from the "colors" group instance
+      // and re-emit them from this group, so the parent widget can handle them.
       program { signal: "select,1"; source: "colors:elm";
          action: SIGNAL_EMIT "elm,colorclass,select,1" "elm";
       }
@@ -165,8 +209,11 @@ group { "elm/layout/colorclass/base"; program_source: "elm"; nobroadcast;
    }
 }
 
+// This group defines the layout for the three color selectors (Base, Outline, Shadow).
 group { "colorclass/colors"; program_source: "elm"; nobroadcast;
    parts {
+      // A rectangle for a glow/highlight effect around the selected color.
+      // 'nomouse' prevents it from interfering with clicks.
       rect { "glow"; nomouse;
          desc {
             rel.to: "color1";
@@ -174,8 +221,10 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             rel2.offset: 8 8;
             rel2.relative: 1 1;
             fixed: 1 1;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, no cc
          }
+         // These states reposition the glow over the other color selectors.
+         // They inherit properties from the default state and only change what's needed.
          desc { "color2"; inherit: "default";
             rel.to: "color2";
          }
@@ -183,6 +232,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             rel.to: "color3";
          }
       }
+      // Instance of the "colorclass/color1" group for the first color swatch.
       group { "color1"; source: "colorclass/color1";
          desc { min: 1 1; max: 1 1; hid;
             link.base: "hide" "";
@@ -193,11 +243,14 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             rel2.relative: 0 0;
             rel2.offset: -3 -1;
             fixed: 1 1;
+            // The minimum size is derived from the source group.
             min: SOURCE;
             link.base: "show" "";
          }
+         // On click, emits a signal for color 1 selection and moves the glow to this swatch.
          program { signal: "mouse,down,1"; source: "color1";
             action: SIGNAL_EMIT "select,1" "elm";
+            // A 'sequence' allows multiple actions to run for a single program.
             sequence {
                action: STATE_SET "default";
                transition: LINEAR 0.2;
@@ -205,6 +258,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             }
          }
       }
+      // Instance for the second color swatch.
       group { "color2"; source: "colorclass/color2";
          desc { min: 1 1; max: 1 1; hid;
             link.base: "hide" "";
@@ -216,6 +270,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             min: SOURCE;
             link.base: "show" "";
          }
+         // On click, emits selection signal and moves glow to "color2" state.
          program { signal: "mouse,down,1"; source: "color2";
             action: SIGNAL_EMIT "select,2" "elm";
             sequence {
@@ -225,6 +280,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             }
          }
       }
+      // Instance for the third color swatch.
       group { "color3"; source: "colorclass/color3";
          desc { min: 1 1; max: 1 1; hid;
             link.base: "hide" "";
@@ -237,6 +293,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             min: SOURCE;
             link.base: "show" "";
          }
+         // On click, emits selection signal and moves glow to "color3" state.
          program { signal: "mouse,down,1"; source: "color3";
             action: SIGNAL_EMIT "select,3" "elm";
             sequence {
@@ -246,6 +303,8 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             }
          }
       }
+      // A swallow part for custom content, positioned below the color selectors.
+      // This is likely for a preview of the combined color classes on a sample widget.
       swallow { "colors";
          desc { align: 0 0;
             rel1.to_y: "color1";
@@ -255,6 +314,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             fixed: 1 1;
          }
       }
+      // Displays sample text with the selected colors applied.
       text { "colortext";
          scale;
          desc { align: 0 0;
@@ -263,6 +323,7 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
             rel1.offset: 0 10;
             rel2.relative: 1 0;
             fixed: 1 1;
+            // The color of this text is defined by the "elm_colorclass_text" color class.
             color_class: "elm_colorclass_text";
             text { font: FNBD; size: 12;
               min: 1 1;
@@ -274,15 +335,21 @@ group { "colorclass/colors"; program_source: "elm"; nobroadcast;
    }
 }
 
+// This group defines a single color selector button. It is reused for all three colors.
+// 'nomouse' on the group means it doesn't receive mouse events itself,
+// but its children can if they have 'mouse' enabled.
 group { "colorclass/color1"; nomouse; nobroadcast;
    parts {
+      // An invisible rectangle that covers the entire part to catch mouse events.
+      // This is a common pattern to separate event handling from visual representation.
       rect { "event"; mouse;
          desc {
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, no cc
             fixed: 1 1;
          }
       }
       rect { "clip"; }
+      // Background rectangle for the color swatch.
       rect { "bg"; clip: "clip";
          desc {
             rel.to: "color";
@@ -290,16 +357,18 @@ group { "colorclass/color1"; nomouse; nobroadcast;
             fixed: 1 1;
          }
       }
+      // The color swatch itself. Its color is determined by a theme color class.
       rect { "color"; clip: "clip";
          scale;
          desc { align: 0 0.5;
             min: 40 20;
             max: 40 20;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
             color_class: "elm_colorclass_color1";
             fixed: 1 1;
          }
       }
+      // The label for the color swatch (e.g., "Base").
       text { "text"; clip: "clip";
          scale: 1;
          desc { align: 0 0.5;
@@ -310,6 +379,7 @@ group { "colorclass/color1"; nomouse; nobroadcast;
             rel2.relative: 1.0 1.0;
             fixed: 1 1;
             color_class: "/fg/normal/colorclass/color/text";
+            // Initially hidden by being scaled to zero.
             offscale;
             text { font: FN; size: 10;
               min: 1 1;
@@ -322,6 +392,8 @@ group { "colorclass/color1"; nomouse; nobroadcast;
    }
 }
 
+// This group inherits from "colorclass/color1" to create the second color button.
+// It only overrides the color class and the label text.
 group { "colorclass/color2"; inherit: "colorclass/color1";
    parts {
       rect { "color";
@@ -337,6 +409,7 @@ group { "colorclass/color2"; inherit: "colorclass/color1";
    }
 }
 
+// Inherits from "colorclass/color1" for the third color button, "Shadow".
 group { "colorclass/color3"; inherit: "colorclass/color1";
    parts {
       rect { "color";

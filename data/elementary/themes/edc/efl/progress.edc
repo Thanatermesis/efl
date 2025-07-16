@@ -1,8 +1,18 @@
+// Group for the standard horizontal progress bar.
+// This group defines the appearance and behavior of a progress bar that can
+// optionally display an icon and a text label. It supports different states
+// like pulsing, disabled, and inverted mode.
 group { name: "efl/progressbar/horizontal";
+// Defines bitmasks for different modes: ICON, LABEL, and DISABLE.
+// These are used in the script to manage the visibility of different parts.
 #define ICON    1
 #define LABEL   2
 #define DISABLE 4
    data.item: "version" "123";
+   // This script manages the state of the progress bar based on whether an
+   // icon, a label, or both are present, and whether the widget is disabled.
+   // The 'slmode' variable holds the current mode as a bitmask.
+   // The 'eval_mode' function is called to apply the state changes.
    script {
       public slmode;
       public eval_mode(m) {
@@ -38,6 +48,9 @@ group { name: "efl/progressbar/horizontal";
       }
    }
    parts {
+      // A rectangle used as a clipping mask to apply a disabled effect.
+      // When in the "disabled" state, it becomes semi-transparent white (#FFFFFF40),
+      // giving a faded look to the content it clips.
       part { name: "dis_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "efl.content";
@@ -47,6 +60,8 @@ group { name: "efl/progressbar/horizontal";
             color: 255 255 255 64; // no cc
          }
       }
+      // A clipping rectangle for the pulse animation. It's normally invisible
+      // but becomes visible during the pulse state to contain the pulse effect.
       part { name: "pulse_clip"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -2.0 -2.0;
@@ -58,6 +73,10 @@ group { name: "efl/progressbar/horizontal";
             visible: 1;
          }
       }
+      // A clipping rectangle for the main progress bar fill ("bar" part).
+      // It is made invisible during pulse mode to hide the fractional display.
+      // The large relative size (-2.0 to 3.0) ensures it covers a larger area
+      // than the part it clips, which is a technique to avoid clipping artifacts at the edges.
       part { name: "fract_clip"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -2.0 -2.0;
@@ -68,6 +87,8 @@ group { name: "efl/progressbar/horizontal";
             visible: 0;
          }
       }
+      // This is a SWALLOW part, which acts as a container for an external object,
+      // typically an icon. It's clipped by "dis_clip" for the disabled effect.
       part { name: "efl.content"; type: SWALLOW;
          scale: 1;
          clip_to: "dis_clip";
@@ -89,6 +110,8 @@ group { name: "efl/progressbar/horizontal";
             min: ICMIN ICMIN;
          }
       }
+      // A text part for the label of the progress bar. It is positioned to the
+      // right of the icon ("efl.content"). Mouse events are disabled.
       part { name: "efl.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -124,6 +147,8 @@ group { name: "efl/progressbar/horizontal";
             color_class: "/fg/disabled/progress/text";
          }
       }
+      // The background of the progress bar. Its size and position can change
+      // based on whether an icon and label are visible (state "iclabel").
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -140,11 +165,14 @@ group { name: "efl/progressbar/horizontal";
             rel1.relative: 1.0 0.0;
          }
       }
+      // A container for the progress bar elements. It fills the "bg" part.
       part { name: "efl.bar"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // A draggable spacer that controls the progress value. Its x-position
+      // is used to determine the width of the progress bar fill.
       part { name: "efl.cur.progressbar"; mouse_events: 0; type: SPACER;
          dragable.confine: "efl.bar";
          dragable.x: 1 1 1;
@@ -156,6 +184,10 @@ group { name: "efl/progressbar/horizontal";
             rel.to: "efl.bar";
          }
       }
+      // This spacer part defines the end point of the progress bar fill. It's
+      // positioned relative to "efl.cur.progressbar", so as the draggable
+      // spacer moves, this part moves with it. In "inv" (inverted) state,
+      // its alignment is flipped.
       part { name: "barend"; type: SPACER;
          description { state: "default" 0.0;
             fixed: 1 0;
@@ -169,6 +201,8 @@ group { name: "efl/progressbar/horizontal";
             align: 0.0 0.5;
          }
       }
+      // The visible progress indicator bar. Its width is determined by the
+      // position of "barend". It is clipped by "fract_clip".
       part { name: "bar"; type: RECT;
          scale: 1;
          clip_to: "fract_clip";
@@ -185,6 +219,8 @@ group { name: "efl/progressbar/horizontal";
             rel2.to_x: "bg";
          }
       }
+      // A rectangle used for the pulsing animation in indeterminate mode.
+      // It animates back and forth within the bounds of "efl.bar".
       part { name: "pulse"; type: RECT;
          clip_to: "pulse_clip";
          scale: 1;
@@ -201,6 +237,8 @@ group { name: "efl/progressbar/horizontal";
             align: 1.0 0.5;
          }
       }
+      // Text part to display the status, e.g., the percentage of progress.
+      // It is positioned on the right side of the progress bar.
       part { name: "efl.text.status"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -224,29 +262,38 @@ group { name: "efl/progressbar/horizontal";
       }
    }
    programs {
+      // When "efl,state,inverted,on" is signaled, the "bar" and "barend" parts
+      // are set to the "inv" state, which reverses the progress bar's direction.
       program { name: "inverted-on";
          signal: "efl,state,inverted,on"; source: "efl";
          action:  STATE_SET "inv" 0.0;
          target: "bar";
          target: "barend";
       }
+      // Reverts the progress bar to its default direction.
       program { name: "inverted-off";
          signal: "efl,state,inverted,off"; source: "efl";
          action:  STATE_SET "default" 0.0;
          target: "bar";
          target: "barend";
       }
+      // On "efl,state,pulse" signal, hides the status text and then chains to "pulse-mode1".
+      // This is for when the mode switches to pulse, but before it starts animating.
       program { name: "pulse-mode0";
          signal: "efl,state,pulse"; source: "efl";
          action:  STATE_SET "hidden" 0.0;
          target: "efl.text.status";
          after: "pulse-mode1";
       }
+      // On "efl,state,pulse,start", sets "fract_clip" to its "pulse" state, which
+      // hides the regular progress bar, preparing for the pulse animation.
       program { name: "pulse-mode1";
          signal: "efl,state,pulse,start"; source: "efl";
          action:  STATE_SET "pulse" 0.0;
          target: "fract_clip";
       }
+      // Starts the pulse animation when "efl,state,pulse,start" is signaled.
+      // It makes the pulse clip visible and then starts the animation loop ("pulse0").
       program { name: "pulse-start";
          signal: "efl,state,pulse,start"; source: "efl";
          action:  STATE_SET "pulse" 0.0;
@@ -254,6 +301,8 @@ group { name: "efl/progressbar/horizontal";
          target: "fract_clip";
          after: "pulse0";
       }
+      // The pulse animation loop. "pulse0" and "pulse1" call each other to create
+      // a continuous back-and-forth movement of the "pulse" part.
       program { name: "pulse0";
          action:  STATE_SET "end" 0.0;
          transition: SINUSOIDAL 0.8;
@@ -266,12 +315,15 @@ group { name: "efl/progressbar/horizontal";
          target: "pulse";
          after: "pulse0";
       }
+      // When switching from pulse mode to fractional mode, this program ensures
+      // the status text is visible and stops the pulse animation.
       program { name: "fraction";
          signal: "efl,state,fraction"; source: "efl";
          action:  STATE_SET "default" 0.0;
          target: "efl.text.status";
          after: "pulse-stop";
       }
+      // Stops the pulse animation loop when "efl,state,pulse,stop" is signaled.
       program { name: "eflpulse-stop";
          signal: "efl,state,pulse,stop"; source: "efl";
          action: ACTION_STOP;
@@ -279,10 +331,12 @@ group { name: "efl/progressbar/horizontal";
          target: "pulse1";
          after: "pulse-stop";
       }
+      // Hides the pulse clipping rectangle after the animation stops.
       program { name: "pulse-stop";
          action:  STATE_SET "default" 0.0;
          target: "pulse_clip";
       }
+      // Manages the visibility of the unit/status text.
       program { name: "units-visible";
          signal: "efl,state,units,visible"; source: "efl";
          action:  STATE_SET "default" 0.0;
@@ -293,6 +347,9 @@ group { name: "efl/progressbar/horizontal";
          action:  STATE_SET "hidden" 0.0;
          target: "efl.text.status";
       }
+      // These programs handle visibility changes for the text label and icon.
+      // They modify the 'slmode' variable (a bitmask) and call the 'eval_mode'
+      // script function to apply the visual changes.
       program { name: "text-visible";
          signal: "efl,text,set"; source: "efl";
          script {
@@ -325,6 +382,8 @@ group { name: "efl/progressbar/horizontal";
             eval_mode(m);
          }
       }
+      // These programs handle the enabled/disabled state of the widget, also
+      // using the 'slmode' bitmask and 'eval_mode' script function.
       program { name: "state-disabled";
          signal: "efl,state,disabled"; source: "efl";
          script {
@@ -347,6 +406,10 @@ group { name: "efl/progressbar/horizontal";
 #undef DISABLE
 }
 
+// Group for the standard vertical progress bar.
+// This is the vertical counterpart to the horizontal progress bar, sharing much
+// of the same logic and structure, but with layout and alignment adjusted for
+// vertical orientation.
 group { name: "efl/progressbar/vertical";
 #define ICON    1
 #define LABEL   2
@@ -549,6 +612,7 @@ group { name: "efl/progressbar/vertical";
             align: 0.5 1.0;
          }
       }
+      // A spacer to help with the positioning of the rotated status text.
       part { name: "statbox"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -557,6 +621,8 @@ group { name: "efl/progressbar/vertical";
             aspect: 1.0 1.0; aspect_preference: NONE;
          }
       }
+      // The status text for the vertical progress bar.
+      // A map is used to rotate the text by 90 degrees to fit the vertical layout.
       part { name: "efl.text.status"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -707,9 +773,14 @@ group { name: "efl/progressbar/vertical";
 #undef DISABLE
 }
 
+// A "bare" style for the horizontal progress bar, which is a simpler version
+// without support for an icon or label. It's designed to be more minimalistic.
 group { name: "efl/progressbar/horizontal:bare";
    data.item: "version" "123";
    parts {
+      // The efl.content part is defined but is always invisible and has zero size.
+      // This is to maintain API compatibility, allowing code to set content
+      // without causing errors, even though it won't be displayed.
       part { name: "efl.content"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -820,6 +891,7 @@ group { name: "efl/progressbar/horizontal:bare";
          target: "bar";
          target: "barend";
       }
+      // Prepares for pulse animation by hiding the fractional bar.
       program { name: "pulse-mode1";
          signal: "efl,state,pulse,start"; source: "efl";
          action:  STATE_SET "pulse" 0.0;
@@ -858,21 +930,25 @@ group { name: "efl/progressbar/horizontal:bare";
    }
 }
 
+// A variation of the "bare" progress bar with a transparent background.
 group { name: "efl/progressbar/horizontal:hidden_bare";
    inherit: "efl/progressbar/horizontal:bare";
    data.item: "version" "123";
    parts {
       part { name: "bg";
          description { state: "default" 0.0;
+            // The background is set to fully transparent black (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
 }
 
+// A "bare" style for the vertical progress bar, analogous to the horizontal "bare" style.
 group { name: "efl/progressbar/vertical:bare";
    data.item: "version" "123";
    parts {
+      // As in other styles, efl.content is kept for API compatibility.
       part { name: "efl.content"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -962,6 +1038,8 @@ group { name: "efl/progressbar/vertical:bare";
             fixed: 1 1;
             min: 5 10;
             max: 9999 10;
+            // Both relative points are tied to "efl.bar", making the pulse
+            // element fill the entire bar area vertically.
             rel1.to: "efl.bar";
             rel2.to: "efl.bar";
             align: 0.5 0.0;
@@ -1024,21 +1102,30 @@ group { name: "efl/progressbar/vertical:bare";
    }
 }
 
+// A variation of the vertical "bare" progress bar with a transparent background.
 group { name: "efl/progressbar/vertical:hidden_bare";
    inherit: "efl/progressbar/vertical:bare";
    data.item: "version" "123";
    parts {
       part { name: "bg";
          description { state: "default" 0.0;
+            // The background is set to fully transparent black (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
 }
 
+// This group defines a "wheel" style progress indicator, often used for
+// indeterminate progress (spinners). It's implemented as a rotating image.
+// This "hidden_wheel" version has a transparent background.
+// It has an alias, so it can be used for vertical orientation as well,
+// since a rotating wheel looks the same in both contexts.
 group { name: "efl/progressbar/horizontal:hidden_wheel";
    alias: "efl/progressbar/vertical:hidden_wheel";
    data.item: "version" "123";
+   // IMAGE_RING is likely a macro that defines an image part for one of the
+   // rings of the spinner animation.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
@@ -1059,7 +1146,10 @@ group { name: "efl/progressbar/horizontal:hidden_wheel";
             visible: 0;
          }
       }
+      // The BUSY macro likely creates the necessary programs to start and stop
+      // the spinner animation based on pulse signals.
       BUSY("base", "efl,state,pulse,start", "efl", "efl,state,pulse,stop", "efl")
+      // The "base" part serves as a container and sizing reference for the spinner.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -1074,12 +1164,15 @@ group { name: "efl/progressbar/horizontal:hidden_wheel";
    }
 }
 
+// This group inherits from the "hidden_wheel" and adds a visible background
+// image, making it a complete, non-transparent wheel spinner.
 group { name: "efl/progressbar/horizontal:wheel";
    inherit: "efl/progressbar/horizontal:hidden_wheel";
    alias: "efl/progressbar/vertical:wheel";
    data.item: "version" "123";
    images.image: "speaker_vol.png" COMP;
    parts {
+      // This part adds a background image behind the spinner.
       part { name: "bg"; nomouse;
          insert_before: "base";
          description { state: "default" 0.0;
@@ -1089,16 +1182,19 @@ group { name: "efl/progressbar/horizontal:wheel";
          }
          description { state: "hidden" 0.0;
             inherit;
+            // The hidden state makes the background fully transparent (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
       }
+      // When pulsing starts, the background fades out (to hidden).
       program {
          signal: "efl,state,pulse,start"; source: "efl";
          action: STATE_SET "hidden" 0.0;
          transition: SINUSOIDAL 1.0;
          target: "bg";
       }
+      // When pulsing stops, the background fades back in.
       program {
          signal: "efl,state,pulse,stop"; source: "efl";
          action: STATE_SET "default" 0.0;
@@ -1108,9 +1204,13 @@ group { name: "efl/progressbar/horizontal:wheel";
    }
 }
 
+// This style shows a series of spinning dashes, often used in places like
+// file selectors to indicate background activity.
 group { name: "efl/progressbar/horizontal:bar";
    alias: "efl/progressbar/horizontal:fileselector";
    data.item: "version" "123";
+   // Defines an image set named "spinner". Edje will automatically select the
+   // best image from the set based on the part's size.
    set { name: "spinner";
       image { image: "spinner-32.png" COMP; size: 17 45 9999 9999; }
       image { image: "spinner-16.png" COMP; size:  9 23   16   44; }
@@ -1133,6 +1233,9 @@ group { name: "efl/progressbar/horizontal:bar";
             visible: 0;
          }
       }
+      // This is the first of five spinning dash parts. Each occupies a 20%
+      // segment of the "base" part's width. A map is used to rotate the part
+      // 360 degrees in the "end" state, creating the spinning animation.
       part { name: "spin1"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -1246,6 +1349,10 @@ group { name: "efl/progressbar/horizontal:bar";
       }
    }
    programs {
+      // This set of programs creates a staggered animation for the five spin
+      // parts. On "pulse,start", it emits a signal to start spin1's animation,
+      // and then chains to the next program with a small delay ("in: 0.2 0.0;"),
+      // creating a cascading effect.
       program { name: "spin-1";
          in: 0.0 0.0;
          signal: "efl,state,pulse,start"; source: "efl";
@@ -1271,6 +1378,10 @@ group { name: "efl/progressbar/horizontal:bar";
          in: 0.2 0.0;
          action: SIGNAL_EMIT "spin5" "";
       }
+      // These programs define the animation loop for each spinning part.
+      // "spin1.1" transitions the part to the "end" state (rotated 360 degrees),
+      // and "spin1.2" resets it to "default" to start over. The other spin
+      // programs (spin2.*, spin3.*, etc.) are identical for their respective parts.
       program { name: "spin1.1";
          signal: "spin1"; source: "";
          action: STATE_SET "end" 0.0;
@@ -1331,6 +1442,7 @@ group { name: "efl/progressbar/horizontal:bar";
          target: "spin5";
          after: "spin5.1";
       }
+      // This program stops the staggered start animation chain.
       program {
          signal: "efl,state,pulse,stop"; source: "efl";
          action: ACTION_STOP;
@@ -1341,6 +1453,9 @@ group { name: "efl/progressbar/horizontal:bar";
          target: "spin-5";
          after: "stop2";
       }
+      // This program smoothly transitions all spinning parts back to their
+      // default (non-rotated) state. The CURRENT keyword makes the transition
+      // start from whatever the current rotation is.
       program { name: "stop2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 1.0 CURRENT;
@@ -1353,10 +1468,14 @@ group { name: "efl/progressbar/horizontal:bar";
    }
 }
 
+// The vertical version of the spinning dashes progress bar. It inherits from
+// the horizontal version and modifies the layout and rotation for vertical use.
 group { name: "efl/progressbar/vertical:bar";
    inherit: "efl/progressbar/horizontal:bar";
    data.item: "version" "123";
    parts {
+      // The spin parts are redefined to stack vertically and are rotated by 90
+      // degrees to align correctly.
       part { name: "spin1";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -1365,6 +1484,8 @@ group { name: "efl/progressbar/vertical:bar";
          }
          description { state: "end" 0.0;
             inherit;
+            // The end rotation is 450 degrees (90 + 360), so it completes a
+            // full 360-degree spin from its initial 90-degree rotation.
             map.rotation.z: 450;
          }
       }
@@ -1421,10 +1542,15 @@ group { name: "efl/progressbar/vertical:bar";
    }
 }
 
+// A progress bar style that displays two progress values simultaneously. It
+// inherits from the standard horizontal progress bar and adds a second bar.
 group { name: "efl/progressbar/horizontal:double";
    inherit: "efl/progressbar/horizontal";
    data.item: "version" "123";
    parts {
+      // This set of parts ("...1") creates a second progress bar, analogous to
+      // the primary one. It includes a draggable spacer, an end marker, and a
+      // visual bar part.
       part { name: "efl.cur.progressbar1"; mouse_events: 0; type: SPACER;
          insert_after: "bg";
          scale: 1;
@@ -1472,6 +1598,7 @@ group { name: "efl/progressbar/horizontal:double";
       }
    }
    programs {
+      // The inverted state programs are overridden to control both bars.
       program { name: "inverted-on";
          signal: "efl,state,inverted,on"; source: "efl";
          action:  STATE_SET "inv" 0.0;
@@ -1492,10 +1619,12 @@ group { name: "efl/progressbar/horizontal:double";
    }
 }
 
+// The vertical version of the double progress bar.
 group { name: "efl/progressbar/vertical:double";
    inherit: "efl/progressbar/vertical";
    data.item: "version" "123";
    parts {
+      // Adds the second progress bar for the vertical layout.
       part { name: "efl.cur.progressbar1"; mouse_events: 0; type: SPACER;
          insert_after: "bg";
          scale: 1;

@@ -1,15 +1,37 @@
+// All EDC files are wrapped in a collections block, which contains groups of UI
+// elements.
 collections {
+   // A group is a self-contained UI component that can be loaded and displayed.
+   // It acts as a container for parts and programs that define its appearance
+   // and behavior.
    group {
       name: "example_table";
+      // Sets the minimum size hint for this group. The window containing this
+      // object will not shrink below this size.
       min: 50 50;
 
+      // The 'parts' block contains all the visual elements that make up the group.
+      // These parts can be simple rectangles, text, images, or complex containers.
       parts {
+         // This defines a single part within the group.
          part {
             name: "table_part";
+            // The TABLE part is a container that arranges its children in a grid.
+            // It's a powerful tool for creating structured layouts. Child elements
+            // are added programmatically from the C code.
             type: TABLE;
+            // The 'description' block defines the properties of the part for a
+            // specific state. A part can have multiple descriptions for
+            // different states (e.g., "clicked", "disabled").
             description {
+               // The minimum size of the table part itself.
                min: 50 50;
+               // Defines the "default" state of the part. '0.0' is the state index.
                state: "default" 0.0;
+               // rel1 and rel2 define the part's position and size relative to its
+               // container. rel1 specifies the top-left corner and rel2 the
+               // bottom-right. Using (0.0, 0.0) for rel1 and (1.0, 1.0) for rel2
+               // makes the part fill its entire container (the group).
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }

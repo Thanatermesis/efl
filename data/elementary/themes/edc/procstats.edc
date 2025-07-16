@@ -1,51 +1,82 @@
 // XXX: fix cc's
+// This group defines the visual representation of a process statistics gadget.
+// It displays CPU and memory usage as a set of horizontal bars.
+// The size of the gadget can range from 16x16 to 160x160 pixels.
 
 group { name: "e/modules/procstats/border";
    max: 160 160;
    min: 16 16;
+   // The script handles dynamic updates of the UI based on incoming data.
+   // It listens for messages from the host application and adjusts the size of
+   // the visual bars to reflect the latest CPU and memory statistics.
    script {
       public message(Msg_Type:type, id, ...) {
+         // The script reacts to a specific message type (MSG_INT_SET) and ID (1973).
+         // This is a custom protocol between the gadget and its C module.
          if ((type == MSG_INT_SET) && (id == 1973)) {
             new cpu_num, cpu, pages_total, pages;
             new cp, cn, m500, mt;
             new Float:x, Float:y;
 
+            // Arguments are passed in the message from the C code.
+            // arg 2: number of CPU cores.
+            // arg 3: total CPU usage (can be > 100% for multi-core systems).
+            // arg 4: total memory pages.
+            // arg 5: used memory pages.
             cpu_num     = getarg(2);
             cpu         = getarg(3);
             pages_total = getarg(4);
             pages       = getarg(5);
 
             cp = cpu;
+            // Calculate average CPU usage across all cores.
+            // On a single-core system, this will be the same as total CPU usage.
             if (cpu_num > 0) cn = cp / cpu_num;
             else             cn = cp;
 
+            // Calculate memory usage against a fixed 512MB baseline.
+            // 131072 pages corresponds to 512MB of RAM (assuming 4KB pages),
+            // providing a consistent scale regardless of total system memory.
             m500 = pages * 100 / 131072; // 512m of pages
+            // Calculate memory usage as a percentage of total available memory.
             if (pages_total > 0) mt = pages * 100 / pages_total;
             else                 mt = m500;
 
+            // Cap all percentage values at 100 to prevent bars from overdrawing.
             if (cp   > 100) cp   = 100;
             if (cn   > 100) cn   = 100;
             if (m500 > 100) m500 = 100;
             if (mt   > 100) mt   = 100;
 
+            // --- UI UPDATE LOGIC ---
+            // The following blocks update the width of the visual bars.
+            // This is achieved by creating a custom state for each bar part,
+            // calculating the new relative width based on the statistic, and then
+            // applying this new state. 'rel2' defines the bottom-right corner of a part,
+            // so modifying its 'x' value effectively resizes the part's width.
+
+            // Update 'cpu_perc' bar to show total CPU usage.
             custom_state(PART:"cpu_perc", "default", 0.0);
             get_state_val(PART:"cpu_perc", STATE_REL2, x, y);
             x = float(cp) / 100.0;
             set_state_val(PART:"cpu_perc", STATE_REL2, x, y);
             set_state(PART:"cpu_perc", "custom", 0.0);
 
+            // Update 'cpu_num' bar to show per-core average CPU usage.
             custom_state(PART:"cpu_num", "default", 0.0);
             get_state_val(PART:"cpu_num", STATE_REL2, x, y);
             x = float(cn) / 100.0;
             set_state_val(PART:"cpu_num", STATE_REL2, x, y);
             set_state(PART:"cpu_num", "custom", 0.0);
 
+            // Update 'mem_500' bar to show memory usage relative to 512MB.
             custom_state(PART:"mem_500", "default", 0.0);
             get_state_val(PART:"mem_500", STATE_REL2, x, y);
             x = float(m500) / 100.0;
             set_state_val(PART:"mem_500", STATE_REL2, x, y);
             set_state(PART:"mem_500", "custom", 0.0);
 
+            // Update 'mem_total' bar to show memory usage relative to total system memory.
             custom_state(PART:"mem_total", "default", 0.0);
             get_state_val(PART:"mem_total", STATE_REL2, x, y);
             x = float(mt) / 100.0;
@@ -54,13 +85,20 @@ group { name: "e/modules/procstats/border";
          }
       }
    }
+   // The 'parts' block defines all the visual components of the gadget.
    parts {
+      // 'base' is a rectangle that serves as the background for the entire gadget.
+      // Its appearance is defined by a color class, allowing it to be themed.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
             color_class: "/bg/normal/gadgets/procstats/base";
          }
       }
+      // 'area' is an invisible spacer that defines the content region.
+      // It is slightly smaller than 'base' to create a padding effect.
+      // The 'offscale' property ensures that 'area' itself is not rendered,
+      // but its dimensions are used for positioning its child parts.
       part { name: "area"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -70,6 +108,11 @@ group { name: "e/modules/procstats/border";
             offscale;
          }
       }
+      // The following RECT parts are the colored bars that display the stats.
+      // They are stacked vertically within the 'area' part, each occupying 25% of its height.
+      // Their widths are dynamically adjusted by the script.
+
+      // Bar for total CPU usage (all cores combined).
       part { name: "cpu_perc"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "area";
@@ -78,6 +121,7 @@ group { name: "e/modules/procstats/border";
             color_class: "/fg/normal/gadgets/procstats/cpu/one";
          }
       }
+      // Bar for average CPU usage per core.
       part { name: "cpu_num"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "area";
@@ -86,6 +130,7 @@ group { name: "e/modules/procstats/border";
             color_class: "/fg/normal/gadgets/procstats/cpu/all";
          }
       }
+      // Bar for memory usage relative to a 512MB baseline.
       part { name: "mem_500"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "area";
@@ -94,6 +139,7 @@ group { name: "e/modules/procstats/border";
             color_class: "/fg/normal/gadgets/procstats/mem/limit";
          }
       }
+      // Bar for memory usage relative to total system memory.
       part { name: "mem_total"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "area";
@@ -102,12 +148,21 @@ group { name: "e/modules/procstats/border";
             color_class: "/fg/normal/gadgets/procstats/mem/all";
          }
       }
+      // 'over' is a transparent rectangle covering the entire gadget.
+      // This part is often used to capture mouse events for the whole gadget area
+      // without interfering with the visuals of the bars underneath.
       part { name: "over"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            // Sets color to RGBA(0, 0, 0, 0), which is fully transparent black.
+            // A direct color is used here instead of a themeable color class.
+            color: 0 0 0 0;
          }
       }
    }
+   // The 'programs' block is used for defining interactions, such as animations
+   // or actions triggered by signals (e.g., mouse clicks).
+   // It is empty here because this gadget is passive, and its state is controlled
+   // entirely by the external messages sent to its script.
    programs {
    }
 }

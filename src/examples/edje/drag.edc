@@ -1,10 +1,16 @@
 collections {
+   // This group defines a layout for a draggable knob example.
+   // It sets a minimum size for the window or container it will be placed in.
    group {
       name: "example/group";
 
       min: 160 160;
 
       parts {
+         // The 'bg' part is a simple rectangle that serves as the background.
+         // 'mouse_events: 0;' ensures it doesn't intercept mouse input, which is
+         // important for performance and to allow events to pass through to
+         // other elements if needed.
          part {
             name: "bg";
             type: RECT;
@@ -16,6 +22,9 @@ collections {
             }
          } // bg
 
+         // The 'title' part displays the text "Drag Example".
+         // It is positioned relative to the 'bg' part, occupying the top 20%
+         // of the container's width.
          part {
             name: "title";
             type: TEXT;
@@ -23,6 +32,7 @@ collections {
 
             description {
                state: "default" 0.0;
+               // Color: Black (#000000FF)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -43,6 +53,10 @@ collections {
             }
          }
 
+         // 'drag_area' defines the confinement region for the draggable knob.
+         // It's a thin vertical rectangle in the middle of the group.
+         // While it is visible as a black line, its primary purpose is to constrain
+         // the movement of the 'example/knob' part.
          part {
             name: "drag_area";
             type: RECT;
@@ -51,6 +65,7 @@ collections {
 
             description {
                state: "default" 0.0;
+               // Color: Black (#000000FF)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.5 0.3;
@@ -64,15 +79,21 @@ collections {
             }
          } // drag_area
 
+         // This is the draggable knob. 'mouse_events: 1;' is required for it
+         // to be interactive.
          part {
             name: "example/knob";
             type: RECT;
 
             mouse_events: 1;
 
+            // The 'dragable' block specifies the dragging behavior.
             dragable {
+               // 'confine' restricts the knob's movement to within the 'drag_area' part.
                confine: "drag_area";
+               // 'x: 0 0 0;' disables dragging along the X-axis.
                x: 0 0 0;
+               // 'y: 1 1 0;' enables dragging along the Y-axis with a step of 1 pixel.
                y: 1 1 0;
             }
 
@@ -80,6 +101,7 @@ collections {
                state: "default" 0.0;
                min: 10 10;
 
+               // Color: Red with some transparency (#FF0000C8)
                color: 255 0 0 200;
 
             }

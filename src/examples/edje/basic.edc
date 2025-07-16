@@ -1,24 +1,43 @@
+// The collections block is the root of an EDC file, containing one or more groups.
 collections {
+   // A group defines a single user interface component or layout.
    group {
       name: "example_group";
+      // Sets the maximum and minimum size hints for the object.
+      // Edje will not allow the object to be resized beyond these limits.
       max: 500 500;
       min: 50 50;
 
+      // The data block allows embedding arbitrary key-value string data into the group.
+      // This data can be queried at runtime.
       data {
          item: "example_data" "a string";
       }
 
+      // The parts block contains all the visual and non-visual elements of the group.
       parts {
+         // A part is a fundamental building block, like a rectangle, text, or image.
          part {
             name: "part_one";
             type: RECT;
+            // 'scale: 1' enables smooth scaling of the part's contents (e.g., image, text).
+            // This is especially useful for maintaining quality on high-DPI displays.
             scale: 1;
+            // A description defines the state of a part. Parts can have multiple descriptions
+            // to represent different states (e.g., "clicked", "disabled").
             description {
+               // Defines the minimum and maximum size for this specific part.
                min: 50 50;
                max: 50 50;
                state: "default" 0.0;
+               // Color is defined in R G B A format (0-255).
+               // This is blue (#0000FFFF) with full opacity.
                color: 0 0 255 255; /* blue */
+               // rel1 and rel2 define the part's position and size relative to its container.
+               // (0.0, 0.0) aligns the top-left corner of the part with the top-left of the container.
                rel1.relative: 0.0 0.0;
+               // (1.0, 1.0) aligns the bottom-right corner of the part with the bottom-right of the container.
+               // The combined effect makes this part fill its container entirely.
                rel2.relative: 1.0 1.0;
             }
          }
@@ -28,8 +47,14 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
+               // This is green (#00FF00FF) with full opacity.
                color: 0 255 0 255; /* green */
+               // The position of this part is initially outside the visible area of the group.
+               // rel1 places the top-left corner of the part one full container-width to the left
+               // and one full container-height above the container's top-left corner.
                rel1.relative: -1.0 -1.0;
+               // rel2 aligns the bottom-right of the part with the top-left of the container.
+               // This setup is often used for parts that will be animated into view.
                rel2.relative: 0.0 0.0;
             }
          }

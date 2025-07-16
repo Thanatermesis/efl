@@ -1,16 +1,22 @@
+// Defines the icon for bugfix updates. This group is a simple container for a single image.
 group { name: "e/modules/packagekit/icon/bugfix";
    images.image: "pkg-bug.png" COMP;
    parts {
+      // The 'image' part displays the bug icon.
+      // 'mouse_events: 0' prevents it from capturing mouse interactions, making it purely decorative.
       part { name: "image";  mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "pkg-bug.png";
+            // 'aspect' and 'aspect_preference' ensure the icon maintains its proportions.
             aspect: 1.0 1.0; aspect_preference: BOTH;
+            // 'color_class' allows the icon's color to be themed.
             color_class: "/fg/normal/gadgets/packagekit/pkg/bug";
          }
       }
    }
 }
 
+// Defines the icon for enhancement updates.
 group { name: "e/modules/packagekit/icon/enhancement";
    images.image: "pkg-enhance.png" COMP;
    parts {
@@ -24,6 +30,7 @@ group { name: "e/modules/packagekit/icon/enhancement";
    }
 }
 
+// Defines the icon for important updates.
 group { name: "e/modules/packagekit/icon/important";
    images.image: "pkg-important.png" COMP;
    parts {
@@ -37,6 +44,7 @@ group { name: "e/modules/packagekit/icon/important";
    }
 }
 
+// Defines the icon for low-priority updates.
 group { name: "e/modules/packagekit/icon/low";
    images.image: "pkg-low.png" COMP;
    parts {
@@ -50,6 +58,7 @@ group { name: "e/modules/packagekit/icon/low";
    }
 }
 
+// Defines the icon for normal-priority updates.
 group { name: "e/modules/packagekit/icon/normal";
    images.image: "pkg-normal.png" COMP;
    parts {
@@ -63,6 +72,7 @@ group { name: "e/modules/packagekit/icon/normal";
    }
 }
 
+// Defines the icon for security updates.
 group { name: "e/modules/packagekit/icon/security";
    images.image: "pkg-security.png" COMP;
    parts {
@@ -76,8 +86,12 @@ group { name: "e/modules/packagekit/icon/security";
    }
 }
 
+// This group defines the main packagekit gadget, which shows update status.
+// It includes a base icon, status indicators, and a busy animation.
 group { name: "e/modules/packagekit/main";
    max: 160 160;
+   // Image sets are used for resolution independence. Edje selects the best image
+   // based on the part's size. This avoids scaling artifacts and improves performance.
    set { name: "pkg_base";
       image { image: "pkg-base-160.png"  COMP; size: 81 81 99999 99999; }
       image { image: "pkg-base-080.png"  COMP; size: 41 41 80 80 99999; }
@@ -101,6 +115,7 @@ group { name: "e/modules/packagekit/main";
    images.image: "pkg-busy3.png" COMP;
    images.image: "pkg-busy4.png" COMP;
    parts {
+      // The 'base' part is the background of the gadget.
       part { name: "base";
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
@@ -108,12 +123,15 @@ group { name: "e/modules/packagekit/main";
             image.normal: "pkg_base";
          }
       }
+      // The 'shade' part is an overlay on the 'base' part, likely for a shadow or highlight effect.
       part { name: "shade";
          description { state: "default" 0.0;
+            // 'rel.to' positions this part exactly on top of the 'base' part.
             rel.to: "base";
             image.normal: "pkg_shade";
          }
       }
+      // The 'label' part is another overlay, probably for text or branding.
       part { name: "label";
          description { state: "default" 0.0;
             rel.to: "base";
@@ -121,9 +139,11 @@ group { name: "e/modules/packagekit/main";
             color_class: "/fg/normal/gadgets/packagekit/label";
          }
       }
+      // Displays the number of available updates. 'scale: 1' enables smooth scaling of the text.
       part { name: "num_updates"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
+            // The position is defined relative to a 40x40 grid, making it resolution-independent.
             rel1.relative: (8/40) (8/40);
             rel2.relative: (32/40) (32/40);
             color_class: "/fg/normal/gadgets/packagekit/text/updates";
@@ -131,11 +151,14 @@ group { name: "e/modules/packagekit/main";
             }
          }
       }
+      // This part displays a status icon (e.g., ok, error) based on the current state.
+      // It has multiple descriptions, one for each state, and is mostly invisible by default.
       part { name: "status";
          description { state: "default" 0.0;
             fixed: 1 1;
             visible: 0;
          }
+         // The 'running' and 'updates' states are handled by other visuals (busy animation/text).
          description { state: "running" 0.0;
             inherit: "default" 0.0;
             visible: 0;
@@ -144,6 +167,7 @@ group { name: "e/modules/packagekit/main";
             inherit: "default" 0.0;
             visible: 0;
          }
+         // In 'updated' state, it shows a checkmark icon.
          description { state: "updated" 0.0;
             inherit: "default" 0.0;
             visible: 1;
@@ -152,6 +176,7 @@ group { name: "e/modules/packagekit/main";
             image.normal: "pkg-ok.png";
             color_class: "/fg/normal/gadgets/packagekit/status/ok";
          }
+         // In 'error' state, it shows an error icon.
          description { state: "error" 0.0;
             inherit: "default" 0.0;
             visible: 1;
@@ -161,17 +186,24 @@ group { name: "e/modules/packagekit/main";
             color_class: "/fg/normal/gadgets/packagekit/status/error";
          }
       }
+      // 'busy_clip' is a rectangle used as a clipper for the busy animation parts.
+      // It controls the visibility of the animation by transitioning its color's alpha channel.
       part { name: "busy_clip"; type: RECT;
          description { state: "default" 0.0;
+            // Initially transparent (#FFFFFF00) and invisible.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "busy" 0.0;
             inherit: "default" 0.0;
+            // Becomes opaque white (#FFFFFFFF) and visible when in the 'busy' state.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The four 'busy' parts form a spinning animation to indicate work in progress.
+      // They are all clipped by 'busy_clip' and rotate around the center of 'busy1'.
+      // The different rotation angles (360, -360, 720, -720) create a complex visual effect.
       part { name: "busy1"; mouse_events: 0;
          clip_to: "busy_clip";
          description { state: "default" 0.0;
@@ -179,11 +211,13 @@ group { name: "e/modules/packagekit/main";
             image.normal: "pkg-busy1.png";
             rel1.relative: (7/40) (7/40);
             rel2.relative: (33/40) (33/40);
+            // 'map.on: 1' enables transformations like rotation. 'map.smooth: 1' ensures it looks good.
             map.on: 1;
             map.smooth: 1;
             map.rotation.center: "busy1";
             color_class: "/fg/normal/gadgets/packagekit/status/busy/1";
          }
+         // The 'spin' state defines a 360-degree rotation.
          description { state: "spin" 0.0;
             inherit: "default" 0.0;
             map.rotation.z: 360;
@@ -242,30 +276,39 @@ group { name: "e/modules/packagekit/main";
       }
    }
    programs {
+      // The 'spin' and 'spin2' programs create a continuous looping animation for the 'busy' parts.
+      // This is triggered by an 'e,state,hung' signal, which is typically emitted when the application is busy.
       program { name: "spin";
          signal: "e,state,hung"; source: "e";
+         // Sets the state of the busy parts to 'spin', initiating the rotation.
          action: STATE_SET "spin" 0.0;
          transition: LINEAR 1.0;
          target: "busy1";
          target: "busy2";
          target: "busy3";
          target: "busy4";
+         // After the transition, it calls 'spin2' to reset.
          after: "spin2";
       }
       program { name: "spin2";
+         // Resets the state of the busy parts back to 'default'.
          action: STATE_SET "default" 0.0;
          target: "busy1";
          target: "busy2";
          target: "busy3";
          target: "busy4";
+         // Calls 'spin' again to continue the loop.
          after: "spin";
       }
+      // The 'busy-on' program fades in the 'busy_clip', making the spinner visible.
       program { name: "busy-on";
          signal: "e,state,hung"; source: "e";
          action: STATE_SET "busy" 0.0;
          transition: SINUSOIDAL 0.25;
          target: "busy_clip";
       }
+      // The 'busy-off' program fades out the 'busy_clip'. The 'after' chain ensures
+      // that the animation is stopped and reset cleanly.
       program { name: "busy-off";
          signal: "e,state,unhung"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -273,12 +316,14 @@ group { name: "e/modules/packagekit/main";
          target: "busy_clip";
          after: "spin3";
       }
+      // 'spin3' stops the animation loop.
       program { name: "spin3";
          action: ACTION_STOP;
          target: "spin";
          target: "spin2";
          after: "spin4";
       }
+      // 'spin4' resets the state of the busy parts to their default (non-rotated) state.
       program { name: "spin4";
          action: STATE_SET "default" 0.0;
          target: "busy1";
@@ -287,12 +332,17 @@ group { name: "e/modules/packagekit/main";
          target: "busy4";
       }
 
+      // These programs respond to signals from the packagekit C module to update the gadget's UI.
+      // 'packagekit,state,none' means there are no ongoing operations and no updates.
       program {
          signal: "packagekit,state,none"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "status";
          after: "busy-off";
       }
+      // 'packagekit,state,working' indicates an operation is in progress.
+      // The two programs below are triggered by this signal. One starts the spinning animation ('spin')
+      // and the other makes it visible ('busy-on'). Both also set the 'status' part's state to 'running'.
       program {
          signal: "packagekit,state,working"; source: "e";
          action: STATE_SET "running" 0.0;
@@ -305,18 +355,24 @@ group { name: "e/modules/packagekit/main";
          target: "status";
          after: "busy-on";
       }
+      // 'packagekit,state,updates' means updates are available, but nothing is happening.
+      // The number of updates would be set on the 'num_updates' text part from C code.
       program {
          signal: "packagekit,state,updates"; source: "e";
          action: STATE_SET "updates" 0.0;
          target: "status";
          after: "busy-off";
       }
+      // 'packagekit,state,updated' means an operation finished successfully.
+      // It shows the 'updated' state (checkmark icon) and stops any busy animation.
       program {
          signal: "packagekit,state,updated"; source: "e";
          action: STATE_SET "updated" 0.0;
          target: "status";
          after: "busy-off";
       }
+      // 'packagekit,state,error' indicates an operation failed.
+      // It shows the 'error' state (error icon) and stops any busy animation.
       program {
          signal: "packagekit,state,error"; source: "e";
          action: STATE_SET "error" 0.0;

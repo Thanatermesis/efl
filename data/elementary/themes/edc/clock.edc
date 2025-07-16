@@ -1,3 +1,6 @@
+// This group defines the digital clock, which displays the time using a set
+// of images for each digit. It supports 12/24 hour formats, with optional
+// seconds and date display.
 group { name: "e/modules/clock/digital";
    min: 64 16;
    max: 512 128;
@@ -14,9 +17,17 @@ group { name: "e/modules/clock/digital";
    images.image: "digit_am.png" COMP;
    images.image: "digit_pm.png" COMP;
    images.image: "digit_sep.png" COMP;
+   // The script block contains the logic for the digital clock, handling time
+   // updates, format changes (12/24h, with/without seconds), and resizing.
    script {
+      // These are public variables that can be modified from the C code to
+      // control the clock's appearance and behavior.
       public do_seconds, do_24h, do_date, tick_timer;
 
+      // This function dynamically adjusts the layout of the clock's digits
+      // based on whether seconds, AM/PM, or the date are displayed.
+      // It calculates the total width required and resizes each digit part
+      // accordingly, ensuring the clock looks good in all configurations.
       evalsize() {
          new do24h, dosec, v[14], i, tot, mul;
          new parts[] = {
@@ -76,6 +87,8 @@ group { name: "e/modules/clock/digital";
          set_max_size(tot * 8 * mul, 128);
          emit("e,state,sizing,changed", "");
       }
+      // Resets the clock to its initial state. It recalculates the layout,
+      // cancels any pending timers, and triggers an immediate time update.
       reset() {
          new tim;
 
@@ -87,6 +100,9 @@ group { name: "e/modules/clock/digital";
          }
          clock_cb(0);
       }
+      // A helper function to display a specific digit. It iterates through all
+      // possible digit images (0-9) for a given part (e.g., "s0" for the first
+      // seconds digit) and emits signals to show the correct one and hide the others.
       valset(name[], v) {
          new buf[20], i;
 
@@ -100,10 +116,16 @@ group { name: "e/modules/clock/digital";
             emit(buf, "c");
          }
       }
+      // Sets the state of the AM/PM indicator. "active" for PM, "default" for AM.
       apvalset(id, pm) {
          if (pm) set_state(id, "active", 0.0);
          else set_state(id, "default", 0.0);
       }
+      // This is the main timer callback, executed periodically to update the clock display.
+      // It retrieves the current time, sets up the next timer tick, and updates the
+      // hour, minute, and second digits. The timer's interval is cleverly adjusted to
+      // account for execution time, ensuring it fires as close to the start of the
+      // next second/minute as possible.
       public clock_cb(val) {
          new year, month, day, yearday, weekday, hour, minute;
          new Float:second;
@@ -154,7 +176,10 @@ group { name: "e/modules/clock/digital";
          }
       }
    }
+   // The 'parts' section defines the visual components of the digital clock.
    parts {
+      // A clipping rectangle for the seconds digits. When seconds are hidden,
+      // this part becomes invisible, effectively hiding the digits clipped to it.
       part { name: "secclip"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -162,6 +187,8 @@ group { name: "e/modules/clock/digital";
             visible: 0;
          }
       }
+      // A clipping rectangle for the AM/PM indicator, used in 12-hour mode.
+      // It's hidden in 24-hour mode.
       part { name: "ampmclip"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -169,8 +196,13 @@ group { name: "e/modules/clock/digital";
             visible: 0;
          }
       }
-      // XXX: hours1/2, mins1/2, secs1/2 and ampm SHOULD be spacers... but
-      // if they are calculations go weird. this shouldnt happen, but does.
+      // The 'timearea' part is an invisible container whose size is adjusted
+      // based on whether the date is shown. The digit spacers below are
+      // relative to this part.
+      // The following RECT parts serve as invisible spacers, defining the
+      // regions for hours, minutes, seconds, and AM/PM. `evalsize()` in the
+      // script dynamically resizes them. Using RECT instead of SPACER avoids
+      // some layout calculation quirks.
       part { name: "timearea"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -245,6 +277,8 @@ group { name: "e/modules/clock/digital";
             visible: 0;
          }
       }
+      // These parts represent the dots in the separator (e.g., the colon in 12:34).
+      // They are positioned between the hour/minute and minute/second spacers.
       part { name: "c00";
          description { state: "default" 0.0;
             rel1.to: "hours2";
@@ -267,6 +301,8 @@ group { name: "e/modules/clock/digital";
             aspect: 1.0 1.0; aspect_preference: BOTH;
          }
       }
+      // This separator is between minutes and seconds, so it's clipped by "secclip"
+      // and will only be visible when seconds are displayed.
       part { name: "c10";
          clip_to: "secclip";
          description { state: "default" 0.0;
@@ -291,6 +327,9 @@ group { name: "e/modules/clock/digital";
             aspect: 1.0 1.0; aspect_preference: BOTH;
          }
       }
+// Defines a macro to create a single digit part. It sets up the basic properties
+// like aspect ratio, image, and color class. The part is initially invisible
+// (color #FFFFFF00) and becomes visible in the "active" state (color #FFFFFFFF).
 #define ELEM(_NAME, _TO, _DIGIT, _CC) \
    part { name: _NAME; \
       description { state: "default" 0.0; \
@@ -307,6 +346,8 @@ group { name: "e/modules/clock/digital";
          color: 255 255 255 255; /* no cc */ \
       } \
    }
+// Defines a macro to generate all 10 digit parts (0-9) for a given position
+// (e.g., "h0", "m1") using the ELEM macro.
 #define DIGIT(_NAME, _TO, _CC) \
    ELEM(_NAME"-0", _TO, "0", _CC) \
    ELEM(_NAME"-1", _TO, "1", _CC) \
@@ -318,6 +359,7 @@ group { name: "e/modules/clock/digital";
    ELEM(_NAME"-7", _TO, "7", _CC) \
    ELEM(_NAME"-8", _TO, "8", _CC) \
    ELEM(_NAME"-9", _TO, "9", _CC)
+// Similar to ELEM, but for parts that need to be clipped (e.g., seconds digits).
 #define ELEMC(_NAME, _TO, _DIGIT, _CLIP, _CC) \
    part { name: _NAME; \
       clip_to: _CLIP; \
@@ -335,6 +377,7 @@ group { name: "e/modules/clock/digital";
          color: 255 255 255 255; /* no cc */ \
       } \
    }
+// Similar to DIGIT, but uses ELEMC to create clipped digit parts.
 #define DIGITC(_NAME, _TO, _CLIP, _CC) \
    ELEMC(_NAME"-0", _TO, "0", _CLIP, _CC) \
    ELEMC(_NAME"-1", _TO, "1", _CLIP, _CC) \
@@ -346,6 +389,8 @@ group { name: "e/modules/clock/digital";
    ELEMC(_NAME"-7", _TO, "7", _CLIP, _CC) \
    ELEMC(_NAME"-8", _TO, "8", _CLIP, _CC) \
    ELEMC(_NAME"-9", _TO, "9", _CLIP, _CC)
+// Defines the AM/PM indicator part. It uses "digit_am.png" for the default
+// state (AM) and "digit_pm.png" for the "active" state (PM).
 #define TAG(_NAME, _TO, _CLIP, _CC) \
    part { name: _NAME; \
       clip_to: _CLIP; \
@@ -360,10 +405,10 @@ group { name: "e/modules/clock/digital";
          image.normal: "digit_pm.png"; \
       } \
    }
-// color_class: "/fg/normal/gadgets/clock/time/digital/hours";
-// color_class: "/fg/normal/gadgets/clock/time/digital/mins";
-// color_class: "/fg/normal/gadgets/clock/time/digital/secs";
-// color_class: "/fg/normal/gadgets/clock/time/digital/ampm";
+// The following macro calls generate all the necessary parts for the clock display:
+// two digits for hours, two for minutes, two for seconds (clipped), and one
+// for the AM/PM tag (also clipped). Each set of digits is associated with a
+// specific spacer part and a color class for theming.
       DIGIT ("h0", "hours1", "/fg/normal/gadgets/clock/time/digital/hours")
       DIGIT ("h1", "hours2", "/fg/normal/gadgets/clock/time/digital/hours")
       DIGIT ("m0", "mins1", "/fg/normal/gadgets/clock/time/digital/mins")
@@ -378,6 +423,9 @@ group { name: "e/modules/clock/digital";
 #undef DIGIT
 #undef DIGITC
 
+       // This part displays the date text (e.g., "Tuesday, 23 July"). It is
+       // positioned below the time display and is only visible when the date
+       // feature is enabled.
        part { name: "e.text.today"; type: TEXT;
           scale: 1;
           description { state: "default" 0.0;
@@ -402,18 +450,28 @@ group { name: "e/modules/clock/digital";
              text.ellipsis: 0;
           }
        }
+       // This is a transparent rectangle covering the entire gadget area. It's
+       // typically used to capture mouse events for the whole gadget, though
+       // it's not configured to do so here. Its color #00000000 makes it fully
+       // transparent.
        part { name: "event"; type: RECT;
           description { state: "default" 0.0;
              color: 0 0 0 0; // no cc
           }
        }
    }
+   // The 'programs' section defines how the gadget responds to signals, such
+   // as configuration changes from the C code or internal events.
    programs {
+      // When the gadget is loaded, it calls the reset() script function to
+      // initialize the clock.
       program { signal: "load"; source: "";
          script {
             reset();
          }
       }
+      // Triggered by C code to show the date. It sets the 'do_date' flag,
+      // switches relevant parts to their "date" state, and resets the layout.
       program { signal: "e,state,date,on"; source: "e";
          script {
             set_int(do_date, 1);
@@ -422,6 +480,7 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+      // Triggered by C code to hide the date.
       program { signal: "e,state,date,off"; source: "e";
          script {
             set_int(do_date, 0);
@@ -430,6 +489,7 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+      // Triggered by C code to show seconds.
       program { signal: "e,state,seconds,on"; source: "e";
          script {
             set_int(do_seconds, 1);
@@ -437,6 +497,7 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+      // Triggered by C code to hide seconds.
       program { signal: "e,state,seconds,off"; source: "e";
          script {
             set_int(do_seconds, 0);
@@ -444,6 +505,7 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+      // Triggered by C code to switch to 24-hour format.
       program { signal: "e,state,24h,on"; source: "e";
          script {
             set_int(do_24h, 1);
@@ -451,6 +513,7 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+      // Triggered by C code to switch to 12-hour format.
       program { signal: "e,state,24h,off"; source: "e";
          script {
             set_int(do_24h, 0);
@@ -458,6 +521,10 @@ group { name: "e/modules/clock/digital";
             reset();
          }
       }
+// This macro generates a pair of programs for a single digit part (e.g., "h0-1").
+// The "show" program makes the digit visible by setting its state to "active".
+// The "hide" program makes it invisible by setting it back to "default" with a
+// fade-out transition. These are triggered by the `valset` script function.
 #define DIGPRG(_NAME) \
       program { signal: "show,"_NAME; source: "c"; \
          action: STATE_SET "active" 0.0; \
@@ -488,6 +555,9 @@ group { name: "e/modules/clock/digital";
       DIGPRGS("s1")
 #undef DIGPRG
 #undef DIGPRGS
+      // The "freeze" signal is sent when the gadget should stop updating, for
+      // example, if it's hidden or the screen is off. This program cancels the
+      // pending timer to save CPU cycles.
       program { signal: "e,state,freeze"; source: "e";
          script {
             new tim;
@@ -499,6 +569,9 @@ group { name: "e/modules/clock/digital";
             }
          }
       }
+      // The "thaw" signal resumes updates. It cancels any existing timer (as a
+      // precaution) and then calls clock_cb to immediately refresh the display
+      // and schedule the next update.
       program { signal: "e,state,thaw"; source: "e";
          script {
             new tim;
@@ -514,8 +587,13 @@ group { name: "e/modules/clock/digital";
    }
 }
 
+// This group defines the analog clock view. It consists of a base image, digits,
+// and three hands (hours, minutes, seconds) that are rotated using map transformations.
 group { name: "e/modules/clock/main";
    set { name: "clock_base";
+      // Image sets are used to provide different versions of an image for various
+      // sizes, allowing the theme to scale gracefully. Edje will pick the most
+      // appropriate image based on the gadget's current size.
       image { image: "clock_base-160.png" COMP; size: 81 81 99999 99999; }
       image { image: "clock_base-080.png" COMP; size: 41 41 80 80; }
       image { image: "clock_base-040.png" COMP; size: 0 0 40 40; }
@@ -542,9 +620,14 @@ group { name: "e/modules/clock/main";
    }
    min: 16 16;
    max: 160 160;
+   // The script for the analog clock handles the rotation of the clock hands.
    script {
       public do_seconds, tick_timer;
 
+         // This callback updates the rotation of the hour, minute, and second hands.
+         // It uses `set_state_val` with `STATE_MAP_ROT_Z` to apply a Z-axis rotation.
+         // The rotation for the hour hand includes a fractional component based on
+         // the current minute for smoother movement.
          public clock_cb(val) {
             new year, month, day, yearday, weekday, hour, minute;
             new Float:second;
@@ -575,6 +658,7 @@ group { name: "e/modules/clock/main";
          }
    }
    parts {
+      // The base image of the analog clock face.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             aspect: 1.0 1.0; aspect_preference: BOTH;
@@ -582,6 +666,7 @@ group { name: "e/modules/clock/main";
             color_class: "/bg/normal/gadgets/clock/analog/base";
          }
       }
+      // The numbers on the clock face, layered on top of the base.
       part { name: "digits"; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -589,6 +674,9 @@ group { name: "e/modules/clock/main";
             color_class: "/fg/normal/gadgets/clock/analog/digits";
          }
       }
+      // The second hand. The 'map' property enables transformations, allowing the
+      // script to rotate it. It has a "hidden" state for when seconds display
+      // is turned off.
       part { name: "seconds"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "clock_hand_secs";
@@ -603,6 +691,7 @@ group { name: "e/modules/clock/main";
             visible: 0;
          }
       }
+      // The minute hand, also uses mapping for rotation.
       part { name: "minutes"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "clock_hand_mins";
@@ -613,6 +702,7 @@ group { name: "e/modules/clock/main";
             }
          }
       }
+      // The hour hand, also uses mapping for rotation.
       part { name: "hours"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "clock_hand_hours";
@@ -625,21 +715,26 @@ group { name: "e/modules/clock/main";
       }
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, fully transparent
          }
       }
    }
    programs {
+      // On load, immediately update the clock hands.
       program { signal: "load"; source: "";
          script {
             clock_cb(0);
          }
       }
+      // When enabling seconds, this program makes the "seconds" hand visible.
+      // The 'after' keyword chains this to the 'sec2' program.
       program { signal: "e,state,seconds,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "seconds";
          after: "sec2";
       }
+      // This program runs after the hand is made visible. It updates the
+      // 'do_seconds' flag and resets the clock to start per-second updates.
       program { name: "sec2";
          script {
             new tim;
@@ -653,11 +748,14 @@ group { name: "e/modules/clock/main";
             clock_cb(0);
          }
       }
+      // When disabling seconds, this program hides the second hand.
       program { signal: "e,state,seconds,off"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "seconds";
          after: "sec3";
       }
+      // After hiding the hand, this updates the flag and resets the clock
+      // to switch to per-minute updates.
       program { name: "sec3";
          script {
             new tim;
@@ -671,6 +769,7 @@ group { name: "e/modules/clock/main";
             clock_cb(0);
          }
       }
+      // Freeze/thaw programs stop and resume the timer, same as in the digital clock.
       program { signal: "e,state,freeze"; source: "e";
          script {
             new tim;
@@ -697,8 +796,11 @@ group { name: "e/modules/clock/main";
    }
 }
 
+// This group defines a single day name label (e.g., "Mon") for the calendar header.
 group { name: "e/modules/clock/calendar/dayname";
    parts {
+      // The text part for the day name. It has two states: "default" for weekdays
+      // and "weekend" for weekends, allowing them to be styled differently.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -718,10 +820,12 @@ group { name: "e/modules/clock/calendar/dayname";
       }
    }
    programs {
+      // Sets the label to its "weekend" state.
       program { signal: "e,state,weekend"; source: "e";
          action: STATE_SET "weekend" 0.0;
          target: "e.text.label";
       }
+      // Sets the label to its "weekday" (default) state.
       program { signal: "e,state,weekday"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.text.label";
@@ -729,24 +833,34 @@ group { name: "e/modules/clock/calendar/dayname";
    }
 }
 
+// This group represents a single day cell in the calendar grid.
 group { name: "e/modules/clock/calendar/day";
    script {
+      // This script manages the complex state of a day cell using a bitmask.
+      // The state can be a combination of: weekend (1), today (2), and hidden
+      // (4, for days not in the current month).
       public day_state = 0;
+      // evalstate reads the bitmask and applies the correct visual state to the
+      // parts. This is more efficient than having many separate state variables.
       evalstate() {
          new vv = get_int(day_state);
 
+         // today (bit 2) has the highest priority
          if (vv & 2) {
             set_state(PART:"e.text.label", "today", 0.0);
             set_state(PART:"label2", "today", 0.0);
             set_state(PART:"base", "today", 0.0);
+         // hidden (bit 4) for days of previous/next month
          } else if (vv & 4) {
             set_state(PART:"e.text.label", "hidden", 0.0);
             set_state(PART:"label2", "default", 0.0);
             set_state(PART:"base", "default", 0.0);
+         // weekend (bit 1)
          } else if (vv & 1) {
             set_state(PART:"e.text.label", "weekend", 0.0);
-            set_state(PART:"label2", "default", 0.0); 
+            set_state(PART:"label2", "default", 0.0);
             set_state(PART:"base", "default", 0.0);
+         // default weekday state
          } else {
             set_state(PART:"e.text.label", "default", 0.0);
             set_state(PART:"label2", "default", 0.0);
@@ -755,6 +869,8 @@ group { name: "e/modules/clock/calendar/day";
       }
    }
    parts {
+      // The background of the day cell. It's normally invisible but becomes
+      // visible to apply a background color for "today", "weekend", or "hidden" states.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/gadgets/clock/cal/day/date/normal";
@@ -776,6 +892,7 @@ group { name: "e/modules/clock/calendar/day";
             visible: 1;
          }
       }
+      // The main text part displaying the day number.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -804,6 +921,10 @@ group { name: "e/modules/clock/calendar/day";
             color_class: "/fg/normal/gadgets/clock/cal/day/date/faded";
          }
       }
+      // An overlay text part used only for the "today" state. By layering a
+      // separate text part with a different color class on top of the original,
+      // we can highlight "today" without duplicating all the text properties.
+      // It's invisible by default and becomes visible only for "today".
       part { name: "label2"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -824,6 +945,8 @@ group { name: "e/modules/clock/calendar/day";
       }
    }
    programs {
+      // These programs manipulate the 'day_state' bitmask and then call
+      // 'evalstate' to apply the visual changes.
       program { signal: "e,state,weekend"; source: "e";
          script {
             new vv = get_int(day_state);
@@ -871,8 +994,11 @@ group { name: "e/modules/clock/calendar/day";
    }
 }
 
+// This is the main calendar group, which assembles the month/year labels,
+// navigation buttons, and the grids for day names and dates.
 group { name: "e/modules/clock/calendar";
    parts {
+      // Displays the current month's name.
       part { name: "e.text.month"; type: TEXT;
          mouse_events: 1;
          scale: 1;
@@ -892,6 +1018,7 @@ group { name: "e/modules/clock/calendar";
             }
          }
       }
+      // Displays the current year.
       part { name: "e.text.year"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -910,6 +1037,8 @@ group { name: "e/modules/clock/calendar";
             }
          }
       }
+      // The image for the "previous month" button. It changes color class
+      // when pressed.
       part { name: "previm"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -925,6 +1054,8 @@ group { name: "e/modules/clock/calendar";
             color_class: "/fg/pressed/gadgets/clock/cal/prev";
          }
       }
+      // The clickable, transparent rectangle for the "previous month" button.
+      // It overlays the `previm` image.
       part { name: "prev"; type: RECT;
          description { state: "default" 0.0;
             align: 0.0 0.5;
@@ -935,18 +1066,24 @@ group { name: "e/modules/clock/calendar";
             rel2.to_y: "e.text.month";
             rel2.relative: 0.0 1.0;
          }
+         // When the button is pressed down, it sets the "previm" image to the
+         // "pressed" state, providing visual feedback.
          program { signal: "mouse,down,1*"; source: "prev";
             action: STATE_SET "pressed" 0.0;
             target: "previm";
          }
+         // On mouse up, it reverts the image to the "default" state.
          program { signal: "mouse,up,1"; source: "prev";
             action: STATE_SET "default" 0.0;
             target: "previm";
          }
+         // On a complete click, it emits a signal that the C code will handle
+         // to navigate to the previous month.
          program { signal: "mouse,clicked,1*"; source: "prev";
             action: SIGNAL_EMIT "e,action,prev" "";
          }
       }
+      // The "next month" button image, works just like `previm`.
       part { name: "nextim"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -962,6 +1099,7 @@ group { name: "e/modules/clock/calendar";
             color_class: "/fg/pressed/gadgets/clock/cal/next";
          }
       }
+      // The clickable area for the "next month" button.
       part { name: "next"; type: RECT;
          description { state: "default" 0.0;
             align: 1.0 0.5;
@@ -984,6 +1122,7 @@ group { name: "e/modules/clock/calendar";
             action: SIGNAL_EMIT "e,action,next" "";
          }
       }
+      // A horizontal line separating the month/year header from the calendar grid.
       part { name: "sep"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/fg/normal/gadgets/clock/cal/daydate-sep";
@@ -998,6 +1137,8 @@ group { name: "e/modules/clock/calendar";
          }
       }
 
+      // This table arranges the 7 day name labels (from the "e/modules/clock/calendar/dayname"
+      // group) into a horizontal row.
       part { name: "e.table.daynames"; type: TABLE;
          description { state: "default" 0.0;
             fixed: 0 1;
@@ -1026,10 +1167,13 @@ item { \
    align: -1.0 -1.0; \
 }
                D(0) D(1) D(2) D(3) D(4) D(5) D(6)
-#undef D                 
+#undef D
             }
          }
       }
+      // This table arranges the 42 day cells (from the "e/modules/clock/calendar/day"
+      // group) into a 7x6 grid. A 7x6 grid is used to accommodate any possible
+      // month layout.
       part { name: "e.table.days"; type: TABLE;
          scale: 1;
          description { state: "default" 0.0;

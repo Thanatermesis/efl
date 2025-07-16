@@ -1,18 +1,32 @@
+// This group defines the main UI for the battery module gadget.
+// It includes a visual representation of the battery level,
+// charging status, and text information that appears on mouse-over.
 group { name: "e/modules/battery/main";
    images.image: "bat_base.png" COMP;
    min: 16 16;
    max: 160 160;
+   // This script block contains Embryo code for dynamic gadget behavior.
+   // It handles updating the battery level display and debouncing
+   // audio feedback to avoid sound spam on load.
    script {
       public load_time;
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_FLOAT) && (id == 1)) {
+            // Receives battery level as a float (0.0-1.0) from the module C code.
             new Float:val = getfarg(2);
+            // The fill level is represented by a clipping rectangle.
+            // This calculation maps the battery level to the clipper's vertical
+            // position. The fill appears from bottom to top, so the value is inverted.
+            // An offset of 0.05 and a scale of 0.9 are used to fit the level
+            // visually within the battery icon's frame.
             val = 0.05 + (0.9 * (1.0 - val));
             custom_state(PART:"fill_clip", "default", 0.0);
             set_state_val(PART:"fill_clip", STATE_REL1, 0.0, val);
             set_state(PART:"fill_clip", "custom", 0.0);
          }
       }
+      // Provides a timestamp that is unique for long periods.
+      // This is used to check uptime of the gadget.
       public Float:year_sec() {
          new year, month, day, yearday, weekday, hour, minute;
          new Float:second;
@@ -20,6 +34,10 @@ group { name: "e/modules/battery/main";
          date(year, month, day, yearday, weekday, hour, minute, second);
          return seconds() + float(yearday * 24 * 3600);
       }
+      // Delays program execution to prevent sounds from playing immediately
+      // on gadget load (e.g., when the session starts and AC is already plugged in).
+      // It only allows the program to run if the gadget has been loaded for
+      // more than 5 seconds.
       public run_prog_later(prog) {
          new Float:second, Float:start;
 
@@ -29,32 +47,43 @@ group { name: "e/modules/battery/main";
       }
    }
    parts {
+      // A clipping rectangle that is used to create a pulsing effect when
+      // the battery is critically low. The pulse animation targets this part.
       part { name: "pulse_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
          description { state: "faded" 0.0;
             inherit: "default" 0.0;
+            // #FFFFFF80, 50% transparent white
             color: 255 255 255 128; // no cc
          }
       }
+      // This clipping rectangle's vertical position is adjusted by the script
+      // to visually represent the battery level. It clips the "fill" part.
       part { name: "fill_clip"; type: RECT;
          clip_to: "pulse_clip";
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // A clipping rectangle for the informational text parts.
+      // It is normally fully transparent and becomes opaque on mouse-over,
+      // making the text underneath visible.
       part { name: "info_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
             color_class: "/fg/normal/gadgets/battery/text/info";
+            // #FFFFFF00, fully transparent
             color: 255 255 255 0; // no cc
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // #FFFFFFFF, fully opaque
             color: 255 255 255 255; // no cc
          }
       }
+      // The base image of the battery, clipped by "pulse_clip".
       part { name: "bg";
          clip_to: "pulse_clip";
          description { state: "default" 0.0;
@@ -63,6 +92,9 @@ group { name: "e/modules/battery/main";
             color_class: "/bg-dark/normal/gadgets/battery/base";
          }
       }
+      // This part represents the battery's charge level. It uses the same
+      // base image as "bg", but is clipped by "fill_clip" to show a partial
+      // fill. Its color changes depending on the charging state.
       part { name: "fill";
          clip_to: "fill_clip";
          description { state: "default" 0.0;
@@ -75,6 +107,8 @@ group { name: "e/modules/battery/main";
             color_class: "/fg/normal/gadgets/battery/level/charge";
          }
       }
+      // Text part to display the current battery percentage. It's clipped
+      // by "info_clip" and is only visible on mouse-over.
       part { name: "e.text.reading"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "info_clip";
@@ -93,6 +127,8 @@ group { name: "e/modules/battery/main";
             }
          }
       }
+      // Text part to display the estimated time remaining. Like the reading,
+      // it is clipped by "info_clip" and visible on mouse-over.
       part { name: "e.text.time"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "info_clip";
@@ -111,36 +147,54 @@ group { name: "e/modules/battery/main";
             }
          }
       }
+      // An invisible rectangle placed on top of all other parts to capture
+      // mouse events. It triggers the visibility of the info text.
       part { name: "over"; type: RECT;
          description { state: "default" 0.0;
+            // #00000000, fully transparent
             color: 0 0 0 0; // no cc
          }
       }
    }
    programs {
+      // On gadget load, captures the current time to enable debouncing
+      // of other events, like AC plug/unplug sounds.
       program { signal: "load"; source: "";
          script { set_float(load_time, year_sec()); }
       }
+      // When the "e,state,ac,on" signal is received, it calls the script function
+      // "run_prog_later" to avoid playing a sound on initial load. If enough
+      // time has passed, the "ac_on" program is run.
       program { signal: "e,state,ac,on"; source: "e";
          script { run_prog_later(PROGRAM:"ac_on"); }
       }
+      // Plays a sample to indicate AC power has been connected.
       program { name: "ac_on";
          action: PLAY_SAMPLE "synth-worble-up" 1.0 ALERT;
       }
+      // Similar to AC on, this debounces the AC off event.
       program { signal: "e,state,ac,off"; source: "e";
          script { run_prog_later(PROGRAM:"ac_off"); }
       }
+      // Plays a sample to indicate AC power has been disconnected.
       program { name: "ac_off";
          action: PLAY_SAMPLE "synth-worble-dn" 1.0 ALERT;
       }
+      // Triggered when charging begins. It changes the "fill" part to the
+      // "charging" state, which typically involves a color change.
       program { signal: "e,state,charging"; source: "e";
          action: STATE_SET "charging" 0.0;
          target: "fill";
       }
+      // Triggered when discharging begins (running on battery). It resets
+      // the "fill" part to its default state and color.
       program { signal: "e,state,discharging"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "fill";
       }
+      // This set of programs creates a repeating pulse effect, likely for
+      // critically low battery alerts. The animation is started by the
+      // "e,action,pulse,start" signal.
       program { name: "pulse";
          signal: "e,action,pulse,start"; source: "e";
          action: STATE_SET "faded" 0.0;
@@ -148,28 +202,36 @@ group { name: "e/modules/battery/main";
          after: "pulse2";
          target: "pulse_clip";
       }
+      // The second part of the pulse animation loop, transitioning back to default.
       program { name: "pulse2";
          action: STATE_SET "default" 0.0;
          transition: ACCELERATE 0.1;
          target: "pulse_clip";
          after: "pulse";
       }
+      // The "e,action,pulse,stop" signal stops the animation loop.
       program { signal: "e,action,pulse,stop"; source: "e";
          action: ACTION_STOP;
          target: "pulse";
          target: "pulse2";
          after: "pulse3";
       }
+      // Ensures the "pulse_clip" is returned to its default, non-faded state
+      // after the animation is stopped.
       program { name: "pulse3";
          signal: "e,action,pulse,stop"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "pulse_clip";
       }
+      // When the mouse enters the "over" part, it transitions the "info_clip"
+      // to the "visible" state, revealing the text.
       program { signal: "mouse,in"; source: "over";
          action: STATE_SET "visible" 0.0;
          transition: SINUSOIDAL 0.3;
          target: "info_clip";
       }
+      // When the mouse leaves, it transitions "info_clip" back to the
+      // "default" state, hiding the text.
       program { signal: "mouse,out"; source: "over";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.3;
@@ -178,9 +240,14 @@ group { name: "e/modules/battery/main";
    }
 }
 
+// This group defines the layout for the low battery popup notification.
+// It includes an icon, a title, and a descriptive text.
 group { name: "e/modules/battery/popup";
    min: 320 80;
    parts {
+      // A SWALLOW part is a container that can host another Edje object.
+      // In this case, it's used to display the main battery gadget
+      // ("e/modules/battery/main") as an icon within the popup.
       part { name: "e.swallow.battery"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -189,6 +256,7 @@ group { name: "e/modules/battery/popup";
             align: 0.0 0.5;
          }
       }
+      // The main title of the popup notification.
       part { name: "e.text.title"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -204,6 +272,7 @@ group { name: "e/modules/battery/popup";
             }
          }
       }
+      // The descriptive text of the popup notification.
       part { name: "e.text.label"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;

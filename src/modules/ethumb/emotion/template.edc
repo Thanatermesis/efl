@@ -1,24 +1,35 @@
 collections {
 
+   // This group defines the visual representation and behavior of a movie thumbnail.
+   // It's a self-contained component that can be instanced in a layout.
    group {
       name: "movie/thumb";
 
+      // Preload images for faster access. COMP means the image will be stored
+      // compressed in the final EDJ file, saving space.
       images.image: "placeholder.png" COMP;
 
       parts {
+         // This is the main visual element of the thumbnail, an image part.
          part {
             name: "image";
             type: IMAGE;
+            // Disabling mouse events improves performance as this part is non-interactive.
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Disabling smooth filling is a performance optimization when image scaling
+               // quality is not a primary concern or for pixel-perfect rendering.
                fill.smooth: 0;
                image.normal: "placeholder.png";  /* edje doesn't allow image without files anymore */
             }
          }
       }
 
+      // Programs define the dynamic behavior of the group, responding to signals.
       programs {
+         // This program, when triggered by the "animate" signal, transitions the "image"
+         // part to its "default" state over 3 seconds. This can be used for a one-shot animation.
          program {
             name: "animate";
             signal: "animate";
@@ -26,6 +37,9 @@ collections {
             transition: LINEAR 3.0;
             target: "image";
          }
+         // Triggered by the "animate_loop" signal, this program creates a continuous
+         // animation loop. After each 3-second transition to the "default" state,
+         // it restarts itself using the "after" property.
          program {
             name: "animate_loop";
             signal: "animate_loop";
@@ -34,6 +48,8 @@ collections {
             target: "image";
             after: "animate_loop";
          }
+         // This program stops the "animate_loop" program when it receives the
+         // "animate_stop" signal. This is the mechanism to break the infinite loop.
          program {
             name: "animate_stop";
             signal: "animate_stop";

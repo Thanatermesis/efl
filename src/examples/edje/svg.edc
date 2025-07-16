@@ -1,6 +1,13 @@
+// This macro, SVG_PART_INTERPOLATE, creates a composite UI element from two parts: a RECT ('bg') and a VECTOR ('vg').
+// The RECT part 'bg' acts as a container and a clickable hot-spot, positioned relatively.
+// The VECTOR part 'vg' displays an SVG. It is aligned to fill the 'bg' part.
+// It features two states: "default" and "clicked". In the "default" state, it displays image 'id1' at a 130x130 pixel size.
+// In the "clicked" state, it switches to image 'id2' and enlarges to 150x150 pixels.
+// This allows for both a size and image change on interaction, suitable for animated feedback.
 #define SVG_PART_INTERPOLATE(bg, vg, rel1x, rel1y, rel2x, rel2y,id1, id2)\
          rect { bg; \
             description { state: "default" 0.0; \
+               // color: #FFFFFFFF (white, fully opaque)
                color: 255 255 255 255; \
                rel1.relative: rel1x rel1y; \
                rel2.relative: rel2x rel2y; \
@@ -24,9 +31,20 @@
                max: 150 150; \
             } \
          }
+// The SVG_PART macro is a simplified variant of SVG_PART_INTERPOLATE.
+// It's a convenient shorthand for when the icon's image does not change upon being clicked.
+// It uses the same image ('id1') for both "default" and "clicked" states.
+// The visual feedback for interaction is limited to the size change animation defined in SVG_PART_INTERPOLATE (130px to 150px).
 #define SVG_PART(bg, vg, rel1x, rel1y, rel2x, rel2y,id1)\
          SVG_PART_INTERPOLATE(bg, vg, rel1x, rel1y, rel2x, rel2y,id1, id1)
 
+ // This macro, SVG_PROGRAM, defines the interaction logic that triggers the state changes in a vector part ('vg').
+ // It creates two programs that respond to mouse events.
+ // The first program triggers on "mouse,down,1" (left mouse button press). It changes the state of the 'vg' part to "clicked".
+ // The second program triggers on "mouse,up,1" (left mouse button release), reverting the state to "default".
+ // Both state changes are animated with a linear transition over 0.2 seconds.
+ // NOTE: The 'source' of the signal is specified as 'vg'. By default, VECTOR parts do not emit mouse signals.
+ // For this program to work as intended, the signal's source should typically be the 'bg' RECT part, which does capture mouse events.
  #define SVG_PROGRAM(bg, vg) \
          program { bg; \
             signal: "mouse,down,1"; \
@@ -43,9 +61,12 @@
             target: vg; \
          }
 
+// The 'collections' block is the root element of an Edje file, containing all resources and group definitions.
 collections {
+   // 'base_scale' defines the default scaling factor for the UI. 1.0 means no scaling.
    base_scale: 1.0;
-   /* TODO: Please replace embedded image files to your application image files. */
+   // The 'images' block lists all image assets required by this collection.
+   // Using 'vector:' indicates that these are SVG files, which will be rendered by the vector graphics engine.
    images {
       vector: "dst.svg";
       vector: "atom.svg";
@@ -74,9 +95,15 @@ collections {
       vector: "batman2.svg";
       vector: "gradients.svg";
    }
+   // A 'group' defines a single, self-contained UI layout or widget.
+   // This group is named "svg-test" and demonstrates a grid of interactive SVG icons.
    group {
       name: "svg-test";
+      // The 'parts' block declares all the components that make up this group's UI.
       parts {
+         // This creates the first icon in a 5x5 grid.
+         // It occupies the top-left cell, spanning from (0%, 0%) to (20%, 20%) of the group's area.
+         // It uses "dst.svg" for its visual representation.
          SVG_PART("bg1", "vg1", 0.0, 0.0, .2, .2,"dst.svg")
          SVG_PART("bg2", "vg2", 0.2, 0.0, .4, .2,"atom.svg")
          SVG_PART("bg3", "vg3", 0.4, 0.0, .6, .2,"bojo.svg")
@@ -104,10 +131,16 @@ collections {
          SVG_PART("bg21", "vg21", 0.0, 0.8, .2, 1.0,"yadis.svg")
          SVG_PART("bg22", "vg22", 0.2, 0.8, .4, 1.0,"favorite_on.svg")
          SVG_PART("bg23", "vg23", 0.4, 0.8, .6, 1.0,"favorite_off.svg")
+         // This part uses SVG_PART_INTERPOLATE directly to specify different images for its states.
+         // It shows "batman1.svg" by default and switches to "batman2.svg" when clicked.
          SVG_PART_INTERPOLATE("bg24", "vg24", 0.6, 0.8, .8, 1.0,"batman1.svg", "batman2.svg")
          SVG_PART("bg25", "vg25", 0.8, 0.8, 1.0, 1.0,"gradients.svg")
       }
+      // The 'programs' block defines the interactive logic for the group.
+      // It connects signals from parts to actions that modify the state of other parts.
       programs {
+         // This instantiates the SVG_PROGRAM macro for the first icon ('vg1').
+         // It sets up the logic to handle mouse clicks on 'vg1', triggering the state change between "default" and "clicked".
          SVG_PROGRAM("bg1", "vg1")
          SVG_PROGRAM("bg2", "vg2")
          SVG_PROGRAM("bg3", "vg3")

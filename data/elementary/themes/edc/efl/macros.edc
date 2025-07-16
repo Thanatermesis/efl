@@ -1,11 +1,22 @@
-/**
- * A macro for defining the programms that are needed to redirect the mouse
- * events of a part to the implementation of Efl.Ui.Clickable.
- *
- * The Widget using this has to call the method bind_to_theme of Efl.Ui.Clickable_Util
- * in order to redirect the here called signals to real events that can be used in code.
- * The resulting events on the widget will be from the Efl.Ui.Clickable class.
- */
+// This macro simplifies the process of making an EDC part interactive by
+// connecting its mouse events to the Efl.Ui.Clickable interface logic. It
+// defines a set of programs that capture raw mouse input on a specified
+// part and translate them into abstract signals.
+//
+// These signals are then handled by the Efl.Ui.Clickable_Util helper class in the
+// widget's C code, which must call bind_to_theme() to establish the connection.
+// This separation of concerns allows the theme to define 'what' is clickable,
+// while the C code defines 'how' the clicks are handled (e.g., resulting in
+// events from the Efl.Ui.Clickable class).
+//
+// The macro creates programs that react to the following mouse signals on the PART:
+// - "mouse,down,1" and "mouse,down,1,*": Trigger on left-click press (with or
+//   without modifier keys). Emits "efl,action,press".
+// - "mouse,up,1": Triggers on left-click release. Emits "efl,action,unpress".
+// - "mouse,pressed,out": Triggers if the mouse moves out of the part while
+//   pressed. Emits "efl,action,mouse_out".
+//
+// @param PART The name of the EDC part that should become clickable.
 
 #define EFL_UI_CLICKABLE_PART_BIND(PART) \
 program { \

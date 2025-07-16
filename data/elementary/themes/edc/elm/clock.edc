@@ -1,3 +1,6 @@
+// Defines an image collection for icons, providing multiple resolutions
+// to be used based on the object's size. This is a common technique in Edje
+// for creating scalable and resolution-independent UIs.
 #define IC(_NAME, _ICON) \
 set { name: _NAME; \
 image {image: _ICON"-060.png" COMP; size: 31 31 60000 60000; } \
@@ -7,6 +10,9 @@ image {image: _ICON"-015.png" COMP; size:  0  0    15    15; } \
 IC("ic-arrow-u", "arrow-u")
 IC("ic-arrow-d", "arrow-d")
 
+// This group defines a single digit of the clock that can "flip" to show
+// a new value. It includes the visual representation of the digit, interactive
+// areas for changing it, and the animation logic.
 group { name: "elm/clock/flipdigit/default";
    images.image: "digit_0.png" COMP;
    images.image: "digit_1.png" COMP;
@@ -18,9 +24,21 @@ group { name: "elm/clock/flipdigit/default";
    images.image: "digit_7.png" COMP;
    images.image: "digit_8.png" COMP;
    images.image: "digit_9.png" COMP;
+   // The Embryo script handles the logic for updating the digit's value and
+   // managing the flip animation. It uses a locking mechanism (v0_lock) to
+   // prevent new value changes while an animation is in progress. If a new
+   // value arrives during animation, it's queued in v0_next.
+   // - v0_cur: The currently displayed digit value.
+   // - v0_lock: A flag to indicate if an animation is active (1) or not (0).
+   // - v0_next: Stores the next value to be displayed if a change request
+   //   occurs during an animation.
    script {
       public v0_cur, v0_lock, v0_next;
 
+      // This function is the animation callback, executed when the flip
+      // animation completes. It unlocks the digit for the next update and
+      // processes any queued value change from v0_next by sending a
+      // message back to the script.
       public animator1(val, Float:pos) {
          new v;
          set_int(v0_lock, 0);
@@ -30,6 +48,10 @@ group { name: "elm/clock/flipdigit/default";
             message(MSG_INT, 1, v);
          }
       }
+      // This is the entry point for changing the digit. It receives a message
+      // with the new digit value. If not locked, it updates the "digit" part's
+      // state to show the new number and starts a 1-second animation which
+      // will call animator1 upon completion. If locked, it queues the value.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_INT) && (id == 1)) {
             new value, buf[11];
@@ -47,13 +69,19 @@ group { name: "elm/clock/flipdigit/default";
          }
       }
    }
+   // The 'parts' block defines all the visual and interactive elements of the group.
    parts {
+      // "b" (bottom) and "t" (top) are invisible rectangles that serve as
+      // clickable areas to decrement and increment the digit's value when the
+      // clock is in "edit" mode. They are made visible by a program when
+      // "elm,state,edit,on" is signaled.
+      // The "b" part covers the bottom half of the component.
       part { name: "b"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             visible: 0;
             rel1.relative: 0.0 0.5;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black: #00000000
             min: 20 20;
          }
          description { state: "visible" 0.0;
@@ -61,12 +89,13 @@ group { name: "elm/clock/flipdigit/default";
             visible: 1;
          }
       }
+      // The "t" part covers the top half of the component.
       part { name: "t"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             visible: 0;
             rel2.relative: 1.0 0.5;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black: #00000000
             min: 20 20;
          }
          description { state: "visible" 0.0;
@@ -74,6 +103,9 @@ group { name: "elm/clock/flipdigit/default";
             visible: 1;
          }
       }
+      // This part displays the actual digit image. It's set to not receive mouse
+      // events itself. Its vertical position is constrained between two other
+      // parts, "atop" and "abot", which are the up/down arrow icons.
       part { name: "digit"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -85,6 +117,9 @@ group { name: "elm/clock/flipdigit/default";
             image.normal: "digit_0.png";
             color_class: "/fg/normal/clock";
          }
+// This macro simplifies the creation of the 10 digit states ("0" to "9").
+// For each digit, it defines a state that inherits the default properties but
+// sets the appropriate image.
 #define DIGIT_DESC(_DIGIT) \
    description { state: _DIGIT 0.0; \
       inherit: "default" 0.0; \
@@ -102,6 +137,9 @@ group { name: "elm/clock/flipdigit/default";
          DIGIT_DESC("9")
       }
 #undef DIGIT_DESC
+      // "atop" and "abot" parts display the up and down arrow icons, respectively.
+      // They are only visible in edit mode. They are also used as anchors for
+      // positioning the main "digit" part.
       part { name: "atop"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -133,11 +171,14 @@ group { name: "elm/clock/flipdigit/default";
             visible: 1;
          }
       }
+      // These are invisible rectangles used for accessibility. They correspond to
+      // the top and bottom interactive areas and become visible when accessibility
+      // enhanced edit mode is on, allowing screen readers to identify them.
       part { name: "access.t";
          type: RECT;
          description { state: "default" 0.0;
             rel.to: "t";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black: #00000000
             visible: 0;
          }
          description { state: "visible" 0.0;
@@ -149,7 +190,7 @@ group { name: "elm/clock/flipdigit/default";
          type: RECT;
          description { state: "default" 0.0;
             rel.to: "b";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black: #00000000
             visible: 0;
          }
          description { state: "visible" 0.0;
@@ -158,7 +199,10 @@ group { name: "elm/clock/flipdigit/default";
          }
       }
    }
+   // Programs define the dynamic behavior of the group, reacting to signals.
    programs {
+      // On "load", this program initializes the script's global variables to
+      // their default state, ensuring the digit is ready for interactions.
       program { signal: "load"; source: "";
          script {
             set_int(v0_cur, 0);
@@ -166,6 +210,9 @@ group { name: "elm/clock/flipdigit/default";
             set_int(v0_next, -1);
          }
       }
+      // When the widget enters or leaves edit mode (receives "elm,state,edit,on/off"
+      // from the "elm" source), these programs toggle the visibility of the arrow
+      // icons and the top/bottom clickable areas.
       program { signal: "elm,state,edit,on"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "atop";
@@ -180,6 +227,10 @@ group { name: "elm/clock/flipdigit/default";
          target: "t";
          target: "b";
       }
+      // When the top clickable area ("t") is pressed or released, a signal
+      // is emitted to the elementary widget's C code to start or stop the
+      // continuous incrementing of the digit. The programs for the bottom
+      // area ("b") do the same for decrementing.
       program { signal: "mouse,down,1"; source: "t";
          action: SIGNAL_EMIT "elm,action,up,start" "elm";
       }
@@ -192,6 +243,9 @@ group { name: "elm/clock/flipdigit/default";
       program { signal: "mouse,up,1"; source: "b";
          action: SIGNAL_EMIT "elm,action,down,stop" "elm";
       }
+      // These programs handle accessibility. They toggle the visibility of the
+      // accessibility-specific clickable areas and forward their mouse events
+      // to the parent widget, mirroring the behavior of the "t" and "b" parts.
       program { signal: "elm,state,access,edit,on"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "access.t";
@@ -218,11 +272,16 @@ group { name: "elm/clock/flipdigit/default";
 }
 
 
+// This group defines the AM/PM selector. It inherits almost all of its
+// functionality from "elm/clock/flipdigit/default", but overrides the "digit"
+// part to display "AM" and "PM" images instead of numbers.
 group { name: "elm/clock/flipampm/default";
    inherit: "elm/clock/flipdigit/default";
    images.image: "digit_am.png" COMP;
    images.image: "digit_pm.png" COMP;
    parts {
+      // Overrides the "digit" part from the parent group to change its aspect
+      // ratio and define states "0" and "1" to map to "am" and "pm" images.
       part { name: "digit"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -241,6 +300,10 @@ group { name: "elm/clock/flipampm/default";
    }
 }
 
+// This macro creates a SWALLOW part, which acts as a container for other Edje
+// objects or Elementary widgets. The "elm." prefix is a convention for parts
+// that will be populated by the widget's C code. The parameters define its
+// relative position and size within the parent.
 #define SWALLOW_PART(_NAME, _R1X, _R1Y, _R2X, _R2Y) \
    part { name: "elm."_NAME; \
       type: SWALLOW; \
@@ -250,6 +313,9 @@ group { name: "elm/clock/flipampm/default";
       } \
    }
 
+// This macro creates a part for the separators (colons) between digit pairs.
+// It's a non-interactive IMAGE part with a fixed size, positioned using
+// relative coordinates and offsets.
 #define HOLE_PART(_NAME, _R1X, _R1Y, _R2X, _R2Y, _AX, _AY, _OX, _OY, _W, _H) \
    part { name: _NAME; mouse_events: 0; \
          scale: 1; \
@@ -267,6 +333,12 @@ group { name: "elm/clock/flipampm/default";
          } \
       }
 
+// Defines the layout for the most comprehensive clock format, including hours,
+// minutes, seconds, and an AM/PM indicator (e.g., HH:MM:SS AM/PM).
+// The layout is divided into 8 equal-width columns for 7 digits (6 numeric,
+// 1 AM/PM) and 2 separators that occupy half a column's width each.
+// Example: [d][d]:[d][d]:[d][d][ampm]. Total width = 7*w_digit + 2*w_sep
+// w_sep = 0.5 * w_digit => 8 * w_digit = 1.0 => w_digit = 0.125
 group { name: "elm/clock/base-all/default";
    images.image: "digit_sep.png" COMP;
    parts {
@@ -284,6 +356,10 @@ group { name: "elm/clock/base-all/default";
    }
 }
 
+// Layout for a clock with hours, minutes, and seconds (e.g., HH:MM:SS).
+// It has 6 digit swallows and 2 separators. The total width is conceptually
+// divided into 7 units (6 for digits, 2 half-units for separators).
+// Each digit swallow has a width of 1/7 (~0.142857).
 group { name: "elm/clock/base-seconds/default";
    parts {
       SWALLOW_PART("d0", 0.0, 0.0, 0.142857143, 1.0)
@@ -300,6 +376,10 @@ group { name: "elm/clock/base-seconds/default";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Layout for a clock with hours, minutes, and an AM/PM indicator (e.g., HH:MM AM/PM).
+// It features 4 digit swallows, 1 AM/PM swallow, and 1 separator.
+// The total width is divided into 5.5 units (5 for digits/ampm, 0.5 for separator).
+// Each full-width swallow has a width of 1/5.5 = 2/11 (~0.181818).
 group { name: "elm/clock/base-am_pm/default";
    parts {
       SWALLOW_PART("d0", 0.0, 0.0, 0.181818182, 1.0)
@@ -313,12 +393,18 @@ group { name: "elm/clock/base-am_pm/default";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Layout for a basic clock with only hours and minutes (e.g., HH:MM).
+// It contains 4 digit swallows and 1 separator. The total width is divided
+// into 4.5 units (4 for digits, 0.5 for separator).
+// Each digit swallow has a width of 1/4.5 = 2/9 (~0.222222).
 group { name: "elm/clock/base/default";
    parts {
+      // This is a base rectangle, likely used for accessibility highlighting.
+      // It is normally invisible.
       part { name: "base"; type: RECT;
          scale : 1;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent black: #00000000
             visible: 0;
          }
          description { state: "visible" 0.0;
@@ -334,6 +420,9 @@ group { name: "elm/clock/base/default";
       SWALLOW_PART("d3", 0.777777778, 0.0, 1.0, 1.0)
    }
    programs {
+      // These programs toggle the visibility of the "base" rectangle when
+      // the widget's accessibility state changes. This is used by assistive
+      // technologies (like screen readers) to indicate focus on the widget.
       program { signal: "elm,state,access,on"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "base";

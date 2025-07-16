@@ -1,17 +1,26 @@
-/**
-Group: efl/collection (@since 1.23)
-	 Part Rectangle: efl.draggable.horizontal_bar (required)
-	 Part Rectangle: efl.draggable.vertical_bar (required)
-	 Part Swallow: efl.background (required)
-	 Part Swallow: efl.content (required)
-	 Part Swallow: efl.overlay (required)
-	 Signal: efl,action,scroll
-	 Signal: efl,horizontal_bar,visible,off
-	 Signal: efl,horizontal_bar,visible,on
-	 Signal: efl,vertical_bar,visible,off
-	 Signal: efl,vertical_bar,visible,on
-*/
+// Group: efl/collection (@since 1.23)
+// Defines the theme for a collection widget, which is a specialized scroller
+// used for lists, grids, etc. The visual and functional aspects are inherited
+// from the "efl/scroller" group.
+//
+// Public Parts (inherited):
+// - efl.background: Swallow part for a background object.
+// - efl.content: Swallow part for the main scrollable content.
+// - efl.overlay: Swallow part for overlay content.
+// - efl.draggable.horizontal_bar: Rectangle part for the horizontal scrollbar.
+// - efl.draggable.vertical_bar: Rectangle part for the vertical scrollbar.
+//
+// Public Signals (inherited):
+// - "efl,action,scroll": Triggered during scrolling.
+// - "efl,horizontal_bar,visible,on/off": When the horizontal bar is shown/hidden.
+// - "efl,vertical_bar,visible,on/off": When the vertical bar is shown/hidden.
 group { "efl/collection";
+   // The 'inherit' property imports all parts, programs, and properties from
+   // the specified group ("efl/scroller"). This is the core mechanism for
+   // theme extension and reuse in Edje.
    inherit: "efl/scroller";
+   // The 'data' block provides a way to attach arbitrary key-value metadata to
+   // the group. This data can be queried from application code and doesn't
+   // directly affect the visual theme. Here, it is used for versioning.
    data.item: "version" "123";
 }

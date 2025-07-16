@@ -24,19 +24,28 @@ Group: efl/check (@since 1.23)
 	 Signal: efl,text,set
 	 Signal: efl,text,unset
 */
-#define ICON         1
-#define LABEL        2
-#define MASK         3
-#define DISABLE      4
-#define PRESSED      8
-#define BACKGROUND  16
+// Defines bitmasks for widget state flags, used in scripts to manage visibility and behavior.
+#define ICON         1 // Flag for icon visibility.
+#define LABEL        2 // Flag for label visibility.
+#define MASK         3 // Unused flag.
+#define DISABLE      4 // Flag for disabled state.
+#define PRESSED      8 // Flag for pressed state.
+#define BACKGROUND  16 // Flag for background visibility.
 
+// Group for the standard checkbox widget.
 group { name: "efl/check";
    data.item: "version" "123";
+   // The script sets up the logic for showing/hiding the icon and label
+   // based on the flags defined above. It runs whenever a flag is changed.
    script {
+      // This macro contains Embryo script code that controls the visibility
+      // and state of parts like 'efl.text' and 'efl.content' based on flags
+      // like ICON, LABEL, and DISABLE. It centralizes common UI logic.
       BUTTONMODE_SCRIPT2
    }
    parts {
+      // The "shadow" part is a spacer that serves as a base for other elements,
+      // helping to define the layout structure. It's not visible itself.
       part { name: "shadow"; type: SPACER;
          description { state: "default";
          }
@@ -45,6 +54,10 @@ group { name: "efl/check";
          desc { "disabled"; inherit;
          }
       }
+      // "icon_clip" is a rectangle used as a clipping mask for the "efl.content" part.
+      // This ensures that the icon does not draw outside its designated area.
+      // The color is solid white (#FFFFFFFF) by default, and semi-transparent white (#FFFFFF40)
+      // when disabled, which will affect the visibility of the clipped content.
       rect { "icon_clip";
          desc { "default";
             color: 255 255 255 255; // no cc
@@ -56,6 +69,8 @@ group { name: "efl/check";
             color: 255 255 255 64; // no cc
          }
       }
+      // "efl.background" is a swallow part where a custom background object can be placed.
+      // It is positioned relative to the "shadow" part and is hidden by default.
       swallow { "efl.background"; nomouse;
          required;
          desc { "default";
@@ -67,6 +82,7 @@ group { name: "efl/check";
              visible: 1;
          }
       }
+      // "efl.content" is a swallow part for an optional icon. It is clipped by "icon_clip".
       swallow { "efl.content"; nomouse;
          clip_to: "icon_clip";
          scale: 1;
@@ -99,6 +115,8 @@ group { name: "efl/check";
             min: ICMIN ICMIN;
          }
       }
+      // "base" is the main rectangle for the checkbox, providing its visual background.
+      // It is a fixed size of 13x13 pixels.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default";
@@ -120,6 +138,8 @@ group { name: "efl/check";
             color_class: "/bg/disabled/check/base";
          }
       }
+      // "ck_check" is the checkmark icon itself.
+      // It is positioned relative to the "base" part and is clipped by "ck_selected".
       part { name: "ck_check";
          clip_to: "ck_selected";
          scale: 1;
@@ -144,6 +164,9 @@ group { name: "efl/check";
             visible: 1;
          }
       }
+      // "ck_selected" is a rectangle used as a clipping mask for "ck_check".
+      // When disabled, it becomes semi-transparent white (#FFFFFF99),
+      // which fades the checkmark icon.
       part { name: "ck_selected"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -153,6 +176,8 @@ group { name: "efl/check";
             color: 255 255 255 153; // no cc
          }
       }
+      // "efl.text" is the text label for the checkbox. It is not interactive ("nomouse").
+      // The text part's height is fixed while its width can vary.
       text { "efl.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -214,6 +239,10 @@ group { name: "efl/check";
             visible: 1;
          }
       }
+      // "event" is an invisible rectangle that covers the entire widget area
+      // to capture mouse events. Using a transparent rectangle (#00000000) for this
+      // is a standard technique. "ignore_flags: ON_HOLD" prevents events from
+      // being blocked if the mouse button is held down.
       rect { "event";
          ignore_flags: ON_HOLD;
          desc { "default";
@@ -225,8 +254,15 @@ group { name: "efl/check";
       }
    }
    programs {
+      // This macro binds click and press/unpress signals from the "event" part
+      // to the standard "efl,action,click", "efl,action,press", and "efl,action,unpress"
+      // signals, which can be used by the application.
       EFL_UI_CLICKABLE_PART_BIND(event)
+      // When the left mouse button is pressed on the "event" part...
       program { signal: "mouse,down,1"; source: "event";
+         // ...this script checks the current state of the "ck_check" part.
+         // If it's in the "default" state (unchecked), it runs the "snd-check-on" program.
+         // Otherwise (if checked), it runs "snd-check-off" to play a different sound.
          script {
             new buf[32]; new Float:val;
             get_state(PART:"ck_check", buf, 32, val);
@@ -234,37 +270,52 @@ group { name: "efl/check";
             else { run_program(PROGRAM:"snd-check-off"); }
          }
       }
+      // When the widget receives the "efl,state,selected" signal,
+      // it sets the state of the "ck_check" part to "selected", making the checkmark visible.
       program { signal: "efl,state,selected"; source: "efl";
          action:  STATE_SET "selected" 0.0;
          target: "ck_check";
       }
+      // When the widget receives the "efl,state,unselected" signal,
+      // it sets the state of "ck_check" back to "default", hiding the checkmark.
       program { signal: "efl,state,unselected"; source: "efl";
          action:  STATE_SET "default" 0.0;
          target: "ck_check";
       }
+      // These programs define the actions to play sounds for checking and unchecking.
       program { name: "snd-check-on";
          action: PLAY_SAMPLE "wood-tap1" 1.0 INPUT;
       }
       program { name: "snd-check-off";
          action: PLAY_SAMPLE "wood-tap2" 1.0 INPUT;
       }
+      // The following programs handle the visual "pressed" state of the checkbox.
       program { signal: "mouse,down,1"; source: "event";
+         // The "after" keyword ensures this program runs after "button_click_anim" is queued.
          after: "button_click_anim";
       }
+      // On mouse down, the "ck_check" part's state is set to "pressed" for visual feedback.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "pressed" 0.0;
          target: "ck_check";
       }
+      // This program sets the PRESSED flag, triggering the script to update the UI.
       program { name: "button_click_anim";
          script { flag_set(PRESSED); }
       }
+      // On mouse up, the "ck_check" part returns to the "default" state.
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
          target: "ck_check";
       }
+      // On mouse up, the PRESSED flag is unset.
       program { signal: "mouse,up,1"; source: "event";
          script { flag_unset(PRESSED); }
       }
+      // These programs listen for external signals to update the widget's state flags.
+      // Setting/unsetting these flags triggers the main script to update the layout.
+      // These programs update state flags for label, icon, and disabled state,
+      // triggering the main script to adjust the layout.
       program { signal: "efl,text,set"; source: "efl";
          script { flag_set(LABEL); }
       }
@@ -283,6 +334,8 @@ group { name: "efl/check";
       program { signal: "efl,state,enabled"; source: "efl";
          script { flag_unset(DISABLE); }
       }
+      // These programs control the state of the "ck_selected" clipper, which in turn
+      // affects the appearance of the "ck_check" part in the disabled state.
       program { signal: "efl,state,disabled"; source: "efl";
          action:  STATE_SET "disabled" 0.0;
          target: "ck_selected";
@@ -294,15 +347,23 @@ group { name: "efl/check";
    }
 }
 
+// This group defines a toggle switch, a variant of the checkbox.
+// It features a draggable button to switch between "ON" and "OFF" states.
+// The script manages dragging, state changes, and RTL (Right-to-Left) layout support.
 group { name: "efl/check:toggle";
    script {
-      public is_drag;
-      public was_drag;
-      public is_rtl;
+      // Script variables to track the drag state and RTL mode.
+      public is_drag; // True if the button is currently being dragged.
+      public was_drag; // True if the last interaction was a drag (not a click).
+      public is_rtl; // True if the layout is Right-to-Left.
 
+      // This macro contains Embryo script code that controls the visibility
+      // and state of parts like 'efl.text' and 'efl.content' based on flags
+      // like ICON, LABEL, and DISABLE. It centralizes common UI logic.
       BUTTONMODE_SCRIPT2
    }
    parts {
+      // A non-visible spacer for layout structure.
       part { name: "shadow"; type: SPACER;
          description { state: "default";
          }
@@ -311,6 +372,7 @@ group { name: "efl/check:toggle";
          desc { "disabled"; inherit;
          }
       }
+      // Swallow part for a custom background object.
       swallow { "efl.background"; nomouse;
          required;
          desc { "default";
@@ -322,6 +384,7 @@ group { name: "efl/check:toggle";
              visible: 1;
          }
       }
+      // Clipping mask for "efl.content", fading to semi-transparent white (#FFFFFF40) when disabled.
       rect { "icon_clip";
          desc { "default";
             color: 255 255 255 255; // no cc
@@ -333,6 +396,7 @@ group { name: "efl/check:toggle";
             color: 255 255 255 64; // no cc
          }
       }
+      // Swallow part for an optional icon, clipped by "icon_clip".
       swallow { "efl.content"; nomouse;
          clip_to: "icon_clip";
          scale: 1;
@@ -362,6 +426,8 @@ group { name: "efl/check:toggle";
             min: ICMIN ICMIN;
          }
       }
+      // "tog" is a spacer that defines the main area and size of the toggle switch itself.
+      // Other parts of the toggle switch are positioned relative to this spacer.
       spacer { name: "tog"; scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -374,6 +440,7 @@ group { name: "efl/check:toggle";
             offscale;
          }
       }
+      // "base" is the background rectangle for the toggle switch track.
       rect { name: "base";
          description { state: "default";
             fixed: 1 1;
@@ -387,6 +454,9 @@ group { name: "efl/check:toggle";
             color_class: "/bg/disabled/toggle/base";
          }
       }
+      // "onrect" and "offrect" are invisible spacers used to anchor the positions
+      // of the "efl.ontext" and "efl.offtext" parts. Their large relative sizes
+      // push the text to either side of the draggable "button".
       spacer { name: "onrect";
          description { state: "default" 0.0;
             rel.to: "button";
@@ -401,6 +471,9 @@ group { name: "efl/check:toggle";
             rel2.relative: 6.0 1.0;
          }
       }
+      // "efl.offtext" and "efl.ontext" are the "OFF" and "ON" labels within the toggle switch.
+      // They are positioned relative to the "button" and the "onrect"/"offrect" spacers and
+      // clipped by "tog_clip" to stay within the toggle's boundaries.
       text { name: "efl.offtext"; nomouse; scale: 1;
          clip_to: "tog_clip";
          description { state: "default" 0.0;
@@ -455,11 +528,15 @@ group { name: "efl/check:toggle";
             color_class: "/fg/pressed/toggle/text/on";
          }
       }
+      // "tog_clip" is a rectangle used for clipping the contents of the toggle switch,
+      // such as the draggable button and the ON/OFF text labels.
       part { name: "tog_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "tog";
          }
       }
+      // "button" is an invisible, draggable rectangle that acts as the handle for the toggle switch.
+      // Its movement is confined to the "tog" area.
       part { name: "button"; type: RECT; scale: 1;
          clip_to: "tog_clip";
          dragable {
@@ -475,6 +552,8 @@ group { name: "efl/check:toggle";
             color: 0 0 0 0; // no cc
          }
       }
+      // "base_but" is the visible part of the draggable button. It is positioned
+      // relative to the invisible "button" part and changes color based on its state.
       rect { name: "base_but"; nomouse;
          description { state: "default" 0.0;
             rel.to: "button";
@@ -489,12 +568,16 @@ group { name: "efl/check:toggle";
             color_class: "/fg/disabled/toggle/button";
          }
       }
+      // "button_events" is an invisible rectangle that forwards its drag events
+      // to the "button" part. This is a way to separate the event-handling area
+      // from the draggable part itself if needed.
       rect { name: "button_events";
          dragable.events: "button";
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // The main text label for the toggle widget, positioned to the left of the icon/toggle.
       text { "efl.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -558,6 +641,8 @@ group { name: "efl/check:toggle";
             visible: 1;
          }
       }
+      // "event2" is an invisible rectangle that becomes visible when the widget is disabled.
+      // This is likely used to block mouse events from reaching parts underneath it.
       rect { "event2";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -567,6 +652,8 @@ group { name: "efl/check:toggle";
             visible: 1;
          }
       }
+      // "event" is the primary invisible event catcher, similar to the one in the efl/check group.
+      // 'repeat' on mouse events is enabled.
       rect { "event"; repeat;
          ignore_flags: ON_HOLD;
          desc { "default";
@@ -578,33 +665,42 @@ group { name: "efl/check:toggle";
       }
    }
    programs {
+      // Binds standard click signals to the "event" part.
       EFL_UI_CLICKABLE_PART_BIND("event")
+      // These programs respond to "selected" and "unselected" states,
+      // moving the draggable "button" to the ON or OFF position.
+      // The logic accounts for LTR vs RTL direction.
       program { signal: "efl,state,selected"; source: "efl";
          script {
             new Float:drag;
-            if (get_int(is_rtl) == 0) { drag = 100.0; }
-            else                      { drag = 0.0; }
+            if (get_int(is_rtl) == 0) { drag = 100.0; } // LTR: ON is to the right
+            else                      { drag = 0.0; }   // RTL: ON is to the left
             set_drag(PART:"button", drag, 0.0);
          }
       }
       program { signal: "efl,state,unselected"; source: "efl";
          script {
             new Float:drag;
-            if (get_int(is_rtl) == 0) { drag = 0.0; }
-            else                      { drag = 100.0; }
+            if (get_int(is_rtl) == 0) { drag = 0.0; }   // LTR: OFF is to the left
+            else                      { drag = 100.0; } // RTL: OFF is to the right
             set_drag(PART:"button", drag, 0.0);
          }
       }
+      // This program handles a simple click on the button (not a drag).
       program { signal: "mouse,clicked,1"; source: "button";
          script {
             new Float:dx, Float:dy;
             get_drag(PART:"button", dx, dy);
+            // It only acts if the last interaction was not a drag.
             if (!get_int(was_drag)) {
+               // It toggles the button's position.
                if (dx > 0.5) {
                   set_drag(PART:"button", 0.0, 0.0);
                } else {
                   set_drag(PART:"button", 1.0, 0.0);
                }
+               // Then emits the appropriate "select" or "unselect" signal
+               // based on the new position and RTL mode.
                if (((get_int(is_rtl) == 1) && (dx <= 0.5)) ||
                    (get_int(is_rtl) == 0) && (dx > 0.5)) {
                   emit("efl,action,unselect", "efl");
@@ -614,38 +710,50 @@ group { name: "efl/check:toggle";
             }
          }
       }
+      // This set of programs manages the drag interaction.
+      // When a drag starts, the "is_drag" flag is set.
       program { signal: "drag"; source: "button";
          script {
             set_int(is_drag, 1);
          }
       }
+      // On mouse down, flags are reset to prepare for a new interaction (click or drag).
       program { signal: "mouse,down,1"; source: "button";
          script {
             set_int(was_drag, 0);
             set_int(is_drag, 0);
          }
       }
+      // When the mouse is released after a drag...
       program { signal: "mouse,up,1"; source: "button";
          script {
             new Float:dx, Float:dy;
             get_drag(PART:"button", dx, dy);
+            // ...if it was a drag...
             if (get_int(is_drag)) {
+               // ...the button snaps to the nearest end (0.0 or 1.0).
                if (dx > 0.5) {
                  set_drag(PART:"button", 1.0, 0.0);
                } else {
                  set_drag(PART:"button", 0.0, 0.0);
                }
+               // It then emits the correct "select" or "unselect" signal.
+               // Note: The logic here for select/unselect is opposite to the click handler.
+               // This seems intentional to ensure the state reflects the final position.
                if (((get_int(is_rtl) == 1) && (dx <= 0.5)) ||
                    (get_int(is_rtl) == 0) && (dx > 0.5)) {
                  emit("efl,action,select", "efl");
                } else {
                  emit("efl,action,unselect", "efl");
                }
+               // Finally, it sets "was_drag" to prevent the click handler from firing.
                set_int(was_drag, 1);
                set_int(is_drag, 0);
             }
          }
       }
+      // These programs handle the visual "clicked" state for the button and text
+      // when the mouse is pressed and released.
       program { signal: "mouse,down,1"; source: "button";
          action: STATE_SET "clicked" 0.0;
          target: "base_but";
@@ -676,6 +784,8 @@ group { name: "efl/check:toggle";
       program { signal: "efl,state,enabled"; source: "efl";
          script { flag_unset(DISABLE); }
       }
+      // These programs listen for global RTL/LTR state changes from Edje
+      // and update the "is_rtl" script variable accordingly.
       program { signal: "edje,state,rtl"; source: "edje";
          script {
             set_int(is_rtl, 1);

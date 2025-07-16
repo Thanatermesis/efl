@@ -1,12 +1,22 @@
+// This group defines an animated focus highlight effect. It draws a rectangle
+// around a focused widget, which can be animated. The animation consists of
+// a pulsing effect and a smooth transition when the focused widget changes.
 group { name: "elm/focus_highlight/top/default";
+   // This data item indicates that the focus highlight should be animated.
    data.item: "animate" "on";
    script {
+      // s_ are for the source geometry, dif are for the difference between
+      // source and target, g_anim_id is to track the current animation.
       public s_x, s_y, s_w, s_h; /* source */
       public difx, dify, difw, difh;
       public g_anim_id;
 
+      // This function is an animator that runs at each frame of the
+      // animation. It calculates the new position and size of the highlight
+      // using an easing function for a smooth effect.
       public animator1(val, Float:pos) {
          new x, y, w, h, dx, dy, dw, dh, Float:p;
+         // Ease-out-cubic interpolation for a smooth deceleration effect.
          p = 1.0 - ((1.0 - pos) * (1.0 - pos) * (1.0 - pos));
          dx = round(float_mul(float(get_int(difx)), p));
          x = get_int(s_x) + dx;
@@ -23,11 +33,15 @@ group { name: "elm/focus_highlight/top/default";
          }
       }
 
+      // This function updates the offsets of the 'base' part, which in turn
+      // moves and resizes all other visual parts that are relative to it.
       public update_offset(x, y, w, h) {
          set_state_val(PART:"base", STATE_REL1_OFFSET, x, y);
          set_state_val(PART:"base", STATE_REL2_OFFSET, x + w - 1, y + h - 1);
       }
 
+      // This function is called when a message is received from the C code.
+      // It is used to start the animation when the focused widget changes.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_INT_SET) && (id == 1)) {
             new x1, y1, w1, h1, x2, y2, w2, h2;
@@ -35,6 +49,7 @@ group { name: "elm/focus_highlight/top/default";
 
             anim_id = get_int(g_anim_id);
             if (anim_id != 0) {
+               // If an animation is already running, cancel it before starting a new one.
                cancel_anim(anim_id);
             }
 
@@ -62,39 +77,55 @@ group { name: "elm/focus_highlight/top/default";
             update_offset(x1, y1, w1, h1);
             set_state(PART:"base", "custom", 0.0);
 
+            // Start the animation over 0.2 seconds, calling the 'animator1' function.
             anim_id = anim(0.2, "animator1", 1);
             set_int(g_anim_id, anim_id);
          }
       }
    }
    parts {
+      // The 'base' part is an invisible spacer that serves as a reference for
+      // all other parts. Its size and position are controlled by the script,
+      // allowing for dynamic resizing and movement of the entire highlight.
       part { name: "base"; type: SPACER;
          description { state: "default" 0.0;
             fixed: 1 1;
          }
       }
+      // The 'clip' part is a rectangle used to clip all other parts. This
+      // ensures that the highlight is only drawn within the bounds of the
+      // focused widget. It's initially invisible and transparent.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
+            // The clip is made much larger than the base part to avoid clipping
+            // issues at the edges during animations.
             rel1.relative: -1.0 -1.0;
             rel1.offset: -999 -999;
             rel2.relative: 2.0 2.0;
             rel2.offset: 999 999;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Solid white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The following parts ('top', 'topl', 'topr', 'bot', 'botl', 'botr')
+      // form the visible border of the highlight. They are all clipped by
+      // the 'clip' part and are positioned relative to the 'base' part.
+      // 'scale: 1' ensures pixel-perfect rendering without scaling artifacts.
       part { name: "top"; type: RECT;
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
             color_class: "/bg/selected/focus";
+            // This makes the part a thin line at the top of the 'base' part.
             rel2.relative: 1.0 0.0;
             min: 4 4;
          }
@@ -103,6 +134,7 @@ group { name: "elm/focus_highlight/top/default";
             color_class: "/bg/selected/focus/hilight";
          }
       }
+      // Top-left corner of the border.
       part { name: "topl"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -119,6 +151,7 @@ group { name: "elm/focus_highlight/top/default";
             color_class: "/bg/selected/focus/hilight";
          }
       }
+      // Top-right corner of the border.
       part { name: "topr"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -135,6 +168,7 @@ group { name: "elm/focus_highlight/top/default";
             color_class: "/bg/selected/focus/hilight";
          }
       }
+      // Bottom line of the border.
       part { name: "bot"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -149,6 +183,7 @@ group { name: "elm/focus_highlight/top/default";
             color_class: "/bg/selected/focus/hilight";
          }
       }
+      // Bottom-left corner of the border.
       part { name: "botl"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -165,6 +200,7 @@ group { name: "elm/focus_highlight/top/default";
             color_class: "/bg/selected/focus/hilight";
          }
       }
+      // Bottom-right corner of the border.
       part { name: "botr"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -183,12 +219,16 @@ group { name: "elm/focus_highlight/top/default";
       }
    }
    programs {
+      // Triggered by the 'elm,action,focus,show' signal to show the highlight.
+      // It stops any existing pulse animation and then starts the 'go2' program.
       program { signal: "elm,action,focus,show"; source: "elm";
          action: ACTION_STOP;
          target: "pulse";
          target: "pulse2";
          after: "go2";
       }
+      // Fades in the 'clip' part to make the highlight visible.
+      // Then, it starts the 'pulse' animation and the 'go3' program.
       program { name: "go2";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2;
@@ -196,27 +236,35 @@ group { name: "elm/focus_highlight/top/default";
          after: "pulse";
          after: "go3";
       }
+      // Emits a signal to notify that the show animation has completed.
       program { name: "go3";
          action: SIGNAL_EMIT "elm,action,focus,show,end" "elm";
       }
+      // Triggered by 'elm,action,focus,hide' to hide the highlight.
+      // It fades out the 'clip' part and then starts the 'stop2' program.
       program { signal: "elm,action,focus,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.4;
          target: "clip";
          after: "stop2";
       }
+      // Emits a signal to notify that the hide animation has completed.
       program { name: "stop2";
          action: SIGNAL_EMIT "elm,action,focus,hide,end" "elm";
          after: "stop3";
       }
+      // Stops the pulse animation programs.
       program { name: "stop3";
          action: ACTION_STOP;
          target: "pulse";
          target: "pulse2";
       }
+      // 'pulse' and 'pulse2' create a continuous pulsing effect by toggling
+      // between the 'hi' and 'default' states of the border parts.
       program { name: "pulse";
          action: STATE_SET "hi" 0.0;
          transition: SINUSOIDAL 0.2;
+         // Wait for 3.0 seconds before starting the pulse animation.
          in: 3.0 0.0;
          target: "top";
          target: "topl";
@@ -237,6 +285,9 @@ group { name: "elm/focus_highlight/top/default";
          target: "botr";
          after: "pulse";
       }
+      // Triggered by 'elm,state,anim,stop', this program stops the script-driven
+      // animation by resetting the 'base' part to its default state. This is a
+      // failsafe to ensure animations don't get stuck.
       program { signal: "elm,state,anim,stop"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -244,6 +295,8 @@ group { name: "elm/focus_highlight/top/default";
    }
 }
 
+// This is a blank/disabled version of the focus highlight. It contains no
+// parts, so nothing will be displayed.
 group { name: "elm/focus_highlight/top/blank";
    parts {
    }

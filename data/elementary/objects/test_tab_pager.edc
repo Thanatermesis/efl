@@ -1,11 +1,19 @@
 collections {
+   // This group defines the main layout structure, which consists of a side menu
+   // and a content area for the tab pager, separated by a vertical line.
    group { "tab_page_layout";
       parts {
+         // The "base" spacer part fills the entire area of the Edje object.
+         // It serves as a reference for positioning and sizing other parts,
+         // ensuring a consistent and scalable layout foundation.
          spacer { "base";
             scale;
             desc { "default";
             }
          }
+         // This "swallow" part is a container for an external menu widget.
+         // It is positioned on the left, with a fixed width of 200 pixels and a
+         // scalable height, making it suitable for a persistent side menu.
          swallow { "menu";
             scale;
             desc { "default";
@@ -16,6 +24,9 @@ collections {
                fixed: 0 1;
             }
          }
+         // A 1-pixel wide rectangle that serves as a visual separator. It is placed
+         // immediately to the right of the "menu" part and extends over the full
+         // height of the container. The color is dark grey (#4B4B4B).
          rect { "separator";
             scale;
             desc { "default";
@@ -28,6 +39,9 @@ collections {
                color: 75 75 75 255;
             }
          }
+         // This "swallow" part is the main content area for the tab pager widget.
+         // It is positioned to the right of the "separator" and fills the remaining
+         // available space of the container.
          swallow { "tab_pager";
             scale;
             desc { "default";
@@ -38,13 +52,19 @@ collections {
          }
       }
    }
+   // This group defines the layout for an individual page within the tab pager.
+   // It's a simple layout designed to display centered text.
    group { "page_layout";
       parts {
+         // A "base" spacer that fills the page, used to center the text part.
          spacer { "base";
             scale;
             desc { "default";
             }
          }
+         // A text part that displays content on the page. It is centered both
+         // horizontally and vertically within the "base" spacer. The text color
+         // is white (#FFFFFF) and the font size is 20.
          text { "text";
             scale;
             desc { "default";

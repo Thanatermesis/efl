@@ -1,15 +1,20 @@
 collections {
+   // The 'main' group defines the primary layout and behavior of the UI.
    group { name: "main";
+      // The 'parts' block contains all the visual elements of the group.
       parts {
+         // A white (#FFFFFFFF) background rectangle that fills the entire area.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
+         // A text label that acts as a clickable trigger for the animation.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Black color (#000000FF).
                color: 0 0 0 255;
                text {
                   text: "Click me.";
@@ -19,25 +24,39 @@ collections {
                }
             }
          }
+         // This rectangle changes its state when the 'label' is clicked.
          part { name: "red_rect";
             type: RECT;
+            // The initial state of the rectangle.
             description { state: "default" 0.0;
+               // Red color (#FF0000FF).
                color: 255 0 0 255;
                max: 30 30;
                align: 0.1 0.2;
             }
+            // The final state of the rectangle, triggered by the program.
             description { state: "default" 1.0;
+               // 'inherit' copies all properties from the 'default' 0.0 state,
+               // so we only need to specify the properties that change.
                inherit: "default" 0.0;
+               // Blue color (#0000FFFF), overriding the inherited red.
                color: 0 0 255 255;
+               // The rectangle moves to the right side of the container.
                align: 0.9 0.2;
             }
          }
       }
+      // The 'programs' block defines the interactive logic and animations.
       programs {
+         // This program listens for a mouse click on the 'label' part.
          program {
             signal: "mouse,down,1";
             source: "label";
+            // The 'script' block contains Embryo script code that runs when
+            // the signal is emitted.
             script {
+               // This function triggers a state change on the 'red_rect' part.
+               // It transitions from its current state to "default" 1.0.
                set_state(PART:"red_rect", "default", 1.0);
             }
          }

@@ -1,15 +1,22 @@
 collections {
+   // A group defines a single UI layout. It acts as a container for parts,
+   // scripts, and programs that work together.
    group {
       name: "animation_group";
       max: 700 700;
       min: 700 700;
+     // The images block pre-loads images used in this group.
+     // 'COMP' hints that the image data should be stored compressed.
      images{
          image: "bubble.png" COMP;
      }
+    // The 'parts' block contains all the visual elements of the group.
     parts{
+              // This part is an image named "part_bubble". It will display "bubble.png".
               part{
                    name: "part_bubble";
                    type: IMAGE;
+                   // A description defines a state of a part. "default" is the initial state.
                    description{
                        state: "default" 0.0;
                        max: 63 63;
@@ -17,30 +24,44 @@ collections {
                        image{
                             normal: "bubble.png";
                        }
+                       // rel1 and rel2 define the part's position relative to its container.
+                       // Here, with both set to (0.0, 0.0), the part is positioned at the top-left corner.
                        rel1.relative: 0.0 0.0;
                        rel2.relative: 0.0 0.0;
                     }
                     description {
+                       // "down-state" is another state for the part, which inherits properties
+                       // from the "default" state.
                        state: "down-state" 1.0;
                        inherit: "default" 0.0;
+                       // This moves the part's top anchor (rel1.y) to the bottom of the container (1.0),
+                       // effectively placing the part just below the visible area.
+                       // The rel2 setting is unusual here but rel1 takes precedence for positioning.
                        rel1.relative: 0.0 1.0;
                        rel2.relative: 0.0 0.0;
                      }
          }
 
     }
+    // The 'programs' block defines actions that can be triggered by signals.
     programs{
+       // This program runs on the "load" signal, which is emitted when the
+       // object is created. After a delay of 0.5s ('in'), it triggers the
+       // "animation,state1" program ('after').
        program {
          signal: "load";
          source: "";
          in: 0.5 0.0;
          after: "animation,state1";
        }
+       // This program, named "animation,state1", performs the actual animation.
        program {
          name: "animation,state1";
          source: "";
+         // It sets the state of "part_bubble" to "down-state".
          action: STATE_SET "down-state" 1.0;
          target: "part_bubble";
+         // The state change is animated with a BOUNCE effect over 2.5 seconds with 5 bounces.
          transition: BOUNCE 2.5 0.0 5.0;
       }
     }

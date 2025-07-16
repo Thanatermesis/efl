@@ -1,5 +1,9 @@
+// This group defines a vertical separator used in the ibar.
+// It is a simple rectangle that can be styled using a color_class.
 group { name: "e/modules/ibar/separator/default";
    parts {
+      // The 'base' part is a 1-pixel wide rectangle that expands vertically.
+      // 'offscale' is an optimization, indicating that the scaling of this part will not change.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -14,6 +18,8 @@ group { name: "e/modules/ibar/separator/default";
    }
 }
 
+// This group creates a horizontal separator by inheriting from the default
+// separator and modifying its maximum size to be horizontal.
 group { name: "e/modules/ibar/separator/horizontal";
    inherit: "e/modules/ibar/separator/default";
    parts {
@@ -25,12 +31,18 @@ group { name: "e/modules/ibar/separator/horizontal";
    }
 }
 
+// This group defines the appearance and behavior of an application icon in the ibar.
+// It handles various states like default, disabled, starting, and urgent notifications.
+// It also includes an indicator for active windows.
 group { name: "e/modules/ibox/icon";
    alias: "e/modules/ibar/icon";
    // 1 or 0 if u want an icon holder to raise when the mouse (or keyboard) hilights it
    data.item: "raise_on_hilight" "1";
 //   data.item: "item_list" "item item2 item3";
    parts {
+      // 'item_clip' is a clipping rectangle for the entire icon.
+      // In the "default" state, it is effectively infinitely large so it doesn't clip.
+      // The "disabled" state applies a semi-transparent white overlay (#FFFFFF40).
       part { name: "item_clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -44,6 +56,8 @@ group { name: "e/modules/ibox/icon";
             color: 255 255 255 64; // no cc
          }
       }
+      // This SPACER part acts as a reference for positioning other elements.
+      // The 'starting' state is used to create a zoom-in animation when the icon is created.
       part { name: "content"; type: SPACER;
          description { state: "default" 0.0;
          }
@@ -53,6 +67,9 @@ group { name: "e/modules/ibox/icon";
             rel2.relative: 0.9 0.9;
          }
       }
+      // This is a SWALLOW part, which is a container for external Evas objects,
+      // in this case, the application's icon. It is clipped by 'item_clip'.
+      // The 'bounce1' and 'bounce2' states create an animation for urgent events.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "item_clip";
          scale: 1;
@@ -73,6 +90,8 @@ group { name: "e/modules/ibox/icon";
             rel2.relative: 1.0 0.85;
          }
       }
+      // This SWALLOW part is for displaying window previews.
+      // It shares the same bouncing animation for urgent notifications.
       part { name: "e.swallow.preview"; type: SWALLOW;
          scale: 1;
          clip_to: "item_clip";
@@ -95,6 +114,11 @@ group { name: "e/modules/ibox/icon";
             rel2.relative: 1.0 0.85;
          }
       }
+      // The 'clip', 'clip1', 'clip2', and 'clip3' parts work together to manage
+      // the visibility and positioning of the active window indicator.
+      // 'clip' is the main container for the clipping rectangles.
+      // 'clip1' is visible by default (for horizontal ibar), while 'clip2' and
+      // 'clip3' are used for left and right orientations, controlled by programs.
       part { name: "clip"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -151,6 +175,10 @@ group { name: "e/modules/ibox/icon";
             visible: 1;
          }
       }
+      // These three RECT parts are the visual indicators for an active window.
+      // Each is clipped by a corresponding 'clip' part and positioned for a
+      // different ibar orientation (bottom, left, right). They are hidden by
+      // default and become visible when the 'e,state,on' signal is received.
       part { name: "indicator1"; type: RECT;
          scale: 1;
          clip_to: "clip1";
@@ -208,6 +236,8 @@ group { name: "e/modules/ibox/icon";
             visible: 1;
          }
       }
+      // A transparent rectangle that covers the entire icon area, often used
+      // to capture mouse events without interfering with the visual elements.
       part { name: "over"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -215,6 +245,9 @@ group { name: "e/modules/ibox/icon";
       }
    }
    programs {
+      // These programs handle the orientation of the ibar. When an 'e,origin,*'
+      // signal is received, they set the state of the clipping parts, which in turn
+      // controls the position of the active window indicator.
       program { signal: "e,origin,center"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "clip1";
@@ -252,6 +285,9 @@ group { name: "e/modules/ibox/icon";
 //      program {
 //         signal: "e,action,hide,label"; source: "e";
 //      }
+      // Manages the startup animation. When 'e,state,starting' is received, it
+      // transitions the 'content' part to the 'starting' state, creating a
+      // zoom-in effect. 'e,state,started' reverts it to the default state.
       program { signal: "e,state,starting"; source: "e";
          action: STATE_SET "starting" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
@@ -263,6 +299,9 @@ group { name: "e/modules/ibox/icon";
          target: "content";
       }
       /////////////////////////////////////////////////////////////
+      // Controls the visibility of the active window indicator.
+      // 'e,state,on' makes the indicators visible with an animation.
+      // 'e,state,off' hides them.
       program { signal: "e,state,on"; source: "e";
          action: STATE_SET "visible" 0.0;
          target: "indicator1";
@@ -278,6 +317,9 @@ group { name: "e/modules/ibox/icon";
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
       }
       /////////////////////////////////////////////////////////////
+      // Handles urgent notifications. When 'e,state,urgent' is received, it starts a
+      // bouncing animation on the icon and preview. The 'urg1' and 'urg2' programs
+      // create a loop, making the animation repeat until 'e,state,not_urgent' stops it.
       program { signal: "e,state,urgent"; source: "e";
          action: STATE_SET "bounce1" 0.0;
          target: "e.swallow.content";
@@ -298,6 +340,7 @@ group { name: "e/modules/ibox/icon";
          target: "e.swallow.preview";
          after: "urg1";
       }
+      // Stops the urgent animation and returns the icon to its default state.
       program { signal: "e,state,not_urgent"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.swallow.content";
@@ -306,12 +349,21 @@ group { name: "e/modules/ibox/icon";
    }
 }
 
+// This group defines an overlay for the ibox/ibar icon, which can be used to display
+// additional information like notifications or activity indicators. It features
+// complex animations and state management using an embedded script.
 group { name: "e/modules/ibox/icon_overlay";
    alias: "e/modules/ibar/icon_overlay";
+   // IMAGE_RING is a macro that defines a set of image parts for creating
+   // a circular, animated ring effect, often used for notifications.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
    script_recursion: 1;
+   // This embedded script defines two public integer variables, 'urgent' and 'active'.
+   // These variables can be accessed and modified by programs within this group
+   // to manage the state of the overlay. `script_recursion: 1` allows a script-
+   // triggered program to run another program that also runs a script.
    script {
       public urgent;
       public active;
@@ -330,6 +382,7 @@ group { name: "e/modules/ibox/icon_overlay";
             color: 255 255 255 64; // no cc
          }
       }
+      // A spacer for positioning, with bounce states for animations.
       part { name: "base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -348,6 +401,9 @@ group { name: "e/modules/ibox/icon_overlay";
             rel2.relative: 1.0 0.85;
          }
       }
+      // 'background' is a rectangle used for various visual effects.
+      // It starts invisible and can transition to different states to create
+      // animations like fades and growing effects.
       part { name: "background"; type: RECT;
          clip_to: "item_clip";
          description { state: "default" 0.0;
@@ -374,6 +430,7 @@ group { name: "e/modules/ibox/icon_overlay";
             color: 255 255 255 0; // no cc
          }
       }
+      // 'content' is a spacer used for the startup animation, similar to the one in 'e/modules/ibox/icon'.
       part { name: "content"; type: SPACER;
          description { state: "default" 0.0;
          }
@@ -383,6 +440,8 @@ group { name: "e/modules/ibox/icon_overlay";
             rel2.relative: 0.9 0.9;
          }
       }
+      // The BUSY macro creates an animated indicator, typically used to show
+      // that an application is loading. It's controlled by the start and stop signals.
       BUSY("busy_area", "e,state,starting", "e", "e,state,started", "e")
       part { name: "busy_area"; type: SPACER;
          description { state: "default" 0.0;
@@ -403,6 +462,8 @@ group { name: "e/modules/ibox/icon_overlay";
             rel.to: "background";
          }
       }
+      // 'bg' is a background for the text label, which fades in and out with it.
+      // It uses a color_class for theming and starts as transparent and invisible.
       part { name: "bg"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -421,6 +482,8 @@ group { name: "e/modules/ibox/icon_overlay";
             visible: 1;
          }
       }
+      // 'e.text.label' is a TEXT part for displaying a label.
+      // It is initially invisible and transparent, and can be shown with an animation.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -446,6 +509,9 @@ group { name: "e/modules/ibox/icon_overlay";
             visible: 1;
          }
       }
+      // This 'spacer' is an invisible TEXT part used for layout purposes.
+      // It links its size to 'e.text.label' to help in positioning the label
+      // dynamically based on its content length and ibar orientation.
       text { name: "spacer"; scale: 1;
          desc {
             visible: 0;
@@ -480,6 +546,7 @@ group { name: "e/modules/ibox/icon_overlay";
 //      program {
 //         signal: "e,action,start"; source: "e";
 //      }
+      // Handles the startup animation for the 'content' part.
       program { signal: "e,state,starting"; source: "e";
          action: STATE_SET "starting" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
@@ -491,11 +558,16 @@ group { name: "e/modules/ibox/icon_overlay";
          target: "content";
       }
       ///////////////////////////////////////////////////////////
+      // On load, this program initializes the 'urgent' variable in the script to 0.
       program { signal: "load"; source: "";
          script {
             set_int(urgent, 0);
          }
       }
+      // This set of programs creates a pulsing animation when the icon is focused.
+      // 'go_active' starts the animation and sets the 'active' script variable to 1.
+      // 'go_active2' transitions the 'background' part and then calls 'go_active'
+      // again, creating a loop as long as 'active' is 1.
       program { name: "go_active";
          signal: "e,state,focused"; source: "e";
          script {
@@ -515,6 +587,8 @@ group { name: "e/modules/ibox/icon_overlay";
             }
          }
       }
+      // When the icon loses focus, 'go_passive' stops the pulsing animation
+      // by setting 'active' to 0. It then calls 'go_passive2' to finalize the state.
       program { name: "go_passive";
          signal: "e,state,unfocused"; source: "e";
          script {
@@ -523,6 +597,7 @@ group { name: "e/modules/ibox/icon_overlay";
          }
          after: "go_passive2";
       }
+      // These programs control the visibility of the text label and its background.
       program { signal: "e,action,show,label"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: SINUSOIDAL 0.5 USE_DURATION_FACTOR 1;
@@ -535,6 +610,8 @@ group { name: "e/modules/ibox/icon_overlay";
          target: "e.text.label";
          target: "bg";
       }
+      // These two unnamed programs seem to be for controlling the 'bg' part directly.
+      // It's possible they are remnants or used in a very specific context.
       program {
          action: STATE_SET visible 0.0;
          transition: SINUSOIDAL 1.0 USE_DURATION_FACTOR 1;
@@ -545,6 +622,9 @@ group { name: "e/modules/ibox/icon_overlay";
          transition: SINUSOIDAL 1.0 USE_DURATION_FACTOR 1;
          target: "bg";
       }
+      // 'go_passive2' reverts the background to its default state. It then checks the
+      // 'urgent' script variable to decide whether to run the 'go_urgent' program
+      // (if there's an urgent notification) or 'go_not_urgent'.
       program { name: "go_passive2";
          action: STATE_SET "default" 0.0;
          target: "background";
@@ -556,11 +636,15 @@ group { name: "e/modules/ibox/icon_overlay";
             }
          }
       }
+      // These programs manage the 'urgent' state. They receive signals and update
+      // the 'urgent' script variable accordingly.
       program { signal: "e,state,urgent"; source: "e";
          script {
             set_int(urgent, 1);
          }
       }
+      // The 'go_urgent' program is triggered when an urgent state needs to be displayed.
+      // It sets the 'item_clip' to 'disabled' to visually alter the icon.
       program { name: "go_urgent";
          signal: "e,state,urgent"; source: "e";
          action: STATE_SET "disabled" 0.0;
@@ -571,11 +655,15 @@ group { name: "e/modules/ibox/icon_overlay";
             set_int(urgent, 0);
          }
       }
+      // 'go_not_urgent' reverts the 'item_clip' to its default state.
       program { name: "go_not_urgent";
          signal: "e,state,not_urgent"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "item_clip";
       }
+      // This sequence handles the animation when an application is executed.
+      // It stops all other ongoing animations and triggers a "grow" effect ('go_big'
+      // and 'go_big2') on the 'background' part.
       program { signal: "e,action,exec"; source: "e";
          after: "exec_start";
       }
@@ -603,11 +691,16 @@ group { name: "e/modules/ibox/icon_overlay";
    }
 }
 
+// This group defines the visual appearance of a drag-and-drop target area
+// over an ibar icon. It consists of a border and a tiled pattern inside.
 group { name: "e/modules/ibox/drop";
    alias: "e/modules/ibar/drop";
    images.image: "outline.png" COMP;
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // The 'pat' part displays a tiled pattern inside the drop area.
+      // It's positioned relative to the 'base' part and uses a color_class for theming.
+      // TILED_PATTERN is a macro that sets up tiling for the image.
       part { name: "pat"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.to: "base";
@@ -619,6 +712,9 @@ group { name: "e/modules/ibox/drop";
             TILED_PATTERN(240, 240)
          }
       }
+      // The 'base' part is the border of the drop zone, using a scalable image.
+      // 'image.border' defines the non-scalable borders of the image, and 'image.middle: 0'
+      // indicates that the center of the image is not drawn (it's transparent).
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.offset: 2 2;
@@ -633,6 +729,8 @@ group { name: "e/modules/ibox/drop";
    }
 }
 
+// This group defines an animated overlay with glowing arrows at the corners,
+// likely used to indicate a potential drop location during a drag operation.
 group { name: "e/modules/ibox/drop_overlay";
    alias: "e/modules/ibar/drop_overlay";
    images.image: "mini_blue_glow_arrow_0.png" COMP;
@@ -640,6 +738,9 @@ group { name: "e/modules/ibox/drop_overlay";
    images.image: "mini_blue_glow_arrow_2.png" COMP;
    images.image: "mini_blue_glow_arrow_3.png" COMP;
    parts {
+      // The four 'drop' parts are the arrows placed at each corner of the icon.
+      // They are initially hidden and have an 'active' state to be made visible
+      // and a 'hidden' state for a fade-out/shrink animation.
       part { name: "drop0"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -750,6 +851,10 @@ group { name: "e/modules/ibox/drop_overlay";
       }
    }
    programs {
+      // This program loop creates a pulsing animation for the corner arrows.
+      // 'drop1' makes the arrows visible and then calls 'drop2'.
+      // 'drop2' animates them to a hidden state (shrinking and fading out)
+      // and then calls 'drop1' again, creating a continuous loop.
       program { name: "drop1";
          signal: "show"; source: "";
          action: STATE_SET "active" 0.0;
@@ -771,8 +876,12 @@ group { name: "e/modules/ibox/drop_overlay";
    }
 }
 
+// This group defines the container for a popup menu associated with an ibar icon.
+// It includes a background, a box layout for menu items, and animations for showing and hiding.
 group { name: "e/modules/ibar/menu";
    parts {
+      // 'clip' is used to control the visibility of the menu, making it transparent
+      // when in the 'hidden' state to create a fade-out effect.
       part { name: "clip"; type: RECT;
          description { state: "default";
          }
@@ -781,12 +890,14 @@ group { name: "e/modules/ibar/menu";
             color: 0 0 0 0; // no cc
          }
       }
+      // 'base' is the visible background of the menu.
       part { name: "base"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          description { state: "default" 0.0;
             color_class: "/dim/normal/gadgets/ibar/menu/base";
          }
       }
+      // 'e.box' is a BOX part that will contain and arrange the menu items vertically.
       part { name: "e.box"; type: BOX;
          clip_to: "clip";
          scale: 1;
@@ -803,11 +914,14 @@ group { name: "e/modules/ibar/menu";
       }
    }
    programs {
+      // This program immediately hides the menu when the 'e,state,hidden' signal is received.
       program { signal: "e,state,hidden"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "clip";
       }
 
+      // The 'e,action,show' signal triggers a fade-in animation for the menu.
+      // After the animation, 'show2' emits 'e,action,show,done' to notify that it's complete.
       program { signal: "e,action,show"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "clip";
@@ -818,6 +932,8 @@ group { name: "e/modules/ibar/menu";
          action: SIGNAL_EMIT "e,action,show,done" "";
       }
 
+      // The 'e,action,hide' signal triggers a fade-out animation.
+      // 'hide2' emits 'e,action,hide,done' upon completion.
       program { signal: "e,action,hide"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "clip";
@@ -830,8 +946,14 @@ group { name: "e/modules/ibar/menu";
    }
 }
 
+// This group defines a single item within the ibar menu. It consists of a highlight
+// rectangle, an icon, a title, and an event-capturing area.
 group { name: "e/modules/ibar/menu/item";
    parts {
+      // 'base' is the highlight rectangle shown when the item is focused.
+      // It's hidden by default and becomes visible on focus. The 'link.base'
+      // property directly ties the part's state to focus signals from the 'e' source,
+      // providing a concise way to handle state changes without a program block.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default";
@@ -870,6 +992,7 @@ group { name: "e/modules/ibar/menu/item";
          }
       }
  */
+      // 'icon' is a spacer that reserves space for the menu item's icon.
       part { name: "icon"; scale: 1; type: SPACER;
          scale: 1;
          description { state: "default";
@@ -881,11 +1004,14 @@ group { name: "e/modules/ibar/menu/item";
             offscale;
          }
       }
+      // 'e.swallow.icon' is the SWALLOW part where the actual icon object is placed.
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          description { state: "default";
             rel.to: "icon";
          }
       }
+      // 'e.text.title' displays the window title or item name.
+      // Its color_class changes on focus, also driven by the 'link.base' property.
       part { name: "e.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -913,6 +1039,7 @@ group { name: "e/modules/ibar/menu/item";
             link.transition: ACCEL 0.1;
          }
       }
+      // 'event' is a transparent rectangle covering the item to capture mouse events.
       part { name: "event"; type: RECT;
          description { state: "default";
             color: 0 0 0 0; // no cc

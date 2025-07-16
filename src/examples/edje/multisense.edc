@@ -1,14 +1,31 @@
 collections {
+   // The 'sounds' block is used to define audio resources that can be used
+   // throughout the EDC file. It can contain both pre-recorded samples and
+   // dynamically generated tones.
    sounds {
+      // Defines a sound sample named "sound_name1" from the "duck.wav" file.
+      // The RAW compression mode indicates that the sample is not compressed,
+      // which is ideal for short, frequently played sounds to reduce CPU usage
+      // at the cost of higher memory consumption.
       sample {
          name: "sound_name1" RAW;
          source: "duck.wav";
       }
+      // Defines a musical tone named "tone-name" with a frequency of 2600 Hz.
+      // This is useful for creating simple audio feedback without needing
+      // separate audio files.
       tone: "tone-name" 2600;
    }
+   // The 'group' block defines a self-contained UI layout. It encapsulates a set of
+   // parts (UI elements) and programs (logic) that work together to create a
+   // functional component. This modular approach allows for complex interfaces to
+   // be built from smaller, reusable pieces.
    group {
       name: "example_group";
       parts {
+         // This part, 'sample_bg', is a rectangle that serves as the background
+         // for the sound sample button. It's set to a fixed size of 300x150 pixels.
+         // 'mouse_events' is enabled, allowing it to detect clicks.
          part {
             name: "sample_bg";
             type: RECT;
@@ -17,13 +34,22 @@ collections {
                state: "default" 0.0;
                min: 300 150;
                max: 300 150;
+               // The color is a semi-transparent gray (RGBA: 200, 200, 200, 100),
+               // which corresponds to the hexadecimal value #C8C8C864.
                color: 200 200 200 100;
+               // Aligns the part to the horizontal center and vertical top of its container.
                align: 0.5 0.0;
+               // Positions the top-left corner of the part at the top-left of the
+               // layout area.
                rel1 {
                   relative: 0.0 0.0;
                }
             }
          }
+         // The 'sample_text' part is a text label. By setting both 'rel1.to' and
+         // 'rel2.to' to 'sample_bg', this text is confined within the boundaries
+         // of the 'sample_bg' rectangle, ensuring it is always positioned
+         // correctly relative to its background.
          part {
             name: "sample_text";
             type: TEXT;
@@ -49,13 +75,21 @@ collections {
                min: 300 150;
                max: 300 150;
                align: 0.5 0.0;
+               // The color is a semi-transparent dark gray (RGBA: 180, 180, 180, 100),
+               // corresponding to the hexadecimal value #B4B4B464.
                color: 180 180 180 100;
+               // This 'rel1' block positions 'tone_bg' directly below 'sample_bg'.
+               // 'relative: 0.0 1.0' places the top-left corner of this part at the
+               // bottom-left of the 'sample_bg' part.
                rel1 {
                   relative: 0.0 1.0;
                   to: "sample_bg";
                }
             }
          }
+         // The 'tone_text' part is the label for the tone button, and it is
+         // constrained to the dimensions of 'tone_bg', similar to how
+         // 'sample_text' is related to 'sample_bg'.
          part {
             name: "tone_text";
             type: TEXT;
@@ -72,13 +106,22 @@ collections {
                }
             }
          }
+         // The 'programs' block contains the logic that drives the interface's
+         // interactivity. Each 'program' defines a specific action to be taken
+         // in response to a signal, such as a mouse click or a custom event.
          programs {
+            // This program is triggered by a left mouse button press ('mouse,down,1')
+            // on the 'sample_bg' part. When activated, it plays the "sound_name1"
+            // sample at full volume (1.0).
             program {
                name: "click_sample1";
                signal: "mouse,down,1";
                source: "sample_bg";
                action: PLAY_SAMPLE "sound_name1" 1.0;
             }
+            // This program triggers when the 'tone_bg' part is clicked with the left
+            // mouse button. It plays the "tone-name" (2600 Hz) for a duration of
+            // 0.1 seconds.
             program {
                name: "click_tone";
                signal: "mouse,down,1";

@@ -1,17 +1,27 @@
+// Defines a color class named "test_colour". Color classes allow changing the color
+// of multiple parts at once from code. The initial color is white (#FFFFFFFF).
 color_classes {
     color_class { name: "test_colour"; color: 255 255 255 255; }
 }
 
+// Defines available fonts for the UI. "Vera.ttf" is aliased as "default",
+// making it easier to reference in parts.
 fonts {
    font: "Vera.ttf" "default";
 }
 
+// Pre-loads images used in the interface. 'COMP' indicates that the images
+// should be stored compressed in the final .edj file to save space.
 images {
     image: "bubble.png" COMP;
     image: "test.png" COMP;
 }
 
 collections {
+   // This group serves as a comprehensive testbed and demonstration for the Edje Lua scripting API.
+   // It does not create a visible UI itself but exercises various API functions like timers,
+   // animations, object creation, and message handling. `lua_script_only: 1;` indicates that
+   // this group contains only a script and no visible parts.
    group {
       name: "main";
       lua_script_only: 1;
@@ -22,7 +32,8 @@ collections {
          local fndata = 99;
          local text_geom;
 
-         --// Functions to print tables.
+         --// Utility functions for recursively printing Lua tables to the console for debugging purposes.
+         --// These are useful for inspecting the contents of complex data structures.
          local print_table, print_table_start;
 
          function print_table_start(table, space, name)
@@ -33,7 +44,7 @@ collections {
          end
 
          function print_table(table, space)
-            for k, v in pairs(table) do 
+            for k, v in pairs(table) do
                if type(v) == "table" then
                   print_table_start(v, space, k);
                elseif type(v) == "string" then
@@ -44,6 +55,10 @@ collections {
             end
          end
 
+         --// Callback function for an `edje.transition`. This function is called repeatedly
+         --// over the duration of the transition (5.0 seconds, as defined below).
+         --// The argument 'v' progresses from 0.0 to 1.0, representing the transition's progress.
+         --// This callback animates a rectangle's geometry and color, creating a circular motion.
          local function mycb3 (v)
             print("lua::callback transition " .. D.val .. " v: " .. v);
             d = {};
@@ -56,7 +71,7 @@ collections {
             D.rect:color(255, 128, v * 255, 255);
             d = D.rect:move(d);
             print("lua::pos= " .. d.x .. " , " .. d.y);
- 
+
             r = D.rect:above();
             if (r ~= nil) then
                print("lua::rcol");
@@ -73,7 +88,11 @@ collections {
             end
             return true;  --// repeat the timer
          end
- 
+
+         --// Callback for an `edje.animator`. Animators are synced with the rendering pipeline,
+         --// making them suitable for smooth, continuous animations.
+         --// This function is called on every frame, updating a color class and a text class,
+         --// which affects parts using these classes in other groups.
          local function mycb2 ()
             print("lua::callback animator " .. count .. " seconds: " .. edje.seconds() .. " looptime: " .. edje.looptime());
             edje.color_class("test_colour", 255, (count * 10) % 255, 255, 255);
@@ -88,7 +107,10 @@ collections {
             D.text:move((edje_geom.w - text_geom.w) / 2, (edje_geom.h - text_geom.h) / 8);
             return true;  --// repeat the timer
          end
- 
+
+         --// Callback for an `edje.timer`. This function is first called after 1.23 seconds.
+         --// It increments a counter and then sets up another timer to call itself again after 0.25 seconds.
+         --// The 'return false' ensures the initial timer does not repeat automatically.
          local function mycb ()
             print("lua::callback timer " .. count .. " fndata = " .. fndata);
             count = count + 1; --// keep count of calls - object data
@@ -96,8 +118,10 @@ collections {
             D.tim = edje.timer(0.25, mycb); --// inside cb add new timer
             return false; --// cease repeating the timer
          end
- 
-         --// init object here
+
+         --// Initialization block for the script. This runs when the group is loaded.
+         --// 'D' is a table used as a local namespace to store object references and state,
+         --// preventing pollution of the global Lua namespace.
          D = {}; --// data is empty table to start
          D.val = math.random(); --// start with some random value so
          fndata = fndata + D.val; --// func data start point
@@ -108,12 +132,12 @@ collections {
          version = edje.version();
          print("The edje version number is " .. version.major .. "." .. version.minor);
 
-         --// actually add the timer to call mycb in 1.23 sec
+         --// Starts the timer, transition, and animator with their respective callbacks.
          D.tim = edje.timer(1.23, mycb);
          D.tra = edje.transition(5.0, mycb3);
          D.ani = edje.animator(mycb2);
          edje_geom = edje.geom();
- 
+
          if (edje.spanky) then edje.spanky(); end
 
          local date = edje.date();
@@ -128,7 +152,9 @@ collections {
             date.sec
          );
 
-         --// send some random edje message
+         --// Demonstrates sending various types of Edje messages. These messages can be caught
+         --// by other parts of the application or by the `message` callback function in this script.
+         --// The first argument is a message ID, followed by a type string and payload.
          edje.messagesend(7, "none"      );
          edje.messagesend(7, "sig",      "signal", "source");
          edje.messagesend(7, "str",      "hello world");
@@ -144,27 +170,38 @@ collections {
          D.edje = edje.edje();
          D.edje:file("plain/edje/group");
          D.edje:show();
-                  
+
+         --// Creates a red rectangle part. Lua-created objects are not part of the static
+         --// EDC definition but are layered on top. They need to be explicitly shown.
          D.rect = edje.rect();
          D.rect:geom  (5, 10, 50, 30);
+         // The color is orange-red (#FF803CFF).
          D.rect:color (255, 128, 60, 255);
          D.rect:show  ();
-                  
+
+         --// Creates a second, semi-transparent dark blue rectangle.
          D.rect2 = edje.rect();
          D.rect2:geom  (50, 50, 50, 50);
+         // The color is #141E3C78.
          D.rect2:color (20, 30, 60, 120);
          D.rect2:show  ();
 
+         --// Creates a rectangle that will be used as a clipping mask.
+         --// Objects clipped by this will only be visible within its bounds.
          D.clip = edje.rect();
          D.clip:geom  (10, 10, 150, 150);
+         // The color is a semi-transparent yellow (#C8C832C8).
          D.clip:color (200, 200, 50, 200);
          D.clip:show  ();
- 
+
+         --// Applies the clip to the two previously created rectangles.
          D.rect2:clip(D.clip);
          D.rect:clip(D.clip);
 
+         --// Creates a text object.
          D.text = edje.text();
          D.text:geom  (50, 5, 150, 50);
+         // The text color is red (#FF0000FF).
          D.text:color (255, 0, 0, 255);
          D.text:font("Sans:style=Bold", 32);
          D.text:text("Lua rocks!");
@@ -217,7 +254,8 @@ collections {
             print("lua::map is clockwise");
          end
 
-         D.map:color(255, 255, 255, 255); // set all points to this colour.
+         D.map:color(255, 255, 255, 255); // Sets all map vertices to white (#FFFFFFFF).
+         // Sets the color of a single vertex (index 1) to magenta (#FF00FFFF).
          D.map:color(1, 255, 0, 255, 255);  // set just one point to this colour.
 
          D.map:lighting(75, 75, 10, 255, 255, 255, 0, 255, 0);  // Ambient light and a 3D light source.
@@ -235,6 +273,7 @@ collections {
          D.map:uv(3, 0.0, 50.0);
 
          --// Actually apply the resulting transformations.
+         --// Applies the defined map to the `rect2` object, enabling 3D-like transformations.
          D.rect2:map(D.map);
          D.rect2:map_enable(true);
          if (D.rect2:map_enable()) then
@@ -249,7 +288,8 @@ collections {
          --// example of deleting something
          --// D.tim:del();
 
-         --// test the color_class stuff
+         --// Demonstrates getting and setting the value of a color_class defined in the EDC.
+         --// This allows dynamic control over themed colors from a script.
          colour = edje.color_class("test_colour");
          print("lua::color_class= " .. colour.r .. "," .. colour.g .. "," .. colour.b .. "," .. colour.a);
          colour = edje.color_class("test_colour", 32, 64, 255, 128);
@@ -258,39 +298,48 @@ collections {
          print("lua::color_class= " .. colour.r .. "," .. colour.g .. "," .. colour.b .. "," .. colour.a);
          text = edje.text_class("test_text_class", "Sans:style=Bold", 8);
          print("lua::text_class= " .. text.font .. " size " .. text.size);
- 
+
          --// Do something bad, just to see what happens.
 --//         edje.color_class(nil);
- 
-         --// shutdown func - generally empty or not there. everything garbage collected for you
+
+         --// The 'shutdown' function is called automatically when the Edje object is destroyed.
+         --// It's a good place for cleanup, although Lua's garbage collection handles most of it.
          function shutdown ()
             print("lua::shutdown ... " .. D.val);
          end
 
+         --// The 'show' function is called when the Edje object becomes visible.
          function show ()
             print("lua::show ... " .. D.val);
          end
 
+         --// The 'hide' function is called when the Edje object is hidden.
          function hide ()
             print("lua::hide ... " .. D.val);
          end
 
+         --// The 'move' function is called when the Edje object is moved.
          function move (x, y)
             print("lua::move x=" .. x .. " x=" .. y);
             D.edje:move(0, 0);
          end
 
+         --// The 'resize' function is called when the Edje object is resized.
+         --// Here it's used to re-center the text object.
          function resize (w, h)
             print("lua::resize w=" .. w .. " h=" .. h);
             D.text:move((w - text_geom.w) / 2, (h - text_geom.h) / 8);
             D.edje:resize(w, h);
          end
 
+         --// The 'message' callback is triggered when `edje.messagesend()` is called
+         --// targeting this object. It's a powerful way to communicate between scripts
+         --// or from C code to a script. The vararg (...) handles different message payloads.
          function message (id, type, ...)
             print("lua::message id=" .. id .. " type=" .. type);
             --// handle your message type here. check id + type then use the
-            --// vararg appropriately. they are the same as the params passed 
-            --// to edje:messagesend() (if any are passed at all).  Any array
+            --// vararg appropriately. they are the same as the params passed
+            --// to edje.messagesend() (if any are passed at all). Any array
             --// arguments are passed as a single table.
 
             if ("none" == type) then
@@ -317,15 +366,22 @@ collections {
             end
          end
 
+         --// The 'signal' callback receives signals emitted by parts within the Edje object's
+         --// groups, or from C code. This is the primary mechanism for script interaction
+         --// with user input and other events from EDC parts.
          function signal (sig, src)
             print("lua::signal sig= " .. sig .. " src= " .. src);
          end
       }
    }
 
-   // The group name NEEDS a / in it, 
+   // The group name NEEDS a / in it,
    // or the part below that tries to swallow it won't work.
    // Leaving just the lua part visible.
+   // This group uses a Lua script to procedurally create a grid of image objects.
+   // This is a powerful technique for creating dynamic or complex layouts that would be
+   // tedious to define statically in EDC. The number of bubbles is controlled by
+   // the `bubbleCols` and `bubbleRows` variables.
    group {
       name: "bubbles/lua";
       lua_script_only: 1;
@@ -345,6 +401,7 @@ collections {
             table.insert(bubbles, row);
          end
 
+         --// The resize callback ensures the grid of bubbles scales correctly when the parent object's size changes.
          function resize (w, h)
             for i = 1, bubbleRows do
                for j = 1, bubbleCols do
@@ -362,20 +419,28 @@ collections {
       }
    }
 
+   // This is a standard Edje group that defines a visual layout using parts.
+   // It serves as the main presentation layer, combining a background, a dynamically generated
+   // element from another group, an image, and text.
    group {
       name: "plain/edje/group";
       parts {
+         // This part is a simple black rectangle that serves as the background for the entire group.
+         // `mouse_events: 0;` makes it transparent to mouse clicks.
          part {
             name: "background";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Opaque black (#000000FF).
                color: 0 0 0 255;
             }
          }
 
-         // A lua group embedded in an edje group.
+         // This part demonstrates embedding one group within another.
+         // The `source` property instructs this GROUP part to load and display the "bubbles/lua" group.
+         // This is a key feature for creating reusable components and complex UIs.
          part {
             name: "bubbles_lua";
             type: GROUP;
@@ -384,6 +449,9 @@ collections {
             description { state: "default" 0.0; }
          }
 
+         // An IMAGE part that displays "test.png". Its color is not set directly
+         // but is linked to the "test_colour" color class. Any script or program
+         // that changes "test_colour" will affect this image's tint.
          part {
             name: "background_image";
             type: IMAGE;
@@ -396,6 +464,9 @@ collections {
             }
          }
 
+         // A TEXT part whose font and size are controlled by the "test_text_class".
+         // The `mycb2` animator function in the "main" script dynamically changes this text class,
+         // causing the text to change its appearance over time.
          part {
             name: "some_text";
             type: TEXT;

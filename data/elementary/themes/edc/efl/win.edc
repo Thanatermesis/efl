@@ -1,29 +1,55 @@
+// This group defines the layout for a standard EFL window.
+// It includes areas for a menu and the main content.
 group { "efl/win";
+   // Custom data, used here to version the theme.
    data.item: "version" "123";
    parts {
+      // A clipping rectangle that covers the entire window client area.
+      // It's used by other parts to ensure they don't draw outside the window.
+      // 'nomouse' prevents this part from interfering with mouse events.
       rect { "client_clip"; nomouse; }
+      // A swallow part to hold a menu widget, which is a placeholder for content.
       swallow { "efl.menu";
+         // The menu is clipped by 'client_clip', so it won't be visible
+         // outside of the main window area.
          clip_to: "client_clip";
          desc { "default";
+            // By default, the menu is positioned off-screen, above the top edge.
+            // 'rel2.relative: 1.0 0.0' places the bottom-right corner of the menu at the
+            // top-right of its container.
             rel2.relative: 1.0 0.0;
+            // This state is activated by the "efl,action,hide" signal.
             link.base: "efl,action,hide" "efl";
             align: 0.5 0.0;
+            // The part is hidden in this state.
             hid;
          }
          desc { "visible";
             inherit: "default";
+            // This state is triggered by the "efl,action,show_menu" signal,
+            // making the menu visible.
             link.base: "efl,action,show_menu" "efl";
+            // 'fixed: 0 1' means the height is fixed, but the width can scale.
             fixed: 0 1;
+            // The part is visible in this state.
             vis;
          }
       }
+      // This swallow part holds the main window content.
       swallow { "efl.contents";
+         // The content is also clipped to prevent drawing outside the window.
          clip_to: "client_clip";
          desc { "default";
          }
          desc { "with_menu";
+            // This state adjusts the content's position when the menu is visible.
+            // 'rel1.to' specifies that its top-left corner is relative to 'efl.menu'.
             rel1.to: "efl.menu";
+            // 'rel1.relative: 0.0 1.0' aligns the top of 'efl.contents' to the
+            // bottom of 'efl.menu', effectively pushing the content down.
             rel1.relative: 0.0 1.0;
+            // This state is also triggered by "efl,action,show_menu", ensuring
+            // the content resizes in sync with the menu's appearance.
             link.base: "efl,action,show_menu" "efl";
          }
       }

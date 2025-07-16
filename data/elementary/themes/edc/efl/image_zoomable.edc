@@ -14,23 +14,50 @@ Group: efl/image_zoomable (@since 1.23)
 	 Signal: efl,vertical_bar,visible,on
 
 */
+// This group defines a zoomable image widget. It inherits from "efl/scroller"
+// to provide scrolling functionality when the image is zoomed in.
 group { name: "efl/image_zoomable";
    inherit: "efl/scroller";
+   // Arbitrary data, can be queried from code.
    data.item: "version" "123";
+   // These macros likely generate the visual parts for a three-ring busy animation.
+   // Each ring is defined as an image part with a specific size (160x160).
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
+   // The 'parts' block contains all the visual elements of the group.
    parts {
+      // This macro creates programs that control the busy animation. The animation starts
+      // on "elm,state,pulse,started" signal from "efl" source and stops on
+      // "elm,state,pulse,stopped" from "efl". The animation is applied to the "base" part.
       BUSY("base", "elm,state,pulse,started", "efl", "elm,state,pulse,stopped", "efl")
+      // This part serves as a container for the busy animation elements. It is a
+      // rectangle, which makes it a simple container without visual representation itself.
       part { name: "base"; type: RECT;
+         // Enables scaling for this part, which is essential for a zoomable interface,
+         // although its child parts might ignore it via 'offscale'.
          scale: 1;
+         // Defines the default appearance of the "base" part.
          description { state: "default" 0.0;
+            // Sets the color to fully transparent black (RGBA: 0, 0, 0, 0 or #00000000).
+            // This makes the rectangle itself invisible, serving only as a layout container.
             color: 0 0 0 0; // no cc
+            // Positions the part with a small margin. rel1.offset of 4 4 creates a 4px
+            // margin from the top and left edges of its container. rel2.offset of -5 -5
+            // creates a 4px margin from the right and bottom edges (as it's -5+1).
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // Aligns the part to the bottom-right corner of its container (1.0 = right/bottom).
+            // Because min and max are set, this effectively just places the 40x40 box in the
+            // bottom-right corner with the specified offsets.
             align: 1.0 1.0;
+            // Fixes the size of the part to 40x40 pixels.
             min: 40 40;
             max: 40 40;
+            // This is a crucial property for UI overlays on zoomable content. It ensures
+            // that this part (and its children) are not affected by parent scaling.
+            // As a result, the busy indicator remains a constant size on screen
+            // regardless of the zoom level of the main content.
             offscale;
          }
       }

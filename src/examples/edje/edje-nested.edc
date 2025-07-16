@@ -1,34 +1,61 @@
+// An Edje collection can contain multiple groups. Each group is a distinct UI layout.
 collections {
+   // This group, named "main", serves as the primary layout.
+   // Edje will load this group by default if no other is specified.
    group {
       name: "main";
+      // The 'parts' block contains all visual elements of this group.
       parts {
+         // This is the top-level part in this layout, a red rectangle.
+         // All other parts in this example are nested inside this one,
+         // inheriting its coordinate space.
          part {
             type: RECT;
             name: "red_rect";
             description {
                state: "default" 0.0;
+               // Color is RGBA: 255 0 0 255 (solid red, #FF0000FF).
                color: 255 0 0 255;
+               // Positioned relative to the group's area.
+               // rel1 is the top-left corner, rel2 is the bottom-right.
+               // It starts at 20% width, 10% height.
                rel1.relative: 0.2 0.1;
+               // It ends at 40% width, 80% height.
                rel2.relative: 0.4 0.8;
             }
 
-            part {   /* This rect is nested in red_rect */
+            // This green rectangle is nested inside "red_rect", making "red_rect" its parent.
+            // All of its geometry is calculated relative to the dimensions of "red_rect".
+            part {
                type: RECT;
                name: "green_rect";
                description {
                   state: "default" 0.0;
+                  // Color is RGBA: 0 255 0 255 (solid green, #00FF00FF).
                   color: 0 255 0 255;
+                  // With rel1 defaulting to (0.0, 0.0), this part occupies the
+                  // top-left section of its parent, "red_rect".
+                  // It extends to 80% of the parent's width and 50% of its height.
                   rel2.relative: 0.8 0.5;
                }
 
-               part {   /* This rect is nested in green_rect */
+               // This blue rectangle is nested within "green_rect".
+               part {
                   type: RECT;
                   name: "blue_rect";
                   description {
                      state: "default" 0.0;
+                     // Color is RGBA: 0 0 255 255 (solid blue, #0000FFFF).
                      color: 0 0 255 255;
+                     // The 'align' property positions the part within its bounding box,
+                     // here set to the bottom-right (1.0 1.0).
+                     // However, for a RECT part that fills its container as defined by rel1 and rel2,
+                     // 'align' has no visible effect.
                      align: 1.0 1.0;
+                     // This part is placed in the bottom-right quadrant of "green_rect",
+                     // starting from its center (50% 50%).
                      rel1.relative: 0.5 0.5;
+                     // And extending to its parent's bottom-right corner (100% 100%).
                      rel2.relative: 1.0 1.0;
                   }
                }

@@ -1,23 +1,37 @@
-
+// Enables or disables debugging information display.
 #define DEBUG_ENABLE 0
+// Defines the game's frame rate, controlling how often the game loop runs.
 #define FPS 30
+// Defines the background color of the game area (dark gray, #323232).
 #define COLOR_BG 50 50 50 255
+// Defines the foreground color for elements like paddles and the ball (light gray, #DEDEDE).
 #define COLOR_FG 222 222 222 255
+// Sets the height of the paddles.
 #define PAD_SIZE 60
+// Sets the distance of the paddles from the side edges of the game area.
 #define PAD_DISTANCE 20
+// The initial horizontal speed of the ball.
 #define BALL_SPEED 5.0
+// How much the ball's speed increases after each paddle hit.
 #define BALL_SPEEDUP 0.1
+// The size (width and height) of the ball.
 #define BALL_SIZE 10
 
 
 collections {
+   // This group defines the main layout and interactive behavior of the pong game.
+   // It sets a minimum size for the window and contains all the game logic and UI elements.
    group { name: "main";
       min: 500 300;
+      // The script block contains all the game's logic, written in Embryo, a C-like scripting language.
+      // It handles game state, object movement, and user interactions.
       script {
+         // Global variables for ball position, speed, and player scores.
          public ballx, bally;
          public ballspeedx, ballspeedy;
          public player_score, ai_score;
 
+         // Resets the entire game, including scores, and initializes a new round.
          public game_reset() {
             set_int(ai_score, 0);
             set_int(player_score, 0);
@@ -25,19 +39,25 @@ collections {
             set_text(PART:"score2", "0");
             game_init();
          }
-         
+
+         // Initializes a new round by resetting the ball's position and speed.
+         // This is called at the start of a game and after a point is scored.
          public game_init() {
             set_float(ballspeedx, 0.0);
             set_float(ballspeedy, 0.0);
             set_float(ballx, 100);
             set_float(bally, 100);
          }
-         
+
+         // Starts the ball's movement from a stationary state.
+         // It gives the ball an initial horizontal speed and a random vertical speed.
          public start_game() {
             set_float(ballspeedx, BALL_SPEED);
             set_float(ballspeedy, BALL_SPEED * randf());
          }
 
+         // Called when the player scores a point. It increments the player's score,
+         // updates the display, and resets the ball for the next round.
          public player_wins() {
             new buf[16]
             set_int(player_score, get_int(player_score) + 1);
@@ -46,6 +66,7 @@ collections {
             game_init();
          }
 
+         // Called when the AI scores. It updates the AI's score and resets the ball.
          public ai_wins() {
             new buf[16]
             set_int(ai_score, get_int(ai_score) + 1);
@@ -54,24 +75,26 @@ collections {
             game_init();
          }
 
+         // The main game loop, which is called repeatedly by a timer to update the game state.
          public game_loop(count) {
             count++;
 
-            /* get field geometry */
+            // Get the geometry of the game field to handle boundaries.
             new fx, fy, fw, fh;
             get_geometry(PART:"bg", fx, fy, fw, fh);
 
-            /* get mouse coords */
+            // Get current mouse coordinates to control the player's paddle.
             new mx, my;
             get_mouse(mx, my);
 
-            /* get the ball info */
+            // Retrieve the ball's current position and speed from global variables.
             new Float:bx = get_float(ballx);
             new Float:by = get_float(bally);
             new Float:speedx = get_float(ballspeedx);
             new Float:speedy = get_float(ballspeedy);
 
-            /* move the player pad */
+            // Move the player's paddle based on the mouse's vertical position.
+            // The paddle's movement is constrained within the game area.
             new pady = my - PAD_SIZE / 2;
             if (pady < 0) pady = 0;
             else if (pady + PAD_SIZE > fh) pady = fh - PAD_SIZE;
@@ -79,19 +102,20 @@ collections {
             set_state_val(PART:"pad1", STATE_REL1_OFFSET, 20, pady);
             set_state(PART:"pad1", "custom", 0.0);
 
-            /* move the AI pad */
+            // Move the AI's paddle to follow the ball's vertical position, creating a simple opponent.
+            // The AI paddle's movement is also constrained.
             new pad2y = round(by) - PAD_SIZE / 2 - BALL_SIZE / 2;
             if (pad2y < 0) pad2y = 0;
             else if (pad2y + PAD_SIZE > fh) pad2y = fh - PAD_SIZE;
             custom_state(PART:"pad2", "default", 0.0);
             set_state_val(PART:"pad2", STATE_REL1_OFFSET, 20, pad2y);
             set_state(PART:"pad2", "custom", 0.0);
-         
-            /* calc new ball position */
+
+            // Calculate the ball's new position based on its speed.
             bx += speedx;
             by += speedy;
 
-            /* check walls collision */
+            // Check for collision with the top and bottom walls and reverse vertical speed if necessary.
             if (by < 0)
             {
                speedy = -speedy;
@@ -103,17 +127,20 @@ collections {
                by = fh - BALL_SIZE - 1;
             }
 
-            /* check player pad collision */
+            // Check for collision with the player's paddle.
             if ((speedx < 0) &&
                 (bx < PAD_DISTANCE + 10) && (bx > 0) &&
                 (by + BALL_SIZE > pady) && (by < pady + PAD_SIZE))
             {
+               // Change the ball's vertical direction based on where it hits the paddle.
+               // This gives the player control over the ball's angle.
                new Float:dy = by - pady - PAD_SIZE / 2;
                speedy += dy / 10;
+               // Reverse horizontal direction and increase speed.
                speedx = -speedx + BALL_SPEEDUP;
             }
 
-            /* check AI pad collision */
+            // Check for collision with the AI's paddle. The logic is similar to the player's paddle.
             else if ((bx + BALL_SIZE > fw - PAD_DISTANCE - 10) &&
                      (bx + BALL_SIZE < fw) &&
                      (by + BALL_SIZE > pad2y) && (by < pad2y + PAD_SIZE))
@@ -122,24 +149,23 @@ collections {
                speedy += dy / 10;
                speedx = -speedx - BALL_SPEEDUP;
             }
-            
-            /* apply the new ball position */
+
+            // Apply the new ball position to the 'ball' part.
             custom_state(PART:"ball", "default", 0.0);
             set_state_val(PART:"ball", STATE_REL1_OFFSET, round(bx), round(by));
             set_state(PART:"ball", "custom", 0.0);
 
-            /* update global vars */
+            // Update the global variables with the new ball position and speed.
             set_float(ballx, bx);
             set_float(bally, by);
             set_float(ballspeedx, speedx);
             set_float(ballspeedy, speedy);
 
-            /* AI score a point */
+            // Check if the ball has gone past a paddle, resulting in a score.
             if (bx < 0) ai_wins();
-            /* player score a point */
             if (bx + BALL_SIZE > fw) player_wins();
 
-            /* show debug info (if debug enabled) */
+            // Display debugging information if enabled.
 #if DEBUG_ENABLE
             new _buf[128];
             snprintf(_buf, sizeof(_buf),
@@ -148,17 +174,21 @@ collections {
             set_text(PART:"dbg", _buf);
 #endif
 
-            /* recall the loop in n seconds */
+            // Schedule the next execution of the game loop to create continuous animation.
             timer(1.0 / FPS, "game_loop", count);
          }
       }
+      // The 'parts' block defines all the visible UI elements of the game.
+      // Each 'part' is a distinct component, like the background, paddles, or ball.
       parts {
+         // The background of the game area. It's a simple rectangle filled with a solid color.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: COLOR_BG;
             }
          }
+         // A thin rectangle in the center of the screen, serving as the net.
          part { name: "net";
             type: RECT;
             description { state: "default" 0.0;
@@ -166,6 +196,7 @@ collections {
                max: 10 9999;
             }
          }
+         // Text part to display the player's score. It is positioned to the left of the center.
          part { name: "score1";
             type: TEXT;
             description { state: "default" 0.0;
@@ -177,9 +208,10 @@ collections {
                   font: "Sans";
                   size: 50;
                   align: 1.0 0.0;
-               } 
+               }
             }
          }
+         // Text part for the AI's score, positioned to the right of the center.
          part { name: "score2";
             type: TEXT;
             description { state: "default" 0.0;
@@ -191,9 +223,11 @@ collections {
                   font: "Sans";
                   size: 50;
                   align: 0.0 0.0;
-               } 
+               }
             }
          }
+         // The player's paddle. It's a rectangle positioned on the left side of the screen.
+         // Its vertical position is controlled by the script based on mouse movement.
          part { name: "pad1";
             type: RECT;
             description { state: "default" 0.0;
@@ -204,6 +238,7 @@ collections {
                rel1.offset: PAD_DISTANCE 0;
             }
          }
+         // The AI's paddle, a rectangle on the right side. Its position is controlled by the script.
          part { name: "pad2";
             type: RECT;
             description { state: "default" 0.0;
@@ -214,6 +249,7 @@ collections {
                rel2.offset: -PAD_DISTANCE 0;
             }
          }
+         // The game ball. Its position is dynamically updated by the script every frame.
          part { name: "ball";
             type: RECT;
             description { state: "default" 0.0;
@@ -225,6 +261,7 @@ collections {
             }
          }
          #if DEBUG_ENABLE
+         // A text part for displaying debug information, only included if DEBUG_ENABLE is set to 1.
          part { name: "dbg";
             type: TEXT;
             description { state: "default" 0.0;
@@ -238,8 +275,10 @@ collections {
          }
          #endif
       }
+      // The 'programs' block defines how the UI responds to events (signals).
+      // These programs connect user actions or system events to script functions.
       programs {
-         /* on load: reset the game and start the game loop */
+         // When the UI is loaded, this program resets the game and starts the game loop.
          program {
             signal: "load";
             source: "";
@@ -248,7 +287,8 @@ collections {
                timer(0.1 , "game_loop", 0);
             }
          }
-         /* mouse left click: start the game, if not yet started */
+         // When the left mouse button is clicked on the background, this program starts the game.
+         // It only acts if the ball is not already moving.
          program {
             signal: "mouse,down,1";
             source: "bg";
@@ -257,7 +297,7 @@ collections {
                   start_game();
             }
          }
-         /* mouse right click: restart the game*/
+         // A right-click on the background resets the entire game.
          program {
             signal: "mouse,down,3";
             source: "bg";

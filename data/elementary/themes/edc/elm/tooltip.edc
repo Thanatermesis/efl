@@ -2,6 +2,8 @@ group { name: "elm/label/base/tooltip/default";
    alias: "elm/label/base/tooltip"; //XXX: Remove it in EFL 2.0
    alias: "elm/label/base/tooltip/transparent";
    styles {
+      // Defines a style named "tooltip_style" for the text, setting its base
+      // properties and how markup tags are interpreted for formatting.
       style { name: "tooltip_style";
          base: "font="FNBD" font_size=10 color=cc:/fg/normal/tooltip/text text_class=bubble align=0.5";
          tag:  "br" "\n";
@@ -11,12 +13,15 @@ group { name: "elm/label/base/tooltip/default";
       }
    }
    parts {
+      // This TEXTBLOCK part is responsible for rendering the tooltip's text content.
+      // It is not interactive (mouse_events: 0) and uses the "tooltip_style".
       part { name: "elm.text"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             text {
                style: "tooltip_style";
                min: 1 1;
+               // ellipsis: -1; disables automatic truncation of long text.
                ellipsis: -1;
             }
          }
@@ -24,16 +29,20 @@ group { name: "elm/label/base/tooltip/default";
    }
 }
 
+// This group defines the main tooltip widget, including its frame, shadow, arrow, and behavior.
+// It is designed to be highly customizable and animated.
 group { name: "elm/tooltip/base/default";
+   // Sets a minimum size for the tooltip.
    min: 30 30;
+   // Defines padding around the content within the tooltip.
    data.item: "pad_x" "10";
    data.item: "pad_y" "10";
    data.item: "pad_border_x" "1";
    data.item: "pad_border_y" "1";
-   /* tooltip is hidden after this amount.
-    Keep in sync with hide animations */
+   // Specifies the time in seconds before the tooltip automatically hides.
+   // This value should be synchronized with the hide animation durations.
    data.item: "hide_timeout" "0.35";
-   // if in a window... it's transparent!
+   // Enables a transparent background, which is useful when the tooltip is displayed in its own window.
    data.item: "transparent" "enabled";
    images.image: "tooltip-corner-top-left-tip.png" COMP;
    images.image: "tooltip-corner-top-right-tip.png" COMP;
@@ -43,7 +52,15 @@ group { name: "elm/tooltip/base/default";
    images.image: "tooltip-edge-right-tip.png" COMP;
    images.image: "tooltip-edge-bottom-tip.png" COMP;
    images.image: "tooltip-edge-top-tip.png" COMP;
+   // This script controls the visibility and positioning of the tooltip's arrow
+   // based on its location relative to the anchor widget.
    script {
+      // The hide_* and show_* functions are helpers to manage the state of the
+      // various arrow parts. They ensure only one arrow (or none) is visible at a time.
+      // `hide_corners` and `hide_edges` set the arrow parts to their default (hidden) state.
+      // `show_corner_*` makes a specific corner arrow visible.
+      // `show_edge_*` makes an edge arrow visible and positions it along the edge
+      // using the `val` parameter.
       hide_corners() {
          set_state(PART:"corner-top-left", "default", 0.0);
          set_state(PART:"corner-top-right", "default", 0.0);
@@ -116,6 +133,18 @@ group { name: "elm/tooltip/base/default";
          set_state(PART:"clipper-edge-right", "default", 0.0);
          hide_corners();
       }
+      // The message handler is the entry point for the script's logic.
+      // It responds to `MSG_FLOAT_SET` with id 1, which is sent by the C code
+      // to update the arrow's position. The message carries two floats, x and y,
+      // representing the desired anchor point on the tooltip's border.
+      // The values are relative to the tooltip's dimensions:
+      // - (x < 0.0): left side
+      // - (x > 1.0): right side
+      // - (y < 0.0): top side
+      // - (y > 1.0): bottom side
+      // If the point is on a corner (e.g., x < 0.0 and y < 0.0), a corner arrow is shown.
+      // If it's on an edge (e.g., x < 0.0 and 0.0 <= y <= 1.0), an edge arrow is shown.
+      // If it's inside the tooltip's area, all arrows are hidden.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_FLOAT_SET) && (id == 1)) {
             new Float:x, Float:y;
@@ -143,10 +172,15 @@ group { name: "elm/tooltip/base/default";
       }
    }
    parts {
+      // A clipper RECT that affects the entire tooltip, including the shadow and arrow.
+      // It is used to fade the whole tooltip in and out. It's initially transparent
+      // (color: 255 255 255 0 is #FFFFFF00) and becomes opaque (255 255 255 255 is #FFFFFFFF)
+      // in the "visible" state.
       part { name: "clipper"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             color: 255 255 255 0; // no cc
+            // Initially positioned very large and offscreen to avoid being drawn.
             rel1 { to: "pop"; offset: -500 -500; }
             rel2 { to: "pop"; offset: 499 499; }
             offscale;
@@ -156,6 +190,7 @@ group { name: "elm/tooltip/base/default";
             color: 255 255 255 255; // no cc
          }
       }
+      // The shadow for the tooltip window, clipped by the main "clipper" part.
       part { name: "shadow"; mouse_events: 0;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -163,17 +198,23 @@ group { name: "elm/tooltip/base/default";
             WIN_SHADOW;
          }
       }
+      // The main background of the tooltip, a RECT that expands around the content.
+      // It is also clipped by the main "clipper".
       part { name: "pop"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "elm.swallow.content";
+            // Padding around the content.
             rel1.offset: -10 -10;
             rel2.offset: 9 9;
             color_class: "/dim/normal/tooltip";
             offscale;
          }
       }
+      // This macro defines the four corner arrow parts.
+      // Each corner is an image part, clipped by the main "clipper".
+      // By default, they are invisible and are made visible by the script.
       #define TT_CORNER(name_, rx, ry, ax, ay, ox, oy)             \
       part { name: "corner-"name_; mouse_events: 0;                \
          clip_to: "clipper";                                       \
@@ -205,6 +246,12 @@ group { name: "elm/tooltip/base/default";
       TT_CORNER("bottom-right", 1, 1, 1, 1, 5, 5);
       #undef TT_CORNER
 
+      // This macro defines the vertical edge arrow parts (left and right).
+      // This is a complex construction to allow the arrow to slide along the edge.
+      // - clipper-edge-*: A RECT part that acts as a clipper for the arrow, making it visible or hidden.
+      // - edge-area-*: A RECT defining the area within which the arrow can move.
+      // - edge-drag-*: A draggable RECT that moves within the "edge-area-*". The script controls its position.
+      // - edge-img-*: The actual image of the arrow, which follows the "edge-drag-*" part.
       #define TT_EDGE_VERT(name_, rx, ax, ox)                      \
       part { name: "clipper-edge-"name_; type: RECT;               \
          clip_to: "clipper";                                       \
@@ -275,6 +322,8 @@ group { name: "elm/tooltip/base/default";
       TT_EDGE_VERT("right", 1, 1, 5);
       #undef TT_EDGE_VERT
 
+      // This macro defines the horizontal edge arrow parts (top and bottom).
+      // It works similarly to the TT_EDGE_VERT macro but for horizontal movement.
       #define TT_EDGE_HORIZ(name_, ry, ay, oy)                     \
       part { name: "clipper-edge-"name_; type: RECT;               \
          clip_to: "clipper";                                       \
@@ -336,6 +385,9 @@ group { name: "elm/tooltip/base/default";
       TT_EDGE_HORIZ("bottom", 1, 1, 5);
       #undef TT_EDGE_HORIZ
 
+      // A separate clipper for the content area.
+      // This allows the content to be animated independently of the tooltip frame and arrow.
+      // It fades from transparent (#FFFFFF00) to opaque (#FFFFFFFF).
       part { name: "clipper_content"; type: RECT;
          description { state: "default" 0.0;
             color: 255 255 255 0; // no cc
@@ -346,6 +398,8 @@ group { name: "elm/tooltip/base/default";
             color: 255 255 255 255; // no cc
          }
       }
+      // The SWALLOW part where the actual tooltip content (e.g., text from another group) is placed.
+      // It is clipped by "clipper_content" to enable independent animations.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper_content";
          scale: 1;
@@ -357,6 +411,8 @@ group { name: "elm/tooltip/base/default";
          }
       }
       programs {
+         // This program is triggered by the "elm,action,show" signal to start the show animation.
+         // It stops any running hide animations and then triggers the actual animation programs.
          program { name: "show0";
             signal: "elm,action,show"; source: "elm";
             action: ACTION_STOP;
@@ -367,17 +423,21 @@ group { name: "elm/tooltip/base/default";
             after: "show1";
             after: "show2";
          }
+         // Fades in the main clipper, making the tooltip frame and shadow visible.
          program { name: "show1";
             action: STATE_SET "visible" 0.0;
             transition: LINEAR 0.15;
             target: "clipper";
          }
+         // Fades in the content clipper with a slight delay, making the content visible.
          program { name: "show2";
             in: 0.1 0.0;
             action: STATE_SET "visible" 0.0;
             transition: LINEAR 0.15;
             target: "clipper_content";
          }
+         // This program is triggered by "elm,action,hide" to start the hide animation.
+         // It stops any running show animations and triggers the hide sequence.
          program { name: "hide0";
             signal: "elm,action,hide"; source: "elm";
             action: ACTION_STOP;
@@ -388,17 +448,20 @@ group { name: "elm/tooltip/base/default";
             after: "hide2";
             after: "hide3";
          }
+         // Immediately hides any visible arrows by calling script functions.
          program { name: "hide1";
             script {
                hide_corners();
                hide_edges();
             }
          }
+         // Fades out the content.
          program { name: "hide2";
             action: STATE_SET "default" 0.0;
             transition: LINEAR 0.1;
             target: "clipper_content";
          }
+         // Fades out the main tooltip frame with a delay.
          program { name: "hide3";
             in: 0.1 0.0;
             action: STATE_SET "default" 0.0;
@@ -409,6 +472,9 @@ group { name: "elm/tooltip/base/default";
    }
 }
 
+// A simplified, frameless tooltip style. It's essentially just a SWALLOW part
+// for content, with padding and a transparent background. This is useful for
+// custom tooltips that don't need the default frame and arrow.
 group { name: "elm/tooltip/base/transparent";
    data.item: "pad_x" "10";
    data.item: "pad_y" "10";

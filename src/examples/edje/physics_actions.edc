@@ -71,6 +71,9 @@
  * message 14 STRING "blue_circle" -> return a message with part's rotation
  */
 
+// These macros define unique identifiers for various physics-related messages
+// that can be processed by the script in this group. This allows for a clear
+// and manageable way to handle different actions triggered by external messages.
 #define ID_IMPULSE (1)
 #define ID_TORQUE_IMPULSE (2)
 #define ID_FORCE (3)
@@ -88,15 +91,32 @@
 
 collections {
 
+   // The 'images' block is used to declare all image files that will be used
+   // within this EDC file. Preloading images here can improve performance
+   // as they are loaded into memory when the Edje object is created.
+   // 'COMP' indicates that the image should be loaded compressed to save memory.
    images {
       image: "bubble-blue.png" COMP;
    }
 
+   // A 'group' is a fundamental building block in Edje, encapsulating a set of parts,
+   // programs, and scripts to create a self-contained UI component or scene.
+   // This group, "example_group", sets up a physics simulation with interactive elements.
    group {
       name: "example_group";
 
+      // The 'script' block contains Embryo script code, which allows for dynamic and
+      // complex behaviors that are difficult or impossible to define with static
+      // programs. This script is designed to handle messages for controlling physics.
       script {
+         // 'message' is a public function that can be called from the application
+         // code. It's the entry point for various commands sent to this Edje object.
+         // It processes different messages based on their 'id' and 'type'.
          public message(Msg_Type:type, id, ...) {
+            // This block handles applying an impulse to the 'blue_circle' part.
+            // It checks for a message with ID_IMPULSE and of type MSG_FLOAT_SET,
+            // which contains floating-point numbers for the x, y, and z components
+            // of the impulse vector.
             if ((id == ID_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -106,6 +126,9 @@ collections {
                z = getfarg(4);
                physics_impulse(PART:"blue_circle", x, y, z);
             }
+            // Similar to the impulse, this block applies a torque impulse, which
+            // causes the object to rotate. The x, y, and z values represent the
+            // axis of rotation and the magnitude of the torque.
             else if ((id == ID_TORQUE_IMPULSE) && (type == MSG_FLOAT_SET)) {
                new Float:x, Float:y, Float:z;
                new n = numargs();
@@ -133,6 +156,9 @@ collections {
                z = getfarg(4);
                physics_torque(PART:"blue_circle", x, y, z);
             }
+            // This block demonstrates handling a string message (MSG_STRING).
+            // It expects the name of a part, retrieves its ID, and then uses
+            // physics_clear_forces() to remove all applied forces from it.
             else if ((id == ID_FORCES_CLEAR) && (type == MSG_STRING)) {
                new pid, name[1024];
                getsarg(2, name, sizeof(name));
@@ -140,6 +166,10 @@ collections {
                if (!pid) return;
                physics_clear_forces(pid);
             }
+            // This block shows how to retrieve physics properties. It gets the
+            // total applied forces on a part and sends them back as a new message
+            // using send_message(). This is useful for debugging or creating
+            // responsive UI elements that display physics state.
             else if ((id == ID_FORCES_GET) && (type == MSG_STRING)) {
                new Float:x, Float:y, Float:z;
                new pid, name[1024];
@@ -201,6 +231,9 @@ collections {
                if (!pid) return;
                physics_stop(pid);
             }
+            // This block handles setting the rotation of a part using a quaternion.
+            // Quaternions are used for representing rotations in 3D space to avoid
+            // issues like gimbal lock. It takes four float values (w, x, y, z).
             else if ((id == ID_ROT_SET) && (type == MSG_FLOAT_SET)) {
                new Float:w, Float:x, Float:y, Float:z;
                new n = numargs();
@@ -223,22 +256,30 @@ collections {
          }
       }
 
+      // The 'parts' block defines all the visual and physical elements of the group.
       parts {
+         // The 'background' part is a simple rectangle that fills the entire area of the group.
          part {
             name: "background";
             type: RECT;
+            // 'physics_body: NONE' ensures that this part does not participate in any
+            // physics calculations, serving only as a visual backdrop.
             physics_body: NONE;
             description {
                state: "default" 0.0;
-               color: 255 255 255 255; /* white */
+               // Defines the color of the rectangle as white (#FFFFFFFF).
+               color: 255 255 255 255;
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
             }
          }
 
+         // This part represents one of the interactive elements in the simulation.
          part {
             name: "blue_circle";
             type: IMAGE;
+            // 'physics_body: RIGID_SPHERE' defines this part as a dynamic, solid sphere
+            // that will be affected by gravity and can collide with other physics bodies.
             physics_body: RIGID_SPHERE;
             description {
                state: "default" 0.0;
@@ -248,20 +289,26 @@ collections {
                image {
                   normal: "bubble-blue.png";
                }
+               // The 'physics' block configures the physical properties of the part.
                physics {
+                  // 'restitution' controls the "bounciness" of the object. A value of
+                  // 0.85 means it will retain 85% of its energy after a collision.
                   restitution: 0.85;
+                  // 'friction' affects how objects slide against each other.
                   friction: 1.0;
                }
             }
          }
 
+         // This is another interactive sphere, similar to 'blue_circle'.
          part {
             name: "red_circle";
             type: IMAGE;
             physics_body: RIGID_SPHERE;
             description {
                state: "default" 0.0;
-               color: 255 0 0 255; /* light red */
+               // This part is colored light red (#FF0000FF) to distinguish it from the blue circle.
+               color: 255 0 0 255;
                rel1.relative: 0.65 0.1;
                rel2.relative: 0.85 0.2;
                aspect: 1 1;
@@ -275,9 +322,13 @@ collections {
             }
          }
 
+         // The following parts ('floor', 'right_wall', 'left_wall', 'roof') are
+         // invisible boundaries that contain the physics simulation.
          part {
             name: "floor";
             type: RECT;
+            // 'physics_body: BOUNDARY_BOTTOM' defines this part as a static, immovable
+            // plane at the bottom of the container.
             physics_body: BOUNDARY_BOTTOM;
             description {
                state: "default" 0.0;
@@ -329,13 +380,21 @@ collections {
          }
       }
 
+      // The 'programs' block contains a series of actions that are triggered by signals.
+      // These signals can be emitted from the application code or from other parts of
+      // the Edje design, allowing for event-driven animations and interactions.
       programs {
 
+         // This program applies an upward impulse when it receives the "up" signal from
+         // the "impulse" source.
          program {
             name: "impulse_up";
             signal: "up";
             source: "impulse";
+            // An impulse is an instantaneous force that changes the momentum of an object.
+            // Here, a vertical impulse is applied (Y is negative because Y-axis points down).
             action: PHYSICS_IMPULSE 0 -300 0;
+            // The action targets both circles, making them jump up simultaneously.
             target: "blue_circle";
             target: "red_circle";
          }
@@ -369,6 +428,8 @@ collections {
             name: "impulse_clockwise";
             signal: "clockwise";
             source: "impulse";
+            // 'PHYSICS_TORQUE_IMPULSE' applies a rotational impulse. The vector (0 0 4)
+            // indicates a torque around the Z-axis, causing a clockwise spin in 2D view.
             action: PHYSICS_TORQUE_IMPULSE 0 0 4;
             target: "blue_circle";
          }
@@ -381,10 +442,14 @@ collections {
             target: "blue_circle";
          }
 
+         // The following programs demonstrate applying continuous forces and torques,
+         // which affect the object as long as they are active, unlike impulses.
          program {
             name: "force_up";
             signal: "up";
             source: "force";
+            // 'PHYSICS_FORCE' applies a continuous force. This will accelerate the
+            // blue circle upwards as long as the force is applied.
             action: PHYSICS_FORCE 0 -300 0;
             target: "blue_circle";
          }
@@ -433,14 +498,19 @@ collections {
             name: "forces_clear";
             signal: "clear";
             source: "force";
+            // 'PHYSICS_FORCES_CLEAR' is a special action that removes all continuous
+            // forces and torques currently applied to the target part.
             action: PHYSICS_FORCES_CLEAR;
             target: "blue_circle";
          }
 
+         // The 'velocity' source programs demonstrate direct manipulation of velocity.
          program {
             name: "velocity_up";
             signal: "up";
             source: "velocity";
+            // 'PHYSICS_VEL_SET' instantly sets the linear velocity of the object,
+            // overriding its current velocity.
             action: PHYSICS_VEL_SET 0 -200 0;
             target: "blue_circle";
          }
@@ -489,14 +559,20 @@ collections {
             name: "stop";
             signal: "stop";
             source: "velocity";
+            // 'PHYSICS_STOP' is a convenience action that sets both linear and
+            // angular velocities to zero, effectively halting the object.
             action: PHYSICS_STOP;
             target: "blue_circle";
          }
 
+         // Rotation programs demonstrate setting the orientation of a part directly.
          program {
             name: "rotation_clockwise";
             signal: "clockwise";
             source: "rotation";
+            // 'PHYSICS_ROT_SET' sets the absolute rotation using a quaternion.
+            // The values (0.707, 0, 0, 0.707) represent a 90-degree rotation
+            // around the Z-axis.
             action: PHYSICS_ROT_SET 0.707 0 0 0.707;
             target: "blue_circle";
          }
@@ -509,6 +585,8 @@ collections {
             target: "blue_circle";
          }
 
+         // This program demonstrates advanced customization of a part's physics
+         // properties at runtime using an embedded script.
          program {
             name: "customize";
             signal: "custom";
@@ -517,7 +595,12 @@ collections {
                new Float: linear, Float:angular;
                new val;
 
+               // 'custom_state' creates a new, temporary state for the part based on
+               // an existing one ("default" 0.0). This allows modifying properties
+               // without affecting the original state defined in the 'parts' block.
                custom_state(PART:"red_circle", "default", 0.0);
+               // 'set_state_val' is used to change specific properties of this new state.
+               // Here, we change color, mass, restitution, friction, and more.
                set_state_val(PART:"red_circle", STATE_COLOR, 0, 0, 0, 255);
                set_state_val(PART:"red_circle", STATE_PHYSICS_MASS, 4.5);
                set_state_val(PART:"red_circle", STATE_PHYSICS_RESTITUTION, 0.1);
@@ -531,8 +614,13 @@ collections {
                        STATE_PHYSICS_IGNORE_PART_POS, 1);
                set_state_val(PART:"red_circle", STATE_PHYSICS_Z, -40);
                set_state_val(PART:"red_circle", STATE_PHYSICS_DEPTH, 80);
+               // 'set_state' applies the newly defined "custom" state to the part,
+               // making the changes visible and effective in the physics simulation.
                set_state(PART:"red_circle", "custom", 0.0);
 
+               // The rest of the script demonstrates retrieving the new physics values
+               // using 'get_state_val' and sending them out as messages. This provides
+               // a feedback mechanism to confirm that the properties were changed.
                get_state_val(PART:"red_circle", STATE_PHYSICS_MASS, mass);
                get_state_val(PART:"red_circle", STATE_PHYSICS_RESTITUTION,
                      rest);

@@ -1,13 +1,25 @@
+// Default frame style, providing a title bar, content area, and a shadow.
+// It supports collapsing and expanding the content area.
 group { name: "elm/frame/base/default";
+   // Preload the shadow image and compress it in memory to improve performance.
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // The shadow part is a rectangle that provides a drop shadow effect.
+      // Its geometry is controlled by the WIN_SHAD macro.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
+            // Color class for the shadow. Typically a semi-transparent black.
             color_class: "/shadow/normal/frame";
          }
       }
+      // This macro generates the necessary parts and logic for a window shadow.
+      // It uses "win_shad_flat.png" to create a resizable shadow around the "base" part.
+      // Parameters define offsets, insets, and opacity for the shadow effect.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // The 'base' part defines the main frame area, excluding the shadow. It's a SPACER,
+      // meaning it's invisible but affects layout. 'offscale' ensures it contributes to
+      // the total object size calculation, including the padding defined by its offsets.
       part { name: "base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -16,22 +28,28 @@ group { name: "elm/frame/base/default";
             offscale;
          }
       }
+      // Background for the title bar area.
       part { name: "top_bg"; type: RECT;
          description { state: "default" 0.0;
+            // It sizes itself to match the 'top' part.
             rel.to: "top";
+            // Color for the title background, e.g., a shade of gray.
             color_class: "/bg/normal/frame/title";
          }
       }
+      // Spacer that defines the title bar area. Its height is linked to the title text.
       part { name: "top"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
             rel1.to: "base";
             rel2.to_x: "base";
+            // The bottom of 'top' is tied to the bottom of 'elm.text' with a 3px offset for padding.
             rel2.to_y: "elm.text";
             rel2.offset: -1 3;
             offscale;
          }
       }
+      // The title text part of the frame.
       part { name: "elm.text"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -40,82 +58,104 @@ group { name: "elm/frame/base/default";
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 4;
             align: 0.0 0.0;
+            // Color for the title text.
             color_class: "/fg/normal/frame/title";
-            text { font: FNBD; size: 10;
-               align: 0.0 0.5;
-               min: 0 1;
+            text { font: FNBD; size: 10; // Font style: bold, size 10.
+               align: 0.0 0.5; // Left-aligned horizontally, center-aligned vertically.
+               min: 0 1; // Minimum width of 0, minimum height of 1.
             }
+            // Height is fixed, width is scalable.
             fixed: 0 1;
             offscale;
          }
       }
+      // Background of the main content area.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned below the 'top' (title) area, filling the rest of 'base'.
             rel1.to_x: "base";
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
             rel2.to: "base";
+            // Color for the main background, e.g., white or a light gray.
             color_class: "/bg/normal/frame";
          }
       }
+      // A clipper rectangle to ensure the content does not draw outside its designated area.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // The SWALLOW part where external content (widgets) will be placed.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
             align: 0.0 1.0;
             rel.to: "bg";
+            // Small padding inside the background area.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
             offscale;
          }
+         // 'collapsed' state shrinks the content area to zero height.
          description { state: "collapsed" 0.0;
             inherit: "default" 0.0;
+            // minmul scales the minimum size. Here, vertical minimum is scaled to 0.
             minmul: 1.0 0.0;
             rel1.offset: 4 0;
             rel2.offset: -5 -1;
          }
       }
+      // An invisible rectangle over the title bar to capture mouse events for toggling.
       part { name: "event"; type: RECT; ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // Transparent color.
             rel1.to_y: "elm.text";
             rel2.to_y: "elm.text";
          }
       }
    }
+   // Programs define the dynamic behavior of the frame.
    programs {
+      // Animates the content area to its 'collapsed' state.
       program { name: "collapse";
          action:  STATE_SET "collapsed" 0.0;
          target: "elm.swallow.content";
-         transition: ACCELERATE 0.3;
+         transition: ACCELERATE 0.3; // Animation takes 0.3s.
+         // After collapsing, run the 'signal' program to notify completion.
          after: "signal";
       }
+      // Animates the content area back to its 'default' (expanded) state.
       program { name: "expand";
          action:  STATE_SET "default" 0.0;
          target: "elm.swallow.content";
          transition: DECELERATE 0.3;
          after: "signal";
       }
+      // When the mouse is released over the 'event' area (title bar),
+      // emit a signal indicating a click.
       program { signal:  "mouse,up,1"; source:  "event";
          action:  SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // This program handles the 'toggle' action, which collapses or expands the frame.
       program { signal:  "elm,action,toggle"; source: "elm";
+         // An Embryo script is used for conditional logic.
          script {
             new st[31];
             new Float:vl;
+            // Get the current state of the content area.
             get_state(PART:"elm.swallow.content", st, 30, vl);
+            // If it's expanded ("default"), run collapse program, otherwise expand.
             if (!strcmp(st, "default"))
               run_program(PROGRAM:"collapse");
             else
               run_program(PROGRAM:"expand");
          }
       }
+      // 'switch' action is similar to 'toggle' but changes state instantly, without animation.
       program { signal:  "elm,action,switch"; source: "elm";
          script {
             new st[31];
@@ -127,32 +167,41 @@ group { name: "elm/frame/base/default";
               set_state(PART:"elm.swallow.content", "default", 0.0);
          }
       }
+      // This program is called after animations complete to signal other parts
+      // of the application that the frame has finished its animation.
       program { name: "signal";
          action: SIGNAL_EMIT "elm,anim,done" "elm";
       }
    }
 }
 
+// A frame style that inherits from 'default' and adds an icon to the title bar.
 group { name: "elm/frame/base/icon";
    inherit: "elm/frame/base/default";
    parts {
+      // A SWALLOW part to hold the icon widget.
       part { name: "elm.swallow.icon"; type: SWALLOW;
+         // Inserts this part after 'top_bg' in the part stack for correct layering.
          insert_after: "top_bg";
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // Aligns vertically with the title text.
             rel1.to_y: "elm.text";
             rel2.to_y: "elm.text";
             rel1.offset: 4 0;
+            // Placed at the left of the title bar.
             rel2.relative: 0.0 0.0;
             rel2.offset: 4 -1;
             align: 0.0 0.5;
-            min: 15 15;
+            min: 15 15; // Minimum size for the icon.
             offscale;
          }
       }
+      // The original title text part is modified.
       part { name: "elm.text";
          description { state: "default" 0.0;
+            // Its left edge is now positioned to the right of the icon, with padding.
             rel1.to_x: "elm.swallow.icon";
             rel1.relative: 1.0 0.0;
             min: 0 15;
@@ -161,28 +210,36 @@ group { name: "elm/frame/base/icon";
    }
 }
 
+// This style inherits from 'icon' and adds a close button, suitable for dialogs or windows.
+// The colors are changed to reflect a "selected" or "active" state.
 group { name: "elm/frame/base/border";
    inherit: "elm/frame/base/icon";
    parts {
       part { name: "top_bg";
          description { state: "default" 0.0;
+            // Uses a 'selected' color for the title bar, e.g., a more prominent color like blue.
             color_class: "/bg/selected/titlebar";
          }
       }
       part { name: "elm.text";
          description { state: "default" 0.0;
+            // The right edge of the text is now constrained by the 'close' button.
             rel2.to_x: "close";
             rel2.relative: 0.0 0.0;
             min: 0 15;
+            // A 'selected' color for the title text, often higher contrast like white.
             color_class: "/fg/selected/titlebar";
          }
       }
+      // The close button part.
       part { name: "close";
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
+            // Vertically aligned with the title text.
             rel1.to_y: "elm.text";
             rel2.to_y: "elm.text";
+            // Positioned at the far right of the title bar.
             rel1.offset: -5 0;
             rel1.relative: 1.0 0.0;
             rel2.offset: -5 -1;
@@ -190,39 +247,48 @@ group { name: "elm/frame/base/border";
             min: 15 15;
             max: 15 15;
             offscale;
-            image.normal: "i-close";
+            image.normal: "i-close"; // Image for the close button.
             color_class: "/fg/selected/titlebar/buttons/close";
          }
+         // 'clicked' state provides visual feedback when the button is pressed.
          description { state: "clicked" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/pressed/titlebar/buttons/close";
          }
       }
+      // When the mouse is pressed on 'close', change its state to 'clicked'.
       program { signal:  "mouse,down,1"; source:  "close";
          action:  STATE_SET "clicked" 0.0;
          target: "close";
       }
+      // When the mouse is released, revert to the 'default' state.
       program { signal:  "mouse,up,1"; source:  "close";
          action:  STATE_SET "default" 0.0;
          target: "close";
       }
+      // On a full click, emit a signal that the user wants to close the frame.
       program { signal:  "mouse,clicked,1"; source:  "close";
          action: SIGNAL_EMIT "elm,action,close" "elm";
       }
    }
 }
 
+// An 'overlay' style variant of the default frame.
+// Used for overlays where the background should be semi-transparent.
 group { name: "elm/frame/base/overlay";
    inherit: "elm/frame/base/default";
    parts {
       part { name: "bg";
          description { state: "default" 0.0;
+            // Uses a 'dim' color class, typically a semi-transparent black (e.g., #000000 with alpha),
+            // to darken the area behind the frame content.
             color_class: "/dim/normal/frame-overlay";
          }
       }
    }
 }
 
+// Icon variant of the overlay style.
 group { name: "elm/frame/base/icon_overlay";
    inherit: "elm/frame/base/icon";
    parts {
@@ -234,6 +300,7 @@ group { name: "elm/frame/base/icon_overlay";
    }
 }
 
+// Border variant of the overlay style.
 group { name: "elm/frame/base/border_overlay";
    inherit: "elm/frame/base/border";
    parts {
@@ -245,8 +312,12 @@ group { name: "elm/frame/base/border_overlay";
    }
 }
 
+// The 'pad' styles provide a simple frame that adds padding around its content.
+// This is the 'small' variant. Other pad styles inherit from this and change padding size.
 group { name: "elm/frame/base/pad_small";
    parts {
+      // Two SPACER parts are used to create the padding.
+      // 'b0' is a 3x3 spacer aligned to the top-left.
       part { name: "b0"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -254,6 +325,7 @@ group { name: "elm/frame/base/pad_small";
             align: 0.0 0.0;
          }
       }
+      // 'b1' is a 3x3 spacer aligned to the bottom-right.
       part { name: "b1"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -261,6 +333,7 @@ group { name: "elm/frame/base/pad_small";
             align: 1.0 1.0;
          }
       }
+      // The content is swallowed between these two spacers, creating a 3px padding on all sides.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
             rel1.to: "b0";
@@ -272,6 +345,7 @@ group { name: "elm/frame/base/pad_small";
    }
 }
 
+// Medium padding (6x6).
 group { name: "elm/frame/base/pad_medium";
    inherit: "elm/frame/base/pad_small";
    parts {
@@ -290,6 +364,7 @@ group { name: "elm/frame/base/pad_medium";
    }
 }
 
+// Large padding (12x12).
 group { name: "elm/frame/base/pad_large";
    inherit: "elm/frame/base/pad_small";
    parts {
@@ -308,6 +383,7 @@ group { name: "elm/frame/base/pad_large";
    }
 }
 
+// Huge padding (24x24).
 group { name: "elm/frame/base/pad_huge";
    inherit: "elm/frame/base/pad_small";
    parts {
@@ -326,8 +402,10 @@ group { name: "elm/frame/base/pad_huge";
    }
 }
 
+// An 'outdent' style that places a separator line above the content area.
 group { name: "elm/frame/base/outdent_top";
    parts {
+      // Content is placed below the 'base' separator line.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -338,10 +416,11 @@ group { name: "elm/frame/base/outdent_top";
             offscale;
          }
       }
+      // This part acts as a 1px high horizontal separator line.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
-            fixed: 0 1;
+            fixed: 0 1; // Unscaled height of 1px.
             rel1.offset: 4 2;
             rel2.offset: -5 2;
             rel2.relative: 1.0 0.0;
@@ -353,8 +432,10 @@ group { name: "elm/frame/base/outdent_top";
    }
 }
 
+// An 'outdent' style that places a separator line below the content area.
 group { name: "elm/frame/base/outdent_bottom";
    parts {
+      // Content is placed above the 'base' separator line.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -365,6 +446,7 @@ group { name: "elm/frame/base/outdent_bottom";
             offscale;
          }
       }
+      // This part is the separator line at the bottom.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -380,6 +462,8 @@ group { name: "elm/frame/base/outdent_bottom";
    }
 }
 
+// A simple frame style that provides an outline with a shadow and a background.
+// It does not have a title bar, making it suitable for simple content containers.
 group { name: "elm/frame/base/outline";
    parts {
       part { name: "shadow"; type: RECT;
@@ -389,6 +473,7 @@ group { name: "elm/frame/base/outline";
          }
       }
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // The 'base' part is a visible rectangle that forms the background.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -398,6 +483,7 @@ group { name: "elm/frame/base/outline";
             offscale;
          }
       }
+      // Content is swallowed directly into the 'base' part, filling it completely.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;

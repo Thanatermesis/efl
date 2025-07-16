@@ -1,27 +1,54 @@
+// This group defines the visual indicator for window tiling positions. It shows
+// where a window will be placed, featuring a background pattern, an outline,
+// and a placeholder for the client's icon.
 group { "e/modules/tiling/indicator";
    images.image: "outline.png" COMP;
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // The 'background' part displays a tiled pattern using 'diagonal_stripes.png'.
+      // It serves as the base layer of the indicator.
       image { "background";
          desc { "default";
             image.normal: "diagonal_stripes.png";
+            // Sets the color of the background image based on the current theme's
+            // definition for "/bg/normal/tiling/position/base".
             color_class: "/bg/normal/tiling/position/base";
+            // The TILED_PATTERN macro configures the image to be tiled across the
+            // part's area, with each tile being 240x240 pixels. This is
+            // efficient for covering large areas with a small repeating pattern.
             TILED_PATTERN(240, 240)
          }
       }
+      // The 'base' part overlays a scalable border ('outline.png') on top of the
+      // background. 'mouse_events: 0' makes it non-interactive, letting mouse
+      // events pass through.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "outline.png";
+            // 'image.border' defines scalable borders (4px on each side) to keep
+            // corners sharp on resize. 'image.middle: 0' prevents the center
+            // of the image from being rendered, optimizing for border-only images.
             image.border: 4 4 4 4;
             image.middle: 0;
+            // 'fill.smooth: 0' disables anti-aliasing, ensuring sharp pixel lines.
             fill.smooth: 0;
+            // Sets the outline color from the theme's color class
+            // "/bg/normal/tiling/position/outline".
             color_class: "/bg/normal/tiling/position/outline";
          }
       }
+      // This 'swallow' part acts as a container for an external Evas object,
+      // identified by "e.client.icon", which is typically the application's icon.
+      // 'scale: 1' allows the swallowed object to be resized with the container.
       swallow { "e.client.icon";
          scale: 1;
          desc { "default";
+            // Ensures the icon is at least 24x24 pixels.
             min: 24 24;
+            // These two lines center the swallowed object. By setting both top-left
+            // (rel1) and bottom-right (rel2) corners to the center (0.5 0.5) of
+            // the container, the object is forced to be centered. Its final size
+            // is determined by other constraints, like 'min' size here.
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
          }
@@ -29,37 +56,58 @@ group { "e/modules/tiling/indicator";
    }
 }
 
+// This group defines a UI component that displays the current tiling mode
+// (e.g., horizontal, vertical, floating). It changes its appearance based on
+// signals received from the tiling module.
 group { name: "e/modules/tiling/main";
+   // 'max' limits the maximum size of this UI component to 160x160 pixels.
    max: 160 160;
    images.image: "tiling-horiz.png" COMP;
    images.image: "tiling-vert.png" COMP;
    images.image: "tiling-float.png" COMP;
    parts {
+      // The 'base' part is the main visual element of this group. It changes
+      // its state to display different icons representing the tiling mode.
       part { name: "base";
+         // 'default' state description, activated for horizontal tiling mode.
          description { state: "default" 0.0;
+            // 'aspect' and 'aspect_preference' enforce a square (1:1) aspect ratio.
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "tiling-vert.png";
+            // Sets the icon's color using a theme-defined color class.
             color_class: "/fg/normal/gadgets/tiling/status";
          }
+         // 'vertical' state description. Note that it inherits properties from
+         // the 'default' state, only changing the displayed image.
          description { state: "vertical" 0.0;
             inherit: "default" 0.0;
             image.normal: "tiling-horiz.png";
          }
+         // 'floating' state description for when tiling is inactive.
          description { state: "floating" 0.0;
             inherit: "default" 0.0;
             image.normal: "tiling-float.png";
          }
       }
    }
+   // The 'programs' block defines reactions to signals from the tiling module.
+   // This allows the icon to update when the tiling mode changes.
    programs {
+      // When Enlightenment ("e") emits the "tiling,mode,horizontal" signal, this
+      // program sets the 'base' part to its "default" state, which shows the
+      // icon for horizontal tiling.
       program { signal: "tiling,mode,horizontal"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "base";
       }
+      // This program reacts to the "tiling,mode,vertical" signal by switching
+      // the 'base' part to its "vertical" state.
       program { signal: "tiling,mode,vertical"; source: "e";
          action: STATE_SET "vertical" 0.0;
          target: "base";
       }
+      // This program handles the "tiling,mode,floating" signal, setting the
+      // 'base' part to the "floating" state.
       program { signal: "tiling,mode,floating"; source: "e";
          action: STATE_SET "floating" 0.0;
          target: "base";

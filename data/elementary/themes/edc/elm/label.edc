@@ -1,5 +1,11 @@
 #define FIXED 1
 
+// LABEL_SCRIPT: A reusable script for managing label states.
+// This macro defines a script that handles the visual state of a label based on
+// its properties, such as being enabled/disabled or having a fixed size.
+// It uses a bitmask 'btmode' to store the state flags (e.g., FIXED, DISABLE)
+// and updates the text part's state accordingly. This is a common EDC technique
+// to avoid code duplication across multiple groups that share similar logic.
 #define LABEL_SCRIPT \
       public btmode; \
       public eval_mode(m) { \
@@ -22,18 +28,28 @@
          set_int(btmode, m); eval_mode(m); \
       }
 
+// Group: elm/label/base/default
+// This is the base theme for a standard label widget. It defines the fundamental
+// appearance and behavior for labels, including styles for different states and
+// basic layout properties. It is designed to be inherited and extended by other
+// label variants (e.g., left-aligned, right-aligned).
 group { name: "elm/label/base/default";
    script {
       LABEL_SCRIPT
    }
    styles {
       style { name: "label_style";
+         // Defines the default text style.
+         // 'color_class' is used to link to a color defined in the theme's color palette.
+         // It allows for consistent coloring across the UI.
          base: "font="FN" font_size=10 text_class=tb_plain align=center color_class=/fg/normal/text";
          tag: "br" "\n";
          tag: "b" "+ font="FNBD" text_class=tb_light";
          ENABLED_TEXTBLOCK_TAGS
       }
       style { name: "label_style_disabled";
+         // Defines the text style for the disabled state.
+         // It uses a different color class to visually indicate that the label is inactive.
          base: "font="FN" font_size=10 text_class=tb_plain align=center color_class=/fg/disabled/text";
          tag: "br" "\n";
          tag: "b" "+ font="FNBD" text_class=tb_light";
@@ -42,21 +58,30 @@ group { name: "elm/label/base/default";
    }
    parts {
       part { name: "label.text.clip"; type: RECT;
+         // A clipping rectangle that ensures the text and background do not
+         // render outside the label's boundaries. It's an invisible part
+         // that acts as a container.
          description { state: "default" 0.0;
          }
       }
       part { name: "elm.swallow.background"; type: SWALLOW;
+         // A SWALLOW part allows external Evas objects (like a background widget)
+         // to be "swallowed" into this part of the layout.
          clip_to: "label.text.clip";
          description { state: "default" 0.0;
          }
       }
       part { name: "elm.text"; type: TEXTBLOCK;
+         // The core TEXTBLOCK part that displays the label's text.
+         // It is clipped by "label.text.clip" to prevent overflow.
          clip_to: "label.text.clip";
          scale: 1;
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
             text {
+               // The 'min' property (1 1) ensures the text part requests at least
+               // a minimum size, preventing it from becoming invisible if the text is empty.
                style: "label_style";
                min: 1 1;
             }
@@ -64,19 +89,28 @@ group { name: "elm/label/base/default";
          description { state: "horizontal_fixed" 0.0;
             inherit: "default" 0.0;
             fixed: 1 0;
+            // 'fixed: 1 0' makes the part's width fixed and height scalable.
+            // 'text.min: 0 1' changes minimum size request, allowing it to shrink horizontally.
+            // This is useful for layouts where the label should not expand to fill space.
             text.min: 0 1;
          }
          description { state: "disabled" 0.0;
+            // In the "disabled" state, the label uses the 'label_style_disabled'
+            // to appear greyed out.
             inherit: "default" 0.0;
             text.style: "label_style_disabled";
          }
          description { state: "disabled_horizontal_fixed" 0.0;
+            // This state combines the "disabled" and "horizontal_fixed" properties.
             inherit: "horizontal_fixed" 0.0;
             text.style: "label_style_disabled";
          }
       }
    }
    programs {
+      // These programs listen for signals from the application logic (e.g., "elm")
+      // and execute scripts to change the label's state. This decouples the
+      // theme's visual logic from the C code.
       program { signal: "elm,state,horizontal,expandable"; source: "elm";
          script { flag_unset(FIXED); }
       }
@@ -84,14 +118,23 @@ group { name: "elm/label/base/default";
          script { flag_set(FIXED); }
       }
       program { signal: "elm,state,disabled"; source: "elm";
+         // When "elm,state,disabled" is received, it sets the DISABLE flag,
+         // triggering the 'eval_mode' function in LABEL_SCRIPT to apply the
+         // "disabled" state.
          script { flag_set(DISABLE); }
       }
       program { signal: "elm,state,enabled"; source: "elm";
+         // When "elm,state,enabled" is received, it unsets the DISABLE flag,
+         // returning the label to its default enabled appearance.
          script { flag_unset(DISABLE); }
       }
    }
 }
 
+// Group: elm/label/base/default/left
+// This group inherits from the default label and overrides the text alignment to be 'left'.
+// This is an efficient way to create variations of a base widget without duplicating
+// all the part and program definitions.
 group { name: "elm/label/base/default/left";
    inherit: "elm/label/base/default";
    script {
@@ -99,12 +142,14 @@ group { name: "elm/label/base/default/left";
    }
    styles {
       style { name: "label_style_left";
+         // The 'align' property is set to 'left'. All other style properties are the same as the base.
          base: "font="FN" font_size=10 text_class=tb_plain align=left color_class=/fg/normal/text";
          tag: "br" "\n";
          tag: "b" "+ font="FNBD" text_class=tb_light";
          ENABLED_TEXTBLOCK_TAGS
       }
       style { name: "label_style_left_disabled";
+         // The disabled style for the left-aligned label.
          base: "font="FN" font_size=10 text_class=tb_plain align=left color_class=/fg/disabled/text";
          tag: "br" "\n";
          tag: "b" "+ font="FNBD" text_class=tb_light";
@@ -113,6 +158,8 @@ group { name: "elm/label/base/default/left";
    }
    parts {
       textblock { "elm.text";
+         // This shorthand syntax updates the description of the 'elm.text' part inherited from the base group.
+         // It assigns the new left-aligned styles to the different states.
          desc { "default"; text.style: "label_style_left"; }
          desc { "horizontal_fixed"; text.style: "label_style_left"; }
          desc { "disabled"; text.style: "label_style_left_disabled"; }
@@ -121,6 +168,9 @@ group { name: "elm/label/base/default/left";
    }
 }
 
+// Group: elm/label/base/default/right
+// Similar to the 'left' variant, this group provides a right-aligned version of the label
+// by inheriting from the base and overriding the text alignment style.
 group { name: "elm/label/base/default/right";
    inherit: "elm/label/base/default";
    script {
@@ -128,6 +178,7 @@ group { name: "elm/label/base/default/right";
    }
    styles {
       style { name: "label_style_right";
+         // Sets text alignment to 'right'.
          base: "font="FN" font_size=10 text_class=tb_plain align=right color_class=/fg/normal/text";
          tag: "br" "\n";
          tag: "b" "+ font="FNBD" text_class=tb_light";
@@ -150,6 +201,10 @@ group { name: "elm/label/base/default/right";
    }
 }
 
+// Group: elm/label/base/marker
+// A 'marker' style label, which likely serves as a more prominent label,
+// for instance, in tooltips or as markers on a map. It uses a bold font by default
+// and defines a 'hilight' tag for special text styling.
 group { name: "elm/label/base/marker";
    inherit: "elm/label/base/default";
    script {
@@ -158,6 +213,9 @@ group { name: "elm/label/base/marker";
    styles {
       style { name: "label_style2";
          base: "font="FNBD" font_size=10 text_class=tb_plain align=center color_class=/fg/normal/text";
+         // The 'hilight' tag allows parts of the label's text to be styled differently,
+         // for example, to draw attention to a specific word. It uses a standout text color.
+         // Usage in code: "This is a <hilight>highlighted</hilight> text."
          tag: "br" "\n";
          tag: "hilight" "+ font="FNBD" color_class=/fg/normal/text-standout text_class=tb_light";
          tag: "b" "+ font="FNBD" color_class=/fg/normal/text-standout text_class=tb_light";
@@ -179,6 +237,9 @@ group { name: "elm/label/base/marker";
    }
 }
 
+// Group: elm/label/base/marker/left
+// A left-aligned, marker-style label. It inherits the base parts from the 'default'
+// group but defines its own styles for a bold, highlighted appearance.
 group { "elm/label/base/marker/left";
    inherit: "elm/label/base/default";
    script {
@@ -208,6 +269,8 @@ group { "elm/label/base/marker/left";
    }
 }
 
+// Group: elm/label/base/marker/right
+// Right-aligned version of the marker-style label.
 group { "elm/label/base/marker/right";
    inherit: "elm/label/base/default";
    script {
@@ -237,12 +300,19 @@ group { "elm/label/base/marker/right";
    }
 }
 
+// Group: elm/label/base/slide_long
+// This group implements a label with a "long slide" animation for text that
+// doesn't fit. When activated, the text slides from right to left until it
+// disappears, then reappears at the starting point. This is useful for displaying
+// long strings of text (like song titles) in a constrained space.
 group { name: "elm/label/base/slide_long";
    inherit: "elm/label/base/default";
    script {
       LABEL_SCRIPT
       public g_duration, g_stopslide, g_timer_id, g_anim_id;
 
+      // The message handler allows the C code to configure the animation's
+      // duration dynamically by sending a MSG_FLOAT_SET message.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_FLOAT_SET) && (id == 0)) {
             new Float:duration;
@@ -250,6 +320,9 @@ group { name: "elm/label/base/slide_long";
             set_float(g_duration, duration);
          }
       }
+      // This function is the callback for the animation timer. It tweens the
+      // state of the 'elm.text' part between "slide_begin" and "slide_end"
+      // to create the sliding motion.
       public slide_to_end_anim(val, Float:pos) {
          new stopflag;
          new id;
@@ -257,11 +330,13 @@ group { name: "elm/label/base/slide_long";
          if (stopflag == 1) return;
          set_tween_state(PART:"elm.text", pos, "slide_begin", 0.0, "slide_end", 0.0);
          if (pos >= 1.0) {
+            // After the slide completes, wait for 0.5s then restart it.
             id = timer(0.5, "slide_to_begin", 1);
             set_int(g_timer_id, id);
             emit("elm,state,slide,end","elm");
          }
       }
+      // Starts the animation from beginning to end.
       public slide_to_end() {
          new stopflag;
          new id;
@@ -272,6 +347,7 @@ group { name: "elm/label/base/slide_long";
          id = anim(duration, "slide_to_end_anim", 1);
          set_int(g_anim_id, id);
       }
+      // Resets the text position and restarts the slide animation.
       public slide_to_begin() {
          new stopflag;
          new id;
@@ -281,11 +357,13 @@ group { name: "elm/label/base/slide_long";
          id = timer(0.5, "slide_to_end", 1);
          set_int(g_timer_id, id);
       }
+      // Public API to start the whole sliding process.
       public start_slide() {
          set_int(g_stopslide, 0);
          set_state(PART:"elm.text", "slide_begin", 0.0);
          slide_to_end();
       }
+      // Public API to stop the sliding animation and reset the label.
       public stop_slide() {
          new id;
          set_int(g_stopslide, 1);
@@ -301,8 +379,13 @@ group { name: "elm/label/base/slide_long";
          description { state: "default" 0.0;
          }
       }
+      // The part descriptions are identical to 'slide_short', defining the
+      // start and end points for the slide. The script uses these for both
+      // the forward and backward animations.
       part { name: "elm.text"; type: TEXTBLOCK;
          scale: 1;
+         // The text is clipped to prevent it from appearing outside the
+         // designated slide area.
          clip_to: "label.text.clip";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -315,18 +398,25 @@ group { name: "elm/label/base/slide_long";
          }
          description { state: "slide_end" 0.0;
             inherit: "default" 0.0;
+            // 'slide_end' state: The text part is positioned entirely to the left of the container
+            // (rel1.relative and rel2.relative x are 0.0), and its content is aligned to the right (align 1.0).
+            // This makes the text slide from view to the left.
             rel1.relative: 0.0 0.0;
             rel2.relative: 0.0 1.0;
             align: 1.0 0.0;
             text {
                style: "label_style";
                min: 1 1;
+               // ellipsis is disabled (-1) to ensure the full text slides, rather than being truncated.
                ellipsis: -1;
             }
             fixed: 1 0;
          }
          description { state: "slide_begin" 0.0;
             inherit: "default" 0.0;
+            // 'slide_begin' state: The text part is positioned to the right of the container
+            // (rel1.relative and rel2.relative x are 1.0), with content aligned to the left.
+            // This is the starting point of the animation, where the text begins to slide in from the right.
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
             align: 0.0 0.0;
@@ -340,12 +430,16 @@ group { name: "elm/label/base/slide_long";
       }
    }
    programs {
+      // The 'start_slide' program is triggered by the "elm,state,slide,start" signal,
+      // initiating the sliding animation.
       program { name: "start_slide";
          signal: "elm,state,slide,start"; source: "elm";
          script {
             start_slide();
          }
       }
+      // The 'stop_slide' program, triggered by "elm,state,slide,stop",
+      // halts the animation.
       program { name: "stop_slide";
          signal: "elm,state,slide,stop"; source: "elm";
          script {
@@ -356,6 +450,11 @@ group { name: "elm/label/base/slide_long";
 }
 
 
+// Group: elm/label/base/slide_short
+// This is a "short slide" animation. Unlike "slide_long", the text in this
+// version slides from left to right. The script logic is the same, but the
+// positioning of the "slide_begin" and "slide_end" states is reversed to
+// change the slide direction.
 group { name: "elm/label/base/slide_short";
    inherit: "elm/label/base/default";
    script {
@@ -433,6 +532,8 @@ group { name: "elm/label/base/slide_short";
          }
          description { state: "slide_end" 0.0;
             inherit: "default" 0.0;
+            // 'slide_end' state: The text is positioned to the right of the container.
+            // This is the destination of the slide animation.
             rel1.relative: 1.0 0.0;
             rel2.relative: 1.0 1.0;
             align: 1.0 0.0;
@@ -444,6 +545,8 @@ group { name: "elm/label/base/slide_short";
          }
          description { state: "slide_begin" 0.0;
             inherit: "default" 0.0;
+            // 'slide_begin' state: The text is positioned to the left of the container,
+            // serving as the starting point for the slide from left to right.
             rel1.relative: 0.0 0.0;
             rel2.relative: 0.0 1.0;
             align: 0.0 0.0;
@@ -471,6 +574,10 @@ group { name: "elm/label/base/slide_short";
    }
 }
 
+// Group: elm/label/base/slide_bounce
+// This label style features a "bounce" animation, where the text slides to one
+// end, pauses, and then slides back to the beginning, repeating in a loop.
+// This is achieved by having two separate animation functions, one for each direction.
 group { name: "elm/label/base/slide_bounce";
    inherit: "elm/label/base/default";
    script {
@@ -484,6 +591,7 @@ group { name: "elm/label/base/slide_bounce";
             set_float(g_duration, duration);
          }
       }
+      // Animates the slide from start to end (e.g., left to right).
       public slide_to_end_anim(val, Float:pos) {
          new stopflag;
          new id;
@@ -491,10 +599,12 @@ group { name: "elm/label/base/slide_bounce";
          if (stopflag == 1) return;
          set_tween_state(PART:"elm.text", pos, "slide_begin", 0.0, "slide_end", 0.0);
          if (pos >= 1.0) {
+            // When the slide reaches the end, a timer is set to start the return slide.
             id = timer(0.5, "slide_to_begin", 1);
             set_int(g_timer_id, id);
          }
       }
+      // Triggers the slide-to-end animation.
       public slide_to_end() {
          new stopflag;
          new id;
@@ -505,6 +615,8 @@ group { name: "elm/label/base/slide_bounce";
          id = anim(duration, "slide_to_end_anim", 1);
          set_int(g_anim_id, id);
       }
+      // Animates the slide from end back to start (e.g., right to left),
+      // creating the "bounce" effect.
       public slide_to_begin_anim(val, Float:pos) {
          new stopflag;
          new id;
@@ -512,11 +624,14 @@ group { name: "elm/label/base/slide_bounce";
          if (stopflag == 1) return;
          set_tween_state(PART:"elm.text", pos, "slide_end", 0.0, "slide_begin", 0.0);
          if (pos >= 1.0) {
+            // When the slide returns to the beginning, it triggers the slide
+            // to the end again, creating a continuous loop.
             id = timer(0.5, "slide_to_end", 1);
             set_int(g_timer_id, id);
             emit("elm,state,slide,end","elm");
          }
       }
+      // Triggers the slide-to-begin (return) animation.
       public slide_to_begin() {
          new stopflag;
          new id;

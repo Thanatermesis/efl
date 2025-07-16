@@ -1,13 +1,26 @@
+// Edje Data Collection. This is the root of an EDC file.
 collections {
+   // A group defines a single user interface. An Edje file can contain multiple groups.
    group {
+      // The name of the group, used to reference it from C code.
       name: "main";
+      // This block contains all the parts that make up the UI for this group.
       parts {
+	 // A part is a basic element of the UI. It can be a rectangle, text, image, or a container.
 	 part {
+	    // The name of the part, used for referencing it in programs or from C code.
 	    name: "content";
+	    // When set to 0, this part will not react to mouse events (clicks, moves, etc.).
+	    // Events will pass through to any content swallowed by this part.
 	    mouse_events: 0;
+	    // A SWALLOW part is a container that can hold another Evas object.
+	    // This is often used to embed custom widgets or other Edje objects from the application.
 	    type:  SWALLOW;
+	    // A description defines the state of a part. Parts can have multiple descriptions for different states.
 	    description {
+	       // Defines the 'default' state with a state value of 0.0. This is the initial state of the part.
 	       state: "default" 0.0;
+               // Makes the part visible in this state.
                visible: 1;
 	    }
 	 }

@@ -1,25 +1,57 @@
+// This group defines the style for a textblock widget, which is a simple
+// element used to display formatted text.
 group { name: "e/widgets/textblock";
+   // Defines text styles used by parts in this group. This allows for consistent
+   // text appearance and easy modification of text properties.
    styles {
+      // Defines a style named "textblock_style" for formatting text.
+      // It sets a base appearance and defines tags for inline styling, similar to HTML/CSS.
       style { name: "textblock_style";
+         // 'base' defines the default appearance for all text: a standard font and size,
+         // left-aligned, with the default foreground color, and word wrapping enabled.
          base: "font="FN" font_size=10 text_class=tb_plain align=left color=cc:/fg/normal wrap=word";
+         // The 'br' tag inserts a newline character.
          tag: "br"      "\n";
+         // The 'b' tag makes text bold by switching to a bold font.
          tag: "b"       "+ font="FNBD"";
+         // The 'hilight' tag uses a bold font and a specific 'tb_light' text class for theming.
          tag: "hilight" "+ font="FNBD" text_class=tb_light";
+         // The 'urgent' tag uses a bold font and the 'text-urgent' color from the theme.
          tag: "urgent"  "+ font="FNBD" color=cc:/fg/normal/text-urgent";
+         // The 'title' tag defines a larger, bold, underlined style suitable for titles.
+         // 'underline_color' is set to a standard text color from the theme.
          tag: "title"   "+ font="FNBD" font_size=16 underline=on underline_color=cc:/fg/normal/text";
       }
    }
+   // The 'parts' block defines the graphical components of the widget.
    parts {
+      // This is the main part of the widget, a TEXTBLOCK that will render the text.
+      // 'mouse_events: 0' disables interaction, which is a performance optimization
+      // for display-only elements.
       part { name: "e.textblock.text"; type: TEXTBLOCK; mouse_events: 0;
+         // 'scale: 1' allows this part to be scaled along with its container.
          scale: 1;
+         // A description defines the state of a part. This is the "default" state.
          description { state: "default" 0.0;
+            // 'rel1.offset' and 'rel2.offset' define padding around the text.
+            // rel1 is the top-left corner, rel2 is the bottom-right.
+            // This creates a 4px padding on the top/left and 5px on the bottom/right.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // The 'text' block defines properties of the text content itself.
             text {
+               // Applies the previously defined "textblock_style".
                style: "textblock_style";
+               // 'min: 1 1' sets the minimum size of the textblock to 1x1 pixels,
+               // allowing it to shrink to almost nothing if needed.
                min: 1 1;
+               // 'ellipsis: -1' will add an ellipsis ("...") at the end of the text if it
+               // overflows the available space. A value of -1 applies it to the end.
                ellipsis: -1;
             }
+            // 'offscale' is an optimization that prevents this part from being upscaled
+            // if it is smaller than its container. This avoids blurry text rendering
+            // when the widget is larger than the text content.
             offscale;
          }
       }

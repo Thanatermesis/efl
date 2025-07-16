@@ -1,12 +1,21 @@
+// Defines a message ID for velocity control. This is used by the script's
+// message handler to identify messages sent from the C application.
 #define MSG_ID_VEL (1)
 
 collections {
+   // This group defines a UI layout with animated elements.
+   // It sets a maximum and minimum size for the Edje object.
    group {
       name: "prefs_edje";
       max: 450 450;
       min: 50 50;
 
+      // The 'parts' block contains all the visual elements of this group.
       parts {
+         // This part is a transparent rectangle that serves as the background.
+         // Its size matches the group's maximum size. Being transparent
+         // (#FFFFFF00), it's likely used as a container or to catch
+         // events over the entire area of the object.
          part {
             name: "bg";
             type: RECT;
@@ -20,60 +29,90 @@ collections {
             }
          }
 
+         // This is one of the two squares that will be animated.
          part {
             name: "square1";
             type: RECT;
             scale: 1;
             description {
+               // The 'default' state description.
                state: "default" 0.0;
                min: 50 50;
                max: 50 50;
+               // Opaque blue color (#0000FFFF).
                color: 0 0 255 255;
+               // Aligned to the vertical center of the left edge.
                align: 0.0 0.5;
             }
             description {
+               // The 'invert' state, used during animation.
                state: "invert" 0.0;
                inherit: "default" 0.0;
+               // Opaque green color (#00FF00FF).
                color: 0 255 0 255;
+               // Aligned to the vertical center of the right edge.
                align: 1 0.5;
             }
          }
 
+         // The second animated square. It is designed to move opposite to square1.
          part {
             name: "square2";
             type: RECT;
             description {
+               // The 'default' state description.
                state: "default" 0.0;
                min: 50 50;
                max: 50 50;
+               // Opaque green color (#00FF00FF).
                color: 0 255 0 255;
+               // Aligned to the horizontal center of the top edge.
                align: 0.5 0.0;
             }
             description {
+               // The 'invert' state for animation.
                state: "invert" 0.0;
                inherit: "default" 0.0;
+               // Opaque blue color (#0000FFFF).
                color: 0 0 255 255;
+               // Aligned to the horizontal center of the bottom edge.
                align: 0.5 1.0;
             }
          }
       }
 
+      // The 'programs' section defines the logic and behavior of the Edje object.
+      // These programs are small scripts that run in response to signals or events.
+      // This set of programs implements a state machine for a continuous two-phase animation.
       program {
+         // This program is triggered by the "start" signal from the "animation" source.
+         // It serves as the entry point for the animation sequence.
+         // The 'after' property chains this program to 'animation,clear',
+         // ensuring that the animation state is reset before starting.
          name: "animation_start";
          signal: "start";
          source: "animation";
          after: "animation,clear";
       }
 
+      // This program initiates the first phase of the animation.
       program {
          name: "call_animation,state1";
          script {
+              // Cancel any currently running animation to prevent conflicts.
               cancel_anim(anim_id);
+              // Start the 'animation_1' timeline, controlling its duration with 'global_speed'.
+              // The new animation's ID is stored in 'anim_id' for future control.
               set_int(anim_id, anim(get_float(global_speed), "animation_1", 0));
+              // Set the animation state to 1. This is used by the script
+              // to identify the current animation phase.
               set_int(anim_n, 1);
          }
       }
 
+      // This program initiates the second phase of the animation, which typically
+      // reverses the first phase. It runs the 'animation_2' timeline and sets
+      // the state identifier 'anim_n' to 2.
       program {
          name: "call_animation,state2";
          script {
@@ -83,45 +122,78 @@ collections {
          }
       }
 
+      // This program stops the animation when it receives a "stop" signal
+      // from the "animation" source.
       program {
          name: "animation,stop";
          signal: "stop";
          source: "animation";
          script {
+              // It cancels the currently active animation using its stored ID.
               cancel_anim(get_int(anim_id));
          }
       }
 
+      // This program is responsible for cleaning up the animation state before
+      // starting a new cycle.
       program {
          name: "animation,clear";
          script {
               cancel_anim(get_int(anim_id));
+              // This logic handles interruptions. If the animation was stopped
+              // during the second phase (anim_n == 2), it reverses the
+              // animation's progress ('anim_pos'). This allows for a smooth
+              // restart or transition, preventing jumps in the animation.
               if (get_int(anim_n) == 2)
                 set_float(anim_pos, (get_float(anim_pos) - 1) * ( -1));
          }
+         // After clearing, it always starts the animation from the first phase.
          after: "call_animation,state1";
       }
 
+      // The script block contains Embryo code, a small C-like language, for complex logic
+      // that is difficult to express with standard EDC properties and programs.
       script {
+         // These public variables maintain the animation's state and can be
+         // accessed from the C application and other parts of the script.
+         // - global_speed: Controls the duration/speed of the animations.
+         // - anim_id: Stores the ID of the current animation for later control.
+         // - anim_pos: Tracks the current position within an animation timeline (0.0 to 1.0).
+         // - anim_n: A state variable indicating which animation phase is active (1 or 2).
          public global_speed;
          public anim_id;
          public anim_pos;
          public anim_n;
 
+         // This function serves as an API to receive messages from the C application.
+         // It allows dynamic control over the Edje object's behavior at runtime.
          public message(Msg_Type:type, id, ...) {
+            // It specifically listens for floating-point messages with the ID
+            // matching MSG_ID_VEL. When such a message is received, it updates
+            // the 'global_speed' variable with the new value.
             if ((type == MSG_FLOAT) && (id == MSG_ID_VEL))
               set_float(global_speed, Float:getarg(2));
          }
 
+         // This function defines the first animation timeline. It's called repeatedly
+         // by the 'anim' function, with 'pos' indicating the progress from 0.0 to 1.0.
          public animation_1(val, Float:pos) {
+           // The condition ensures that we only update the animation when it's phase 1
+           // and the timeline is moving forward. This prevents issues if the animation
+           // is restarted or its timeline is manipulated externally.
            if (pos >= get_float(anim_pos) && get_int(anim_n) == 1)
              {
+                // 'set_tween_state' interpolates the properties of a part between two
+                // states. Here, it transitions both squares from their 'default'
+                // state to their 'invert' state based on the timeline position 'pos'.
                 set_tween_state(PART:"square1", pos, "default", 0.0,
                                 "invert", 0.0);
                 set_tween_state(PART:"square2", pos, "default", 0.0,
                                 "invert", 0.0);
                 set_float(anim_pos, pos);
              }
+           // When the animation completes (pos >= 1.0), it triggers the program
+           // to start the second phase of the animation and resets the position.
            if (pos >= 1)
              {
                 run_program(PROGRAM:"call_animation,state2");
@@ -129,6 +201,8 @@ collections {
              }
          }
 
+         // This function defines the second animation timeline, which reverses the
+         // first one by transitioning the parts from the 'invert' state back to 'default'.
          public animation_2(val, Float:pos) {
            if (pos >= get_float(anim_pos) && get_int(anim_n) == 2)
              {
@@ -138,6 +212,8 @@ collections {
                                 "default", 0.0);
                 set_float(anim_pos, pos);
              }
+           // When this animation completes, it triggers the first phase again,
+           // creating a continuous loop.
            if (pos >= 1)
              {
                 run_program(PROGRAM:"call_animation,state1");
@@ -147,4 +223,6 @@ collections {
       }
 }
 
+// It's good practice to undefine macros to avoid potential conflicts in
+// other files that might include this EDC file.
 #undef MSG_ID_VEL

@@ -1,7 +1,12 @@
+// This group defines the main theme for the xkbswitch module, which includes a flag icon.
+// It features a hover effect that reveals the layout name over the flag.
+// An alias is provided for vertical orientation, using the same layout.
 group { name: "e/modules/xkbswitch/main";
    alias: "e/modules/xkbswitch/main_vert";
    max: 128 128;
    parts {
+      // This is a container for an external Evas object, which will display the country flag.
+      // It's configured to not react to mouse events directly, as those are handled by the 'event' part.
       part { name: "e.swallow.flag"; type: SWALLOW; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -10,22 +15,29 @@ group { name: "e/modules/xkbswitch/main";
             offscale;
          }
       }
+      // This is a black rectangle used as an overlay to dim the flag when the mouse is over the widget.
+      // It is invisible by default and becomes visible on mouse-over.
       part { name: "over"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.swallow.flag";
             color_class: "/dim/normal/gadgets/xkbswitch/base";
+            // The 'default' state, where the overlay is transparent (#00000000) and invisible.
             color: 0 0 0 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             visible: 1;
+            // The 'visible' state, where the overlay is opaque black (#000000FF), dimming the underlying flag.
             color: 0 0 0 255; // no cc
          }
       }
+      // This TEXT part displays the keyboard layout name (e.g., "US").
+      // Like the 'over' part, it is hidden by default and appears on mouse-over.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/fg/selected/gadgets/xkbswitch/text";
+            // The 'default' state: text is transparent white (#FFFFFFFF00) and invisible.
             color: 255 255 255 0; // no cc
             visible: 0;
             rel.to: "e.swallow.flag";
@@ -39,23 +51,33 @@ group { name: "e/modules/xkbswitch/main";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // The 'visible' state: text is opaque white (#FFFFFFFF) and visible.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // A transparent rectangle that covers the entire widget area.
+      // Its purpose is to capture mouse events for the entire module, providing a single source for mouse signals.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
    }
+   // This section defines the interactive behavior of the widget.
    programs {
+      // When the mouse enters the 'event' area, this program triggers.
+      // It changes the state of 'e.text.label' and 'over' parts to "visible",
+      // making them fade in with a decelerating transition over 0.25 seconds.
       program { signal: "mouse,in"; source: "event";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.25;
          target: "e.text.label";
          target: "over";
       }
+      // When the mouse leaves the 'event' area, this program returns the widget to its default appearance.
+      // It sets the state of 'e.text.label' and 'over' back to "default",
+      // causing them to fade out over 1.0 second.
       program { signal: "mouse,out"; source: "event";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 1.0;
@@ -65,9 +87,13 @@ group { name: "e/modules/xkbswitch/main";
    }
 }
 
+// This group provides an alternative layout for when no flag icon is available or desired.
+// It displays only the text label for the keyboard layout on a simple background.
 group { name: "e/modules/xkbswitch/noflag";
    max: 128 128;
    parts {
+      // A rectangle that serves as the background for the text label.
+      // The 'aspect' property ensures it maintains a 1.8 aspect ratio, scaling cleanly.
       part { name: "base"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -78,6 +104,8 @@ group { name: "e/modules/xkbswitch/noflag";
             color_class: "/bg-dark/normal/gadgets/xkbswitch/text";
          }
       }
+      // Displays the keyboard layout name with a bold font.
+      // Unlike the main theme, this label is always visible.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/fg/selected/gadgets/xkbswitch/text";
@@ -91,6 +119,8 @@ group { name: "e/modules/xkbswitch/noflag";
             fixed: 0 1;
          }
       }
+      // A transparent rectangle for capturing mouse events. Although defined, it is not used by any programs
+      // in this group, but it might be used by external code.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc

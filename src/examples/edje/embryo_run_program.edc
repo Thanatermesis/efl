@@ -1,18 +1,31 @@
 collections {
+   // The 'main' group defines the primary interface, including a background,
+   // a clickable label, and an animated rectangle. Its behavior is controlled
+   // by an Embryo script that toggles the rectangle's position on clicks.
    group { name: "main";
+      // Embryo script block to add logic to the interface.
       script {
+         // A public integer variable 'toggle' is used to keep track of the
+         // state of the rectangle's animation (e.g., left or right).
+         // Being public, it can be accessed from the C application code.
          public toggle;
       }
       parts {
+         // The 'bg' part is a simple white rectangle (#FFFFFFFF) that serves as
+         // the background for the entire group, covering the whole area.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
                color: 255 255 255 255;
             }
          }
+         // The 'label' part is a text element that prompts user interaction.
+         // It's positioned towards the bottom-center of the parent container.
+         // This part acts as the event source for mouse clicks.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Solid black text color (#000000FF).
                color: 0 0 0 255;
                text {
                   text: "Click me.";
@@ -22,13 +35,20 @@ collections {
                }
             }
          }
+         // The 'rect' part is a rectangle that animates between two positions.
+         // It has two states defined in separate 'description' blocks, allowing
+         // for smooth transitions between them.
          part { name: "rect";
             type: RECT;
+            // The initial state (0.0) places a 30x30 red square (#FF0000FF)
+            // near the top-left corner.
             description { state: "default" 0.0;
                color: 255 0 0 255;
                max: 30 30;
                align: 0.1 0.2;
             }
+            // The final state (1.0) is based on the initial state but moves the
+            // square to the top-right corner and changes its color to blue (#0000FFFF).
             description { state: "default" 1.0;
                inherit: "default" 0.0;
                color: 0 0 255 255;
@@ -36,20 +56,31 @@ collections {
             }
          }
       }
+      // Programs define actions that can be triggered by signals or scripts.
       programs {
+         // The 'go_right' program animates the 'rect' part to its final state (1.0)
+         // over one second using a sinusoidal transition, creating a smooth
+         // ease-in and ease-out effect.
          program { name: "go_right";
             action: STATE_SET "default" 1.0;
             transition: SINUSOIDAL 1.0;
             target: "rect";
          }
+         // The 'go_left' program does the reverse, animating the 'rect' part
+         // back to its initial state (0.0).
          program { name: "go_left";
             action: STATE_SET "default" 0.0;
             transition: SINUSOIDAL 1.0;
             target: "rect";
          }
+         // This program is triggered when the left mouse button ('mouse,down,1')
+         // is pressed on the 'label' part.
          program {
             signal: "mouse,down,1";
             source: "label";
+            // The script block checks the 'toggle' variable to decide which
+            // animation to run. This creates a toggle behavior: clicking the
+            // label moves the rectangle right, and clicking it again moves it left.
             script {
                if (get_int(toggle) == 0) {
                   run_program(PROGRAM:"go_right");

@@ -17,15 +17,22 @@ Group: efl/datepicker/spin_button (@since 1.23)
 	 Signal: efl,state,disabled
 	 Signal: efl,state,enabled
 */
+// The 'efl/datepicker' group defines the main layout for the datepicker widget.
+// It consists of three main swallow parts: 'efl.field0', 'efl.field1', and 'efl.field2',
+// which are intended to hold the day, month, and year components of the date.
+// The layout is structured with spacers to provide padding and alignment for these fields.
 group { "efl/datepicker";
    data.item: "version" "123";
    parts {
+      // The 'base' spacer serves as the foundation for the entire layout, defining its minimum size.
       spacer { "base";
          scale;
          desc { "default";
              min: 160 40;
          }
       }
+      // 'padding_bg_top' and 'padding_bg_bottom' create vertical padding at the top and bottom of the widget.
+      // They are attached to the 'base' part and have a fixed height of 5 pixels.
       spacer { "padding_bg_top";
          scale;
          desc { "default";
@@ -50,6 +57,9 @@ group { "efl/datepicker";
             align: 0.5 1.0;
          }
       }
+      // The 'bg' spacer defines the main background area of the datepicker.
+      // It is positioned between the top and bottom padding spacers.
+      // Its size is fixed at 160x40 pixels, ensuring a consistent widget size.
       spacer { "bg";
          scale;
          desc { "default";
@@ -65,6 +75,8 @@ group { "efl/datepicker";
             }
          }
       }
+      // 'padding_left' and 'padding_right' create horizontal padding on the sides of the widget.
+      // They are attached to the 'bg' part and have a fixed width of 5 pixels.
       spacer { "padding_left";
          scale;
          desc { "default";
@@ -89,6 +101,9 @@ group { "efl/datepicker";
             align: 1.0 1.0;
          }
       }
+      // 'efl.field0' is a swallow part, a placeholder for external content.
+      // It is positioned to the right of 'padding_left', aligned to the left.
+      // It has a minimum width of 40 pixels.
       swallow { "efl.field0"; required;
          mouse;
          scale;
@@ -100,6 +115,8 @@ group { "efl/datepicker";
             align: 0.0 0.5;
          }
       }
+      // 'padding_center1' is a spacer providing separation between 'efl.field0' and 'efl.field1'.
+      // It has a fixed width of 5 pixels.
       spacer { "padding_center1";
          scale;
          desc { "default";
@@ -111,6 +128,9 @@ group { "efl/datepicker";
             align: 0.0 0.5;
          }
       }
+      // 'efl.field1' is the central swallow part, positioned between 'padding_center1' and 'padding_center2'.
+      // It is intended for the middle component of the date (e.g., month).
+      // Its width is flexible, taking up the available space between the two center paddings.
       swallow { "efl.field1"; required;
          mouse;
          scale;
@@ -128,6 +148,8 @@ group { "efl/datepicker";
             }
          }
       }
+      // 'padding_center2' is a spacer between 'efl.field1' and 'efl.field2'.
+      // It has a fixed width of 10 pixels, creating a slightly larger gap.
       spacer { "padding_center2";
          scale;
          desc { "default";
@@ -139,6 +161,8 @@ group { "efl/datepicker";
             align: 1.0 0.5;
          }
       }
+      // 'efl.field2' is the rightmost swallow part, positioned to the left of 'padding_right'.
+      // It's aligned to the right, intended for the last date component (e.g., year).
       swallow { "efl.field2"; required;
          mouse;
          scale;
@@ -150,6 +174,9 @@ group { "efl/datepicker";
             align: 1.0 0.5;
          }
       }
+      // The 'access' part is a transparent rectangle covering the entire background.
+      // It's used to handle accessibility events for the whole widget.
+      // The color is RGBA(0, 0, 0, 0) or #00000000, making it fully transparent.
       rect { "access";
          repeat;
          desc { "default";
@@ -161,20 +188,31 @@ group { "efl/datepicker";
    }
 }
 
+// The 'efl/datepicker/spin_button' group defines a vertical spin button control.
+// This control includes increment and decrement buttons, and a central area
+// that can display either a text label or an entry field for direct input.
+// This dual-mode display is managed by 'programs' that toggle visibility of parts.
 group { "efl/datepicker/spin_button";
    data.item: "version" "123";
    parts {
+      // 'clip' is a rectangle used as a clipping mask for 'efl.entry'.
+      // This ensures that the entry content does not draw outside its designated area,
+      // which is sized and positioned by 'efl.text_button'.
       rect { "clip";
          desc { "default";
             rel.to: "efl.text_button";
          }
       }
+      // 'base' defines the overall minimum size of the spin button.
       spacer { "base";
          scale;
          desc { "default";
            min: 20 60;
          }
       }
+      // 'access' is a transparent rectangle used for accessibility. It becomes visible
+      // when the widget is in an 'active' state, allowing accessibility tools to interact with it.
+      // The color is RGBA(0, 0, 0, 0) or #00000000 (fully transparent).
       rect { "access";
          repeat;
          desc { "default";
@@ -188,6 +226,8 @@ group { "efl/datepicker/spin_button";
             vis;
          }
       }
+      // 'efl.inc_button' is a swallow part for the increment button.
+      // It is placed at the top of the widget, with a fixed size of 20x20 pixels.
       swallow { "efl.inc_button"; required;
          scale;
          desc { "default";
@@ -197,6 +237,8 @@ group { "efl/datepicker/spin_button";
             fixed: 1 1;
          }
       }
+      // 'efl.dec_button' is a swallow part for the decrement button.
+      // It is positioned at the bottom of the widget, also with a fixed size of 20x20 pixels.
       swallow { "efl.dec_button"; required;
          scale;
          desc { "default";
@@ -206,6 +248,9 @@ group { "efl/datepicker/spin_button";
             fixed: 1 1;
          }
       }
+      // 'efl.entry' is a swallow part for a text entry field.
+      // It is initially hidden and becomes visible when the widget is in an 'active' state.
+      // It is clipped by the 'clip' part to prevent it from drawing outside its bounds.
       swallow { "efl.entry"; required;
          clip: "clip";
          desc { "default";
@@ -218,6 +263,9 @@ group { "efl/datepicker/spin_button";
             vis;
          }
       }
+      // 'efl.text_button' is a swallow part that typically displays the current value as text.
+      // It is positioned between the increment and decrement buttons.
+      // It can be hidden to reveal the 'efl.entry' part for editing.
       swallow { "efl.text_button"; required;
          scale;
          desc { "default";
@@ -239,6 +287,10 @@ group { "efl/datepicker/spin_button";
             hid;
          }
       }
+      // The 'disabler' part is a transparent rectangle used to overlay the entire widget when disabled.
+      // By default, it's hidden. In the 'disabled' state, it becomes visible,
+      // visually indicating the disabled state of the widget without blocking mouse events due to 'nomouse'.
+      // Its color is fully transparent, RGBA(0, 0, 0, 0) or #00000000.
       rect { "disabler";
          norepeat;
          nomouse;
@@ -252,35 +304,51 @@ group { "efl/datepicker/spin_button";
          }
       }
    }
+   // The 'programs' block defines the dynamic behavior of the widget.
+   // These programs listen for signals and change the state of parts accordingly.
    programs {
+      // When the 'efl,entry,visible,on' signal is received, the 'efl.entry' part
+      // transitions to the 'active' state, making the text entry field visible.
       program { signal: "efl,entry,visible,on"; source: "efl";
          action: STATE_SET "active";
          target: "efl.entry";
       }
+      // When 'efl,entry,visible,off' is received, 'efl.entry' returns to its
+      // 'default' state, hiding the entry field.
       program { signal: "efl,entry,visible,off"; source: "efl";
          action: STATE_SET "default";
          target: "efl.entry";
       }
+      // The 'efl,button,visible,on' signal makes the 'efl.text_button' part
+      // visible by setting its state to 'default'.
       program { signal: "efl,button,visible,on"; source: "efl";
          action: STATE_SET "default";
          target: "efl.text_button";
       }
+      // The 'efl,button,visible,off' signal hides the 'efl.text_button' part
+      // by setting its state to 'inactive'. This is used to show the entry field instead.
       program { signal: "efl,button,visible,off"; source: "efl";
          action: STATE_SET "inactive";
          target: "efl.text_button";
       }
+      // The 'efl,state,access,active' signal activates the 'access' part,
+      // making the widget accessible to screen readers and other tools.
       program { signal: "efl,state,access,active"; source: "efl";
          action:  STATE_SET "active";
          target: "access";
       }
+      // The 'efl,state,access,inactive' signal deactivates the 'access' part.
       program { signal: "efl,state,access,inactive"; source: "efl";
          action:  STATE_SET "default";
          target: "access";
       }
+      // When the 'efl,state,disabled' signal is received, the 'disabler' part
+      // is set to its 'disabled' state, visually indicating the widget is disabled.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled";
          target: "disabler";
       }
+      // The 'efl,state,enabled' signal reverses the disabled state, hiding the 'disabler' part.
       program { signal: "efl,state,enabled"; source: "efl";
          action: STATE_SET "default";
          target: "disabler";

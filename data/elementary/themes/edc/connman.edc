@@ -1,4 +1,7 @@
+// This group defines the main ConnMan module icon, which can display
+// different connection types (WiFi, Ethernet, Bluetooth, Cellular) and their states.
 group { name: "e/modules/connman/main";
+   // Images used in this group, COMP means they are lossy compressed.
    images.image: "cloud-conn.png" COMP;
 
    images.image: "eth-top.png" COMP;
@@ -20,6 +23,9 @@ group { name: "e/modules/connman/main";
    images.image: "cell-4.png" COMP;
    images.image: "cell-base.png" COMP;
    parts {
+      // This part displays an exclamation mark icon, typically shown when there's an issue
+      // or no specific connection type is active. It is clipped by "clip_exclam"
+      // which controls its visibility.
       part { name: "exclam_base"; mouse_events: 0;
          scale: 1;
          clip_to: "clip_exclam";
@@ -32,6 +38,7 @@ group { name: "e/modules/connman/main";
          }
       }
 ///////////////////////
+      // Base part for the Ethernet icon. It changes color based on the connection state.
       part { name: "eth-base"; mouse_events: 0;
          scale: 1;
          clip_to: "clip_eth";
@@ -41,17 +48,21 @@ group { name: "e/modules/connman/main";
             rel1.relative: (50/160) (15/160);
             rel2.relative: (110/160) (145/160);
             image.normal: "eth-base.png";
+            // The color class is used for theming. This state is for a disabled/disconnected cable.
             color_class: "/fg/disabled/gadgets/connman/eth/cable";
          }
          description { state: "connected" 0.0;
             inherit: "default" 0.0;
+            // The cable is plugged in.
             color_class: "/fg/normal/gadgets/connman/eth/cable";
          }
          description { state: "online" 0.0;
             inherit: "default" 0.0;
+            // The connection is online and active.
             color_class: "/fg/selected/gadgets/connman/eth/cable";
          }
       }
+      // Top part of the Ethernet icon, representing the connector. It is placed relative to "eth-base".
       part { name: "eth"; mouse_events: 0;
          scale: 1;
          clip_to: "clip_eth";
@@ -70,6 +81,7 @@ group { name: "e/modules/connman/main";
          }
       }
 ///////////////////////
+      // Base part for the WiFi icon, usually the background or a static part of the icon.
       part { name: "wifi-base"; mouse_events: 0;
          clip_to: "clip_wifi";
          description { state: "default" 0.0;
@@ -85,17 +97,22 @@ group { name: "e/modules/connman/main";
             color_class: "/fg/selected/gadgets/connman/wifi/connected";
          }
       }
+      // This part displays the WiFi signal strength. The state is set by a script
+      // based on the signal level, transitioning through different images.
       part { name: "wifi"; mouse_events: 0;
          clip_to: "clip_wifi";
          description { state: "default" 0.0;
             rel.to: "wifi-base";
             image.normal: "wifi-1.png";
             color_class: "/fg/normal/gadgets/connman/wifi/signal";
+            // Color is transparent black #00000000, so it's not visible by default.
             color: 0 0 0 0; // no cc
          }
+         // States from 0.25 to 1.0 show increasing signal strength.
          description { state: "default" 0.25;
             inherit: "default" 0.0;
             image.normal: "wifi-2.png";
+            // Color is solid white #FFFFFFFF, making the signal bars visible.
             color: 255 255 255 255; // no cc
          }
          description { state: "default" 0.5;
@@ -115,6 +132,7 @@ group { name: "e/modules/connman/main";
          }
       }
 ///////////////////////
+      // Base part for the Bluetooth icon.
       part { name: "bt_base"; mouse_events: 0;
          clip_to: "clip_bt";
          description { state: "default" 0.0;
@@ -122,6 +140,8 @@ group { name: "e/modules/connman/main";
             color_class: "/fg/normal/gadgets/connman/bt/base";
          }
       }
+      // These two parts compose the Bluetooth signal strength indicator.
+      // They become visible based on signal strength.
       part { name: "bt_1"; mouse_events: 0;
          clip_to: "clip_bt";
          description { state: "default" 0.0;
@@ -132,6 +152,7 @@ group { name: "e/modules/connman/main";
          }
          description { state: "partly" 0.0;
             inherit: "default" 0.0;
+            // Semi-transparent white #FFFFFF80.
             color: 255 255 255 128; // no cc
             visible: 1;
          }
@@ -159,6 +180,7 @@ group { name: "e/modules/connman/main";
          }
       }
 ///////////////////////
+      // Base part of the cellular network icon.
       part { name: "cell_base"; mouse_events: 0;
          clip_to: "clip_cell";
          description { state: "default" 0.0;
@@ -166,6 +188,8 @@ group { name: "e/modules/connman/main";
             color_class: "/fg/normal/gadgets/connman/cell/base";
          }
       }
+      // These parts show cellular signal strength with four bars.
+      // Each bar's visibility is controlled by its state ('default', 'partly', 'visible').
       part { name: "cell_1"; mouse_events: 0;
          clip_to: "clip_cell";
          description { state: "default" 0.0;
@@ -239,6 +263,9 @@ group { name: "e/modules/connman/main";
          }
       }
 ///////////////////////
+      // These RECT parts are used as clippers to control which technology icon is visible.
+      // By changing their 'visible' property, we can switch between different icons.
+      // For example, when "clip_wifi" is visible, all parts clipped to it will be shown.
       part { name: "clip_exclam"; type: RECT;
          description { state: "default" 0.0;
             visible: 1;
@@ -324,6 +351,7 @@ group { name: "e/modules/connman/main";
             visible: 1;
          }
       }
+      // A transparent rectangle covering the whole object to receive mouse events.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -331,6 +359,24 @@ group { name: "e/modules/connman/main";
       }
    }
 
+// This macro defines an Embryo script to dynamically update the connection status icons.
+// Embryo is a lightweight scripting language for EFL that allows for complex UI logic
+// without needing to recompile the application code. This script handles messages
+// to update signal strength for WiFi, Bluetooth, and Cellular, and connection
+// status for Ethernet and WiFi. Using a macro avoids code duplication since this
+// script is used in multiple groups.
+//
+// The script's `message` function is triggered when the application sends a message
+// to this Edje object. It expects a message of type MSG_INT_SET with ID 1.
+// - getarg(2): connection state (2=connecting, 4=connected, 5=online).
+// - getarg(3): signal strength (0-100).
+//
+// Based on the signal strength, it updates:
+// - WiFi: A smooth transition animation.
+// - Bluetooth: Two-level signal indicator.
+// - Cellular: Four-bar signal indicator.
+//
+// Based on the connection state, it updates the colors of Ethernet and WiFi icons.
 #define SCRIPT_MESSAGE() \
 script { \
 public message(Msg_Type:type, id, ...) { \
@@ -433,7 +479,8 @@ else { \
    set_state(PART:"eth-base", "default", 0.0); \
    set_state(PART:"eth", "default", 0.0); \
 } } } }
-   
+
+   // Instantiates the script defined in the SCRIPT_MESSAGE macro.
    SCRIPT_MESSAGE()
    programs {
 /*
@@ -456,6 +503,8 @@ else { \
 //      program {
 //         signal: "e,unavailable"; source: "e";
 //      }
+      // This program is triggered when the connection is lost.
+      // It resets all technology-specific layers, making the default exclamation icon visible.
       program {
          signal: "e,changed,connected,no"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -465,6 +514,8 @@ else { \
          target: "clip_bt";
          target: "clip_cell";
       }
+      // When the active technology changes to WiFi, this program is triggered.
+      // It sets the state of the clipper parts to show the WiFi icon and hide others.
       program {
          signal: "e,changed,technology,wifi"; source: "e";
          action: STATE_SET "wifi" 0.0;
@@ -513,10 +564,13 @@ else { \
    }
 }
 
+// This group defines a standalone WiFi icon by inheriting the main group.
+// It is used in places where only a WiFi icon is needed.
 group { name: "e/modules/connman/icon/wifi";
    inherit: "e/modules/connman/main";
    SCRIPT_MESSAGE()
    programs {
+      // On load, this program ensures that only the WiFi icon is displayed.
       program { signal: "load"; source: "";
          action: STATE_SET "wifi" 0.0;
          target: "clip_exclam";
@@ -528,6 +582,7 @@ group { name: "e/modules/connman/icon/wifi";
    }
 }
 
+// Standalone Ethernet icon.
 group { name: "e/modules/connman/icon/ethernet";
    inherit: "e/modules/connman/main";
    SCRIPT_MESSAGE()
@@ -543,6 +598,7 @@ group { name: "e/modules/connman/icon/ethernet";
    }
 }
 
+// Standalone Bluetooth icon.
 group { name: "e/modules/connman/icon/bluetooth";
    inherit: "e/modules/connman/main";
    SCRIPT_MESSAGE()
@@ -558,6 +614,7 @@ group { name: "e/modules/connman/icon/bluetooth";
    }
 }
 
+// Standalone Cellular icon.
 group { name: "e/modules/connman/icon/cellular";
    inherit: "e/modules/connman/main";
    SCRIPT_MESSAGE()
@@ -573,8 +630,11 @@ group { name: "e/modules/connman/icon/cellular";
    }
 }
 
+// This group defines the security icon for a network connection,
+// typically shown next to the network name in a list.
 group { name: "e/modules/connman/end";
    parts {
+      // This part displays different lock icons based on the network security type.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "i-unlock";
@@ -584,18 +644,21 @@ group { name: "e/modules/connman/end";
          }
          description { state: "none" 0.0;
             inherit: "default" 0.0;
+            // Unlocked icon for open networks.
             image.normal: "i-unlock";
             color_class: "/fg/normal/gadgets/connman/security/none";
             visible: 1;
          }
          description { state: "wep" 0.0;
             inherit: "default" 0.0;
+            // Single lock for WEP, considered low security.
             image.normal: "i-lock";
             color_class: "/fg/normal/gadgets/connman/security/secure/low";
             visible: 1;
          }
          description { state: "psk" 0.0;
             inherit: "default" 0.0;
+            // Double lock for WPA/WPA2 (PSK), considered high security.
             image.normal: "i-lock-double";
             color_class: "/fg/normal/gadgets/connman/security/secure/hi";
             visible: 1;
@@ -603,6 +666,8 @@ group { name: "e/modules/connman/end";
       }
    }
    programs {
+      // These programs listen for security change signals from the application
+      // and update the icon state accordingly.
       program { signal: "e,security,off"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "base";

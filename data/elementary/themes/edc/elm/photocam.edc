@@ -1,19 +1,33 @@
+// This group defines the base theme for the Elementary photocam widget.
+// It inherits from the scroller widget, which provides the core scrolling
+// functionality, and adds photocam-specific elements on top.
 group { name: "elm/photocam/base/default";
    inherit: "elm/scroller/base/default";
+   // The IMAGE_RING macro is used to create concentric rings, likely for visual
+   // feedback during zoom operations. Each ring has a unique name and size.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
    parts {
+      // The BUSY macro creates a program that shows or hides a busy animation
+      // on the "base" part. The animation is triggered by the "elm,state,busy,start"
+      // signal and stopped by "elm,state,busy,stop".
       BUSY("base", "elm,state,busy,start", "elm", "elm,state,busy,stop", "elm")
+      // This part serves as a base container, likely for the busy animation.
       part { name: "base"; type: RECT;
         scale: 1;
         description { state: "default" 0.0;
+          // Transparent color (#00000000).
           color: 0 0 0 0; // no cc
+          // Positioned at the bottom-right corner with a small offset.
           rel1.offset: 4 4;
           rel2.offset: -5 -5;
           align: 1.0 1.0;
+          // Fixed size of 40x40 pixels.
           min: 40 40;
           max: 40 40;
+          // 'offscale' ensures that this part is not affected by UI scaling,
+          // keeping its size constant.
           offscale;
         }
       }

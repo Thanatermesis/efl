@@ -1,9 +1,19 @@
+// This group defines the appearance and behavior of a desk preview widget.
+// It inherits from the base "e/widgets/preview" group, extending its functionality
+// to create a specialized desk preview component.
 group { name: "e/widgets/deskpreview/desk";
    inherit: "e/widgets/preview";
+   // The 'parts' block contains the visual elements that make up the widget.
    parts {
+      // This part is an invisible rectangle used to capture menu-related events.
+      // Its name, "e.event.menu", suggests it handles events for opening a context menu.
       part { name: "e.event.menu"; type: RECT;
+         // It is placed on top of the "e.swallow.content" part (inherited from the preview widget),
+         // ensuring it can intercept user input over the content area.
          insert_after: "e.swallow.content";
          description { state: "default" 0.0;
+            // The rectangle is made completely transparent (RGBA: 0, 0, 0, 0 or #00000000)
+            // so it doesn't obstruct the view of the content below it.
             color: 0 0 0 0; // no cc
          }
       }

@@ -1,18 +1,33 @@
+// The collections block is the root of an EDC file, containing all defined resources like groups, fonts, etc.
 collections{
+   // A group defines a self-contained UI layout or widget. It encapsulates parts, programs, and scripts.
    group{
+      // The name identifies this group, allowing it to be loaded from code.
       name: "image_group";
+      // max/min define the maximum and minimum size hints for the object created from this group.
       max: 500 500;
       min: 50 50;
+      // The images block preloads image data into memory, which can improve performance
+      // by avoiding disk I/O when the image is first used in a part.
       images{
+           // 'COMP' hints that the image should be stored compressed in memory, trading CPU for memory usage.
            image: "bubble.png" COMP;
      }
+    // The parts block contains all the graphical and logical elements of this group.
     parts{
+            // This is a part of type IMAGE, which is used to display an image.
             part{
+                   // The name of the part, used to reference it from other parts or programs.
                    name: "part_image";
+                   // The type of the part, in this case, a visual image element.
                    type: IMAGE;
+                   // A description block defines a state for the part. The default state is named "default" with a value of 0.0.
                    description{
+                       // Sets the minimum size of this part within this state.
                        min:63 63;
+                       // The image block within a description specifies the visual properties of the part for this state.
                        image{
+                            // 'normal' defines the image to be displayed.
                             normal: "bubble.png";
                        }
                    }

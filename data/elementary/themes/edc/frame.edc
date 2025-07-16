@@ -1,82 +1,119 @@
+// This group defines the visual style for a frame widget, a container with a title.
 group { name: "e/widgets/frame";
+   // Pre-loads the shadow image, compressed to save memory.
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // A rectangle part for the shadow, positioned by the WIN_SHAD macro via "_sh1".
+      // Its color is theme-dependent, set by the "/shadow/normal/frame" color class.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "_sh1";
             color_class: "/shadow/normal/frame";
          }
       }
+      // This macro generates shadow parts around the "base" part to create a drop shadow effect.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25);
+      // An invisible SPACER that defines the main boundary for the frame's content area.
+      // Other parts are positioned relative to this, creating a padded layout.
       part { name: "base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: 6 6;
             rel2.offset: -7 -7;
+            // 'offscale' prevents these offsets from being scaled by the global
+            // UI scale factor, ensuring a crisp, pixel-perfect border.
             offscale;
          }
       }
+      // A background rectangle for the title bar area. It fills the "top" spacer part.
+      // The color is set by the "/bg/normal/frame/title" color class.
       part { name: "top_bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "top";
             color_class: "/bg/normal/frame/title";
          }
       }
+      // This SPACER defines the geometry of the title bar area.
       part { name: "top"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
+            // It stretches from the top-left of the "base" part...
             rel1.to: "base";
+            // ...to the right edge of "base".
             rel2.to_x: "base";
+            // Its height is determined by the height of the label, plus some padding.
             rel2.to_y: "e.text.label";
             rel2.offset: -1 3;
             offscale;
          }
       }
+      // The TEXT part for displaying the frame's title. The "e.text.label" name is a
+      // convention, allowing the application to set the title text externally.
       part { name: "e.text.label"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned within the "base" part with padding.
             rel.to: "base";
             rel1.offset: 4 4;
+            // The label extends to the right edge of the "base" part.
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 4;
             align: 0.0 0.0;
+            // The text color is defined by the "/fg/normal/frame/title" color class.
             color_class: "/fg/normal/frame/title";
             text { font: FNBD; size: 10;
-               align: 0.0 0.5;
-               min: 0 1;
+               align: 0.0 0.5; // Left-aligned horizontally, center-aligned vertically.
+               min: 0 1; // Allows horizontal shrinking, but not vertical.
             }
+            // Fixes the vertical size, but allows horizontal resizing.
             fixed: 0 1;
             offscale;
          }
       }
+      // The background for the main content area of the frame.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned to start just below the "top" (title) area...
             rel1.to_x: "base";
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
+            // ...and extend to the bottom-right of the "base" part.
             rel2.to: "base";
+            // Color is set by the "/bg/normal/frame" color class.
             color_class: "/bg/normal/frame";
          }
       }
+      // An invisible rectangle used as a clipping mask. Any part clipped to this
+      // will only be visible within the bounds of this part.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
+            // It perfectly overlays the "bg" part.
             rel.to: "bg";
          }
       }
+      // A SWALLOW part acts as a container where external UI components (widgets) can be placed.
+      // This is the main content area of the frame.
       part { name: "e.swallow.content"; type: SWALLOW;
+         // Content is clipped to the "clip" part, so it doesn't draw outside the frame's content area.
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
             align: 0.0 1.0;
+            // Positioned inside the "bg" part with a small padding.
             rel.to: "bg";
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
             offscale;
          }
+         // This state is used when the frame is "collapsed" or "closed".
          description { state: "collapsed" 0.0;
             inherit: "default" 0.0;
+            // minmul scales the minimum size hint of the swallowed object.
+            // By setting the vertical multiplier to 0.0, the content's height becomes zero,
+            // effectively hiding it and collapsing the frame vertically.
             minmul: 1.0 0.0;
+            // Adjust offsets for the collapsed state to remove vertical padding.
             rel1.offset: 4 0;
             rel2.offset: -5 -1;
          }

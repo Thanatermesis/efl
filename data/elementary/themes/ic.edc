@@ -3,6 +3,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 // larger icons
 // 160, 80, 40
+// This macro defines an image set for large icons with multiple resolutions (160, 80, 40px).
+// Using image sets allows Edje to select the most appropriate image size at runtime,
+// optimizing memory usage and visual quality by avoiding unnecessary scaling.
+// The `size` property (min_w min_h max_w max_h) guides this selection. For example,
+// the largest image (160px) is used for parts sized 81x81 or larger.
 #define I160(_NAME, _FILE) \
    set { name: _NAME""; \
       image { image: "ic/"_FILE"-160.png" COMP; size: 81 81 16000 16000; } \
@@ -11,6 +16,9 @@
    }
 // smaller icons
 // 60, 30, 15
+// This macro is similar to I160, but for smaller icons (60, 30, 15px).
+// It's intended for UI elements like buttons and list items where smaller,
+// crisp icons are needed without the overhead of larger image assets.
 #define I060(_NAME, _FILE) \
    set { name: _NAME; \
       image { image: "ic/"_FILE"-060.png" COMP; size: 31 31 60000 60000; } \
@@ -20,6 +28,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // smaller monocrhome icons
+// This section defines a series of monochrome icons using the I060 macro.
+// These are general-purpose icons used throughout the UI for actions like
+// navigation, window management, and basic operations.
 I060("i-arrow-l", "arrow-l")
 I060("i-arrow-r", "arrow-r")
 I060("i-arrow-u", "arrow-u")
@@ -156,6 +167,9 @@ I060("i-person-bust", "person-bust")
 
 ///////////////////////////////////////////////////////////////////////////////
 // larger color icons (mostly efm or settings)
+// This section defines larger, colored icons using the I160 macro.
+// These icons are primarily used for file manager (efm) representations of
+// files and devices, as well as for various settings dialogs.
 I160("i-computer", "efm-computer")
 I160("i-desktop", "efm-desktop")
 I160("i-drive-cd", "efm-drive-cd")
@@ -531,6 +545,8 @@ I160("i-emblem-synchronizing", "emblem-synchronizing")
 
 ///////////////////////////////////////////////////////////////////////////////
 // larger mono icons (mostly efm or settings)
+// This section defines large monochrome icons, also using the I160 macro.
+// These are typically for system-level actions and concepts.
 I160("i-system", "system")
 I160("i-system-restart", "system-restart")
 I160("i-system-shutdown", "system-shutdown")
@@ -544,4 +560,5 @@ I160("i-fingerprint", "fingerprint")
 
 ///////////////////////////////////////////////////////////////////////////////
 // misc larger icons
+// A miscellaneous icon for unknown file types or states.
 I160("i-unknown", "unknown")

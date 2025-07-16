@@ -1,19 +1,36 @@
+// An EDC file is structured into collections of groups.
 collections {
+   // This group defines a layout named "image_group". It serves as a container
+   // for visual elements (parts) and logic (programs).
    group {
       name: "image_group";
+      // The 'max' and 'min' properties define the maximum and minimum size
+      // that this group can be resized to, ensuring UI consistency.
       max: 500 500;
       min: 50 50;
 
+     // The 'images' block pre-loads image assets into memory for faster access.
+     // Using 'COMP' (compress) reduces the final file size of the compiled .edj theme.
      images{
 		image: "bubble.png" COMP;
      }
 
+    // The 'parts' block contains all the visual elements that make up the interface for this group.
     parts{
+          	// Defines a part named "part_image" of type IMAGE. Parts are the
+          	// fundamental building blocks of the UI, representing individual elements
+          	// like images, text, or rectangles.
           	part{
                    name: "part_image";
                    type: IMAGE;
+                   // A 'description' defines the properties of a part for a specific state.
+                   // This is the default state, which is applied automatically. A part can have
+                   // multiple descriptions to represent different visual states (e.g., "clicked").
                    description{
+                       // For an IMAGE part, this specifies which graphic to use.
                        image{
+				// 'normal' sets the visible image for this state description.
+				// It refers to the "bubble.png" pre-loaded in the 'images' block.
 				normal: "bubble.png";
                        }
                    }

@@ -1,12 +1,28 @@
+// This collection defines the layout for the elementary preferences swallow item.
+// It is designed to be a simple container that can hold any custom content
+// provided by the application developer.
 collections {
+   // A group defines a single UI layout that can be loaded from an EDC file.
+   // This group is named 'elm_prefs_swallow' and will be referenced by this name
+   // in the C source code to create an instance of this layout.
    group {
       name: "elm_prefs_swallow";
 
       parts {
+         // This part is the main content area of the layout.
+         // It is a SWALLOW type, which means it's a placeholder where another
+         // Evas object (a widget or a custom layout) can be inserted at runtime.
+         // This design makes the prefs item highly flexible, allowing developers
+         // to embed complex custom UIs within a standard preferences list.
          part {
             name: "content";
             type: SWALLOW;
 
+            // The description block defines the visual properties and behavior of
+            // a part in a specific state. An empty description block like this one
+            // means the part will use default values for its properties (e.g.,
+            // position, size). This is sufficient here since the swallowed object's
+            // geometry will be managed by its container.
             description {
             }
          }

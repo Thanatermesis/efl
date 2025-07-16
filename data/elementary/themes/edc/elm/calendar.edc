@@ -1,3 +1,7 @@
+// Defines a set of styles for calendar date items (the days in the month grid).
+// Each style controls the appearance of the text for different states of a day,
+// such as a regular day, a holiday, today, or a weekend.
+// The `color=cc:/...` syntax uses color classes, which allows for themeable colors.
 #define CIT_STYLES\
       style { name: "calendar_date_style";\
          base: "font="FN" font_size=10 color=cc:/fg/normal/calendar/day align=center text_class=calendar_day_text";\
@@ -18,6 +22,14 @@
          base: "font="FN" font_size=10 color=cc:/fg/normal/calendar/day/weekend2 align=center text_class=calendar_day_text_weekend2";\
       }\
 
+// Defines a spinner widget, which consists of left and right arrow buttons
+// and a text label in the middle. This is used for changing the month and year.
+// It uses SPACER parts to define button areas and SWALLOW parts to hold the
+// actual button widgets, which are provided by the C code. This makes the
+// spinner themeable and flexible.
+// _sufix: A suffix to make part names unique, used when multiple spinners are in one group.
+// _text: The name of the text part that will display the changing value (e.g., month name).
+// _relative: The name of the part to which this spinner is relatively positioned.
 #define CAL_SPIN(_sufix, _text, _relative)\
       part { name: "left_bt"#_sufix; type: SPACER;\
          scale: 1;\
@@ -96,6 +108,10 @@
          }\
       }
 
+// Defines a calendar header item, which represents a day of the week (e.g., "Sun", "Mon").
+// The calendar has a header with 7 of these items.
+// _pos: The position of the day in the week, from 0 to 6. This is used to
+//       calculate the part's position in the 7-column header grid.
 #define CH(_pos) \
    part { name: "ch_"#_pos"_base"; type: SPACER; \
       description { state: "default" 0.0; \
@@ -126,6 +142,12 @@
       } \
    }
 
+// Defines a single day item (cell) in the calendar's 6x7 grid.
+// This macro is the core of the calendar view, defining the appearance and behavior
+// of each day. It includes parts for the background, selection/focus highlights,
+// the day number text, and a checkmark. It also contains an extensive set of programs
+// to handle user interaction and state changes.
+// _pos: The position of the day in the grid, from 0 to 41.
 #define CIT(_pos) \
    part { name: "cit_"#_pos"_rect"; type: SPACER; \
       description { state: "default" 0.0; \
@@ -386,8 +408,15 @@
       } \
    }
 
+// This is the main group for the default calendar layout. It assembles all the
+// pieces defined by the macros (spinners, headers, day cells) into a complete widget.
+// It also defines global behaviors and script variables for the widget.
 group { name: "elm/calendar/base/default";
+   // This data item enables the focus highlighting feature for the widget.
    data.item: "focus_highlight" "on";
+   // These Embryo script variables are declared as public, allowing the C code
+   // to read and write them, facilitating communication between the C logic and
+   // the EDC theme script.
    script {
       public rtl;
       public win_focus_enabled;
@@ -406,6 +435,8 @@ group { name: "elm/calendar/base/default";
             offscale;
          }
       }
+      // This SWALLOW part allows the C code to inject a background object (e.g., a themed rectangle)
+      // into the calendar widget, separating the container logic from the background's appearance.
       part { name: "elm.swallow.background"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "bg";
@@ -442,6 +473,8 @@ group { name: "elm/calendar/base/default";
             min: 0 25;
          }
       }
+      // A simple 1-pixel high rectangle that acts as a visual separator
+      // between the weekday header and the grid of days.
       part { name: "header_separator"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -478,6 +511,10 @@ group { name: "elm/calendar/base/default";
 
    }
    programs {
+      // This program is triggered when the widget's containing window gains focus.
+      // The script sets a flag indicating the window is focused and then re-triggers
+      // the focus signal for the last focused day cell. This ensures that the focus
+      // highlight reappears correctly when the user switches back to the application window.
       program {
          signal: "elm,action,focus_highlight,show";
          source: "elm";
@@ -500,6 +537,10 @@ group { name: "elm/calendar/base/default";
    }
 }
 
+// This group defines an alternative calendar layout with two spinners: one for the month and one for the year.
+// It inherits from the "default" group, reusing most of its definition and only overriding
+// the parts necessary to create the new layout. This is a powerful feature of EDC for creating
+// widget variations without duplicating code.
 group { name: "elm/calendar/base/double_spinners";
    inherit: "elm/calendar/base/default";
    parts {

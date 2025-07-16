@@ -1,36 +1,56 @@
+// This group defines the default colored mouse pointer.
+// It includes animations for initialization, clicks, and suspend/resume states,
+// providing visual feedback for user interactions.
 group { name: "e/pointer/enlightenment/default/color";
    images.image: "pointer.png" COMP;
+   // "can_suspend" "1" indicates that this cursor can be hidden by Enlightenment
+   // when idle, to save power or reduce distractions.
    data.item: "can_suspend" "1";
    parts {
+      // The "parent" part is a container that manages the visibility and
+      // overall state of the pointer. It's an invisible rectangle (RECT)
+      // used to apply transformations like fading to all child parts.
       part { name: "parent"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Fully opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
 //            FIXED_SIZE(32, 32)
          }
          description { state: "suspend" 0.0;
             inherit: "default" 0.0;
+            // The pointer shrinks to a single point at the center...
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
+            // ... and becomes fully transparent (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
       }
+      // The "base" part is the visible pointer image.
       part { name: "base";
+         // It is clipped by the "parent" part, so any transformations on
+         // "parent" (like fading out) will also affect "base".
          clip_to: "parent";
          description { state: "default" 0.0;
             image.normal: "pointer.png";
+            // It fills the "parent" part.
             rel.to: "parent";
             color_class: "/fg/normal/pointer/base";
          }
+         // The "clicked" state is used to give feedback when the mouse is clicked.
          description { state: "clicked" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/pressed/pointer/base";
          }
       }
+      // "e.swallow.hotspot" is a special part that defines the pointer's
+      // "hotspot" - the exact pixel that interacts with other UI elements.
+      // It is a 1x1 pixel SWALLOW part.
       part { name: "e.swallow.hotspot"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
             rel.to: "base";
+            // The hotspot is positioned at (5, 5) relative to the 32x32 pointer image.
             rel1.relative: (5/32) (5/32);
             rel2.relative: (5/32) (5/32);
             rel2.offset: 0 0;
@@ -38,18 +58,23 @@ group { name: "e/pointer/enlightenment/default/color";
       }
    }
    programs {
+      // On initialization ("e,state,init"), the pointer starts in a "suspend"
+      // state (invisible and collapsed) and then transitions to the "default" state.
       program {
          signal: "e,state,init"; source: "e";
          action: STATE_SET "suspend" 0.0;
          target: "parent";
          after: "load2";
       }
+      // This program runs after the init program, creating a fade-in effect.
       program { name: "load2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 1.0;
          in: 1.0 0.0;
          target: "parent";
       }
+      // When the mouse is clicked ("e,action,mouse,down"), the "base" part
+      // briefly changes to the "clicked" state, then fades back to "default".
       program {
          signal: "e,action,mouse,down"; source: "e";
          action: STATE_SET "clicked" 0.0;
@@ -61,6 +86,9 @@ group { name: "e/pointer/enlightenment/default/color";
          transition: SINUSOIDAL 0.5;
          target: "base";
       }
+      // When the mouse is suspended ("e,state,mouse,suspend"), the "parent" part
+      // transitions to the "suspend" state (fades out), and a signal is emitted
+      // when done.
       program {
          signal: "e,state,mouse,suspend"; source: "e";
          action: STATE_SET "suspend" 0.0;
@@ -70,6 +98,8 @@ group { name: "e/pointer/enlightenment/default/color";
             action: SIGNAL_EMIT "e,state,mouse,suspend,done" "e";
          }
       }
+      // When the mouse resumes ("e,state,mouse,resume"), the "parent" part
+      // transitions back to the "default" state (fades in).
       program {
          signal: "e,state,mouse,resume"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -109,16 +139,24 @@ group { name: "e/pointer/enlightenment/default/color";
    }
 }
 
+// This group defines a monochrome version of the default pointer.
+// It is a simpler, non-animated version, often used as a fallback or in
+// high-contrast themes.
 group { name: "e/pointer/enlightenment/default/mono";
    images.image: "pointer_mono.png" COMP;
    parts {
+      // The "base" part displays the monochrome pointer image.
+      // `mouse_events: 0;` means this part will not react to mouse events,
+      // which is typical for a cursor image itself.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "pointer_mono.png";
+            // The pointer is fixed to a 32x32 pixel size.
             min: 32 32;
             max: 32 32;
          }
       }
+      // The hotspot for the monochrome pointer, positioned at (6, 8).
       part { name: "e.swallow.hotspot"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -131,16 +169,23 @@ group { name: "e/pointer/enlightenment/default/mono";
    }
 }
 
+// This group defines the bottom-right resize cursor. It inherits from the
+// default colored pointer and adds a small animated box to indicate the
+// resize action. This group serves as a base for other resize cursors.
 group { name: "e/pointer/enlightenment/resize_br/color";
    inherit: "e/pointer/enlightenment/default/color";
    parts {
+      // The "box" part is a rectangle that animates to indicate a resize handle.
       part { name: "box"; type: RECT;
+         // It is inserted after the "base" (pointer image) part from the inherited group.
          insert_after: "base";
          description { state: "default" 0.0;
             color_class: "/fg/normal/pointer/manipulator";
+            // The box is centered in the default state.
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 0.7;
          }
+         // The "p1" state describes the box when it's animated to the bottom-right.
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.3 0.3;
@@ -149,6 +194,8 @@ group { name: "e/pointer/enlightenment/resize_br/color";
       }
    }
    programs {
+      // On load, the "box" part starts an animation loop, transitioning
+      // between the "p1" (bottom-right) state and the "default" (centered) state.
       program { name: "box1";
          signal: "load"; source: "";
          action: STATE_SET "p1" 0.0;
@@ -165,6 +212,7 @@ group { name: "e/pointer/enlightenment/resize_br/color";
    }
 }
 
+// Top-right resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_tr/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
@@ -173,6 +221,7 @@ group { name: "e/pointer/enlightenment/resize_tr/color";
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 0.7;
          }
+         // Overrides p1 state to animate towards top-right.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.0;
             rel2.relative: 1.0 0.7;
@@ -181,14 +230,17 @@ group { name: "e/pointer/enlightenment/resize_tr/color";
    }
 }
 
+// Top-left resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_tl/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
       part { name: "box";
+         // Overrides default state.
          description { state: "default" 0.0;
             rel1.relative: 0.6 0.6;
             rel2.relative: 1.0 1.0;
          }
+         // Overrides p1 state to expand towards top-left.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -197,14 +249,17 @@ group { name: "e/pointer/enlightenment/resize_tl/color";
    }
 }
 
+// Bottom-left resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_bl/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
       part { name: "box";
+         // Overrides default state.
          description { state: "default" 0.0;
             rel1.relative: 0.7 0.3;
             rel2.relative: 1.0 0.7;
          }
+         // Overrides p1 state to expand towards bottom-left.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -213,6 +268,7 @@ group { name: "e/pointer/enlightenment/resize_bl/color";
    }
 }
 
+// Bottom resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_b/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
@@ -221,6 +277,7 @@ group { name: "e/pointer/enlightenment/resize_b/color";
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 0.7;
          }
+         // Overrides p1 state to expand downwards.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -229,6 +286,7 @@ group { name: "e/pointer/enlightenment/resize_b/color";
    }
 }
 
+// Top resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_t/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
@@ -237,6 +295,7 @@ group { name: "e/pointer/enlightenment/resize_t/color";
             rel1.relative: 0.3 0.6;
             rel2.relative: 1.0 1.0;
          }
+         // Overrides p1 state to expand upwards.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -245,6 +304,7 @@ group { name: "e/pointer/enlightenment/resize_t/color";
    }
 }
 
+// Left resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_l/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
@@ -253,6 +313,7 @@ group { name: "e/pointer/enlightenment/resize_l/color";
             rel1.relative: 0.6 0.3;
             rel2.relative: 1.0 1.0;
          }
+         // Overrides p1 state to expand to the left.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -261,6 +322,7 @@ group { name: "e/pointer/enlightenment/resize_l/color";
    }
 }
 
+// Right resize cursor, inheriting from resize_br/color.
 group { name: "e/pointer/enlightenment/resize_r/color";
    inherit: "e/pointer/enlightenment/resize_br/color";
    parts {
@@ -269,6 +331,7 @@ group { name: "e/pointer/enlightenment/resize_r/color";
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.7 1.0;
          }
+         // Overrides p1 state to expand to the right.
          description { state: "p1" 0.0;
             rel1.relative: 0.3 0.3;
             rel2.relative: 1.0 1.0;
@@ -277,9 +340,12 @@ group { name: "e/pointer/enlightenment/resize_r/color";
    }
 }
 
+// This group defines the "hand" cursor, typically used for links or clickable
+// items. It adds a complex, multi-state animation to the default pointer.
 group { name: "e/pointer/enlightenment/hand/color";
    inherit: "e/pointer/enlightenment/default/color";
    parts {
+      // The "box" part is an animated rectangle indicating interactivity.
       part { name: "box"; type: RECT;
          insert_after: "base";
          description { state: "default" 0.0;
@@ -287,6 +353,8 @@ group { name: "e/pointer/enlightenment/hand/color";
             rel1.relative: 0.5 0.5;
             rel2.relative: 1.0 1.0;
          }
+         // The following "p1" through "p4" states define different positions
+         // and sizes for the box, creating a complex animation path.
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.5 0.2;
@@ -309,6 +377,8 @@ group { name: "e/pointer/enlightenment/hand/color";
          }
       }
    }
+   // The programs create a continuous animation loop through all the defined
+   // states (p1 -> p2 -> p3 -> p4 -> default -> p1...).
    programs {
       program { name: "box1";
          signal: "load"; source: "";
@@ -344,10 +414,12 @@ group { name: "e/pointer/enlightenment/hand/color";
    }
 }
 
+// The "move" cursor is an alias for the "hand" cursor.
 group { name: "e/pointer/enlightenment/move/color";
    inherit: "e/pointer/enlightenment/hand/color";
 }
 
+// The "rotate" cursor, indicating a rotation control.
 group { name: "e/pointer/enlightenment/rotate/color";
    inherit: "e/pointer/enlightenment/default/color";
    parts {
@@ -357,20 +429,25 @@ group { name: "e/pointer/enlightenment/rotate/color";
             color_class: "/fg/normal/pointer/manipulator";
             rel1.relative: 0.3 0.3;
             rel2.relative: 0.8 0.8;
+            // The `map` property enables 3D-like transformations.
+            // Here, it's used to rotate the "box" part.
             map.on: 1;
             map.smooth: 1;
             map.rotation.center: "box";
          }
+         // In "p1" state, the box is rotated 30 degrees.
          description { state: "p1" 0.0;
             inherit: "default" 0.0;
             map.rotation.z: 30;
          }
+         // In "p2" state, it's rotated -60 degrees.
          description { state: "p2" 0.0;
             inherit: "default" 0.0;
             map.rotation.z: -60;
          }
       }
    }
+   // The programs create an animation that rotates the box back and forth.
    programs {
       program { name: "box1";
          signal: "load"; source: "";
@@ -394,10 +471,13 @@ group { name: "e/pointer/enlightenment/rotate/color";
    }
 }
 
+// The "plus" cursor, used for operations like "add" or "copy".
+// It adds a pulsing plus sign icon to the default cursor.
 group { name: "e/pointer/enlightenment/plus/color";
    inherit: "e/pointer/enlightenment/default/color";
    images.image: "pointer_plus.png" COMP;
    parts {
+      // The "add" part is the plus sign image.
       part { name: "add";
          insert_after: "base";
          description { state: "default" 0.0;
@@ -409,10 +489,12 @@ group { name: "e/pointer/enlightenment/plus/color";
          }
          description { state: "faded" 0.0;
             inherit: "default" 0.0;
+            // Semi-transparent white (#FFFFFF80).
             color: 255 255 255 128; // no cc
          }
       }
    }
+   // The programs create a fading in-and-out animation for the plus sign.
    programs {
       program { name: "fade1";
          signal: "load"; source: "";
@@ -430,6 +512,8 @@ group { name: "e/pointer/enlightenment/plus/color";
    }
 }
 
+// This group defines the text entry cursor (I-beam).
+// It's a static cursor with no animations.
 group { name: "e/pointer/enlightenment/entry/color";
    images.image: "pointer_entry.png" COMP;
    parts {
@@ -438,10 +522,12 @@ group { name: "e/pointer/enlightenment/entry/color";
          description { state: "default" 0.0;
             color_class: "/fg/normal/pointer/base";
             image.normal: "pointer_entry.png";
+            // The aspect ratio is maintained vertically, and size is fixed.
             aspect: (44/88) (44/88); aspect_preference: VERTICAL;
             FIXED_SIZE(32, 32)
          }
       }
+      // The hotspot is centered.
       part { name: "e.swallow.hotspot"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;

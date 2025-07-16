@@ -3,17 +3,28 @@ efl_version: 1 22;
 collections {
 
    styles {
+      // Defines a reusable style for text entries.
+      // - font="sans": Specifies the font family.
+      // - font_size=10: Sets the font size to 10 points.
+      // - color=#000: Sets the text color to black (#000000).
+      // - wrap="word": Enables word wrapping.
+      // - left_margin=2, right_margin=2: Adds horizontal margins.
       style {
          name: "entry_style";
          base: "font="sans" font_size=10 color=#000 wrap="word" left_margin=2 right_margin=2";
       }
    }
 
+   // This group defines the main layout of the multiseat filter example.
+   // It demonstrates how to restrict input events from different seats (e.g., pointers)
+   // to specific widgets. The layout is divided into four quadrants, each with
+   // different seat filtering rules.
    group {
       name: "example/main";
       min: 400 400;
 
       parts {
+         // A simple background rectangle that does not react to mouse events.
          part {
             name: "bg";
             type: RECT;
@@ -23,12 +34,14 @@ collections {
             }
          }
 
+         // The main title of the example window.
          part {
             name: "title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -49,8 +62,10 @@ collections {
             }
          }
 
-         // focus_bt is important to test if focus action are
-         // respecting allowed seats list
+         // This button is used to test whether focus actions respect the allowed seats list.
+         // It consists of a RECT part for the button background and visuals, and a TEXT
+         // part for the label. The 'focus_bt' part handles mouse events and changes color
+         // based on its state (default, over, pressed).
          part {
             name: "focus_bt";
             type: RECT;
@@ -59,26 +74,31 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.3 0.2;
                rel2.relative: 0.7 0.25;
+               // color: Reddish (#C03232)
                color: 192 50 50 255;
             }
             description {
                state: "over" 0.0;
                inherit: "default" 0.0;
+               // color: Darker Reddish (#8E1E1E) for mouse-over
                color: 142 30 30 255;
             }
             description {
                state: "pressed" 0.0;
                inherit: "default" 0.0;
+               // color: Brighter Reddish (#DC4646) for pressed state
                color: 220 70 70 255;
             }
          }
 
+         // The label for the focus button, positioned in the center of "focus_bt".
          part {
             name: "focus_bt,label";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Dark Red (#5C0000)
                color: 92 0 0 255;
                rel1 {
                   relative: 0.5 0.5;
@@ -97,6 +117,8 @@ collections {
             }
          }
 
+         // This is the container for the top-left widget area. It defines the background
+         // and boundaries for child elements.
          part {
             name: "widget1";
             type: RECT;
@@ -105,10 +127,12 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.0 0.3;
                rel2.relative: 0.5 0.65;
+               // color: Yellow (#FFFF00)
                color: 255 255 0 255;
             }
          }
 
+         // Bottom-left widget area.
          part {
             name: "widget2";
             type: RECT;
@@ -117,10 +141,12 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.0 0.65;
                rel2.relative: 0.5 1.0;
+               // color: Magenta (#FF00FF)
                color: 255 0 255 255;
             }
          }
 
+         // Top-right widget area.
          part {
             name: "widget3";
             type: RECT;
@@ -129,10 +155,12 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.5 0.3;
                rel2.relative: 1.0 0.65;
+               // color: Cyan (#00FFFF)
                color: 0 255 255 255;
             }
          }
 
+         // Bottom-right widget area.
          part {
             name: "widget4";
             type: RECT;
@@ -141,16 +169,19 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.5 0.65;
                rel2.relative: 1.0 1.0;
+               // color: Light Green (#82FF82)
                color: 130 255 130 255;
             }
          }
 
+         // Title for the "widget1" area, indicating its function.
          part {
            name: "widget1,title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.02;
@@ -171,12 +202,15 @@ collections {
             }
          }
 
+         // A visual guide and confinement area for the draggable knob. The knob
+         // cannot be dragged outside of this part's boundaries.
          part {
             name: "widget1,drag_area";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Dark Gray (#141414)
                color: 20 20 20 255;
                rel1 {
                   relative: 0.1 0.2;
@@ -191,6 +225,13 @@ collections {
             }
          }
 
+         // A draggable knob.
+         // - allowed_seats: "seat1" - This is the key property. It restricts all
+         //   mouse and keyboard events for this part to "seat1" only. Events from
+         //   other seats will be ignored.
+         // - dragable.confine: "widget1,drag_area" - Restricts dragging within the
+         //   "widget1,drag_area" part.
+         // - dragable.y: 1 1 0 - Allows vertical dragging but not horizontal.
          part {
             name: "widget,knob,1";
             type: RECT;
@@ -204,15 +245,19 @@ collections {
             description {
                state: "default" 0.0;
                min: 10 30;
+               // color: Gray (#787878)
                color: 120 120 120 255;
             }
             description {
                state: "focused" 0.0;
                inherit: "default" 0.0;
+               // color: Light Gray (#C8C8C8) when focused/dragged
                color: 200 200 200 255;
             }
          }
 
+         // Background for the text entry area. It changes color when the
+         // associated text entry ("widget,text,1") receives focus.
          part {
             name: "widget,bg_text,1";
             type: RECT;
@@ -228,15 +273,24 @@ collections {
                   to: "widget1";
                   relative: 0.85 0.8;
                }
+               // color: Gray (#787878)
                color: 120 120 120 255;
             }
             description {
                state: "focused" 0.0;
                inherit: "default" 0.0;
+               // color: Light Gray (#C8C8C8) when focused
                color: 200 200 200 255;
             }
          }
 
+         // An editable text block.
+         // - entry_mode: EDITABLE - Allows the text to be modified.
+         // - allowed_seats: "seat1" - Restricts interaction to "seat1".
+         // - source: "example/selection" - Uses the "example/selection" group to
+         //   render text selections.
+         // - source4: "example/cursor" - Uses the "example/cursor" group to render
+         //   the text cursor.
          part {
             name: "widget,text,1";
             type: TEXTBLOCK;
@@ -268,12 +322,14 @@ collections {
             }
          }
 
+        // Title for the "widget2" area.
         part {
            name: "widget2,title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.02;
@@ -314,6 +370,7 @@ collections {
             }
          }
 
+         // Draggable knob for widget 2, restricted to "seat2".
          part {
             name: "widget,knob,2";
             type: RECT;
@@ -360,6 +417,7 @@ collections {
             }
          }
 
+         // Editable text block for widget 2, restricted to "seat2".
          part {
             name: "widget,text,2";
             type: TEXTBLOCK;
@@ -391,12 +449,14 @@ collections {
             }
          }
 
+        // Title for the "widget3" area.
         part {
            name: "widget3,title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.02;
@@ -437,6 +497,9 @@ collections {
             }
          }
 
+         // Draggable knob for widget 3.
+         // - allowed_seats: "seat1" "seat2" - Allows interaction from both
+         //   "seat1" and "seat2".
          part {
             name: "widget,knob,3";
             type: RECT;
@@ -483,6 +546,7 @@ collections {
             }
          }
 
+         // Editable text block for widget 3, allows both "seat1" and "seat2".
          part {
             name: "widget,text,3";
             type: TEXTBLOCK;
@@ -514,12 +578,14 @@ collections {
             }
          }
 
+        // Title for the "widget4" area.
         part {
            name: "widget4,title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Black (#000000)
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.02;
@@ -560,6 +626,8 @@ collections {
             }
          }
 
+         // Draggable knob for widget 4. Since `allowed_seats` is not specified,
+         // it accepts input from any seat by default.
          part {
             name: "widget,knob,4";
             type: RECT;
@@ -605,6 +673,7 @@ collections {
             }
          }
 
+         // Editable text block for widget 4, accepts input from any seat.
          part {
             name: "widget,text,4";
             type: TEXTBLOCK;
@@ -636,11 +705,23 @@ collections {
          }
       }
 
+      // The 'programs' section defines the interactive behavior of the interface.
+      // It connects signals (like mouse clicks or focus changes) from specific parts
+      // to actions or scripts.
       programs {
+         // This program is triggered when any of the "widget,text,*" parts are clicked
+         // by any seat.
          program {
             name: "clicked";
             signal: "seat,*,mouse,clicked,1";
             source: "widget,text,*";
+            // The script extracts the seat name that originated the click from the
+            // signal string (e.g., "seat,seat1,mouse,clicked,1") and then uses it
+            // to set the focus on the clicked text part for that specific seat.
+            // This ensures that focus is managed on a per-seat basis.
+            // - strchr(sig[...], ","): Finds the first comma after "seat," to isolate the seat name.
+            // - strncpy(...): Copies the seat name into the 'seat' variable.
+            // - set_focus(partid, seat): Sets focus on the source part for the identified seat.
             script {
                 new seat[256];
                 new partid, idx;
@@ -653,6 +734,12 @@ collections {
             }
          }
 
+         // These programs manage the visual feedback for focused text entries.
+         // When a text part gains focus ("focus,part,in"), its corresponding
+         // background part is set to the "focused" state. When it loses focus
+         // ("focus,part,out"), the background is reset to the "default" state.
+         // The script dynamically constructs the background part's name from the
+         // text part's name using a common EDC string manipulation trick.
          program {
             name: "focused";
             signal: "seat,*,focus,part,in";
@@ -683,6 +770,9 @@ collections {
             }
          }
 
+         // Change the visual state of a knob when it is being dragged.
+         // On "drag,start", the knob's state is set to "focused" (making it lighter).
+         // On "drag,stop", it returns to the "default" state.
          program {
             name: "drag,start";
             signal: "seat,*,drag,start";
@@ -705,6 +795,9 @@ collections {
             }
          }
 
+         // These programs handle the visual states of the "focus_bt" button,
+         // such as mouse-over and pressed states. These are standard for creating
+         // button-like behavior.
          program {
             name: "focus_bt,in";
             signal: "mouse,in";
@@ -737,10 +830,17 @@ collections {
             target: "focus_bt";
          }
 
+         // This program is triggered when the "focus_bt" button is clicked.
          program {
             name: "focus_bt,clicked";
             signal: "seat,*,mouse,clicked,1";
             source: "focus_bt";
+            // The script extracts the seat name from the click signal. It then
+            // tries to set focus on "widget,text,1" for that seat.
+            // This demonstrates a key concept: an action from any seat (since the
+            // button is not restricted) can attempt to focus a restricted widget.
+            // Edje will only grant focus if the seat from the click event is
+            // in the target's `allowed_seats` list (which is "seat1" for this widget).
             script {
                 new seat[256];
                 new idx;
@@ -754,6 +854,9 @@ collections {
       }
    }
 
+   // This group defines the visual appearance of text selection.
+   // When text is selected in a TEXTBLOCK, a part from this group is used to
+   // render the selection highlight.
    group {
       name: "example/selection";
 
@@ -764,17 +867,23 @@ collections {
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: Light Gray (#B4B4B4) for selection highlight.
                color: 180 180 180 255;
             }
          }
       }
    }
 
+   // This group defines the text cursor for editable text parts.
+   // It includes a simple rectangle for the cursor and a set of programs
+   // that create a blinking animation.
    group {
       name: "example/cursor";
       min: 1 0;
 
       parts {
+         // The visual representation of the cursor. It's a black rectangle
+         // that can be hidden by setting its color to transparent.
          part {
             name: "cursor";
             type: RECT;
@@ -782,16 +891,21 @@ collections {
             description {
                state: "default" 0.0;
                min: 2 12;
+               // color: Black (#000000)
                color: 0 0 0 255;
             }
             description {
                state: "hidden" 0.0;
                inherit: "default" 0.0;
+               // color: Transparent black
                color: 0 0 0 0;
             }
          }
       }
 
+      // These programs create a classic blinking cursor effect.
+      // On "load", the cursor starts a hide->show->hide loop using chained
+      // programs and timers.
       programs {
          program {
             name: "cursor_hide";

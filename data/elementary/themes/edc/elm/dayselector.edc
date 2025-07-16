@@ -1,3 +1,6 @@
+// These defines establish fixed values for day positions, types, and states,
+// which are used in the script to determine the visual representation of each day.
+// Using defines instead of magic numbers improves readability and maintainability.
 #define DAYSELECOR_DAY_POS_LEFT 1
 #define DAYSELECOR_DAY_POS_RIGHT 2
 #define DAYSELECOR_DAY_POS_MIDDLE 3
@@ -8,6 +11,9 @@
 #define DAYSELECOR_DAY_STATE_PRESSED 2
 #define DAYSELECOR_DAY_STATE_SELECTED 3
 
+// This macro generates the necessary parts for each day in the selector.
+// It creates a SWALLOW part, which acts as a placeholder for a day's content.
+// The relative positioning chains the days together horizontally.
 #define DAYSELECTOR_DAY(_pos, _after)\
    alias: "day"#_pos "elm.swallow.day"#_pos; \
    part { name: "elm.swallow.day"#_pos; type: SWALLOW;\
@@ -45,8 +51,12 @@
       }\
    }
 
+// This group defines the main container for the day selector. It lays out placeholders
+// (SWALLOW parts) for seven days. The actual content of each day (defined in the
+// "elm/check/base/dayselector/default" group) will be "swallowed" into these parts.
 group { name: "elm/dayselector/base/default";
    parts {
+      // This is the first day, acting as an anchor for the others.
       part { name: "elm.swallow.day0"; type: SWALLOW;
          scale: 1;
          clip_to: "clipper";
@@ -62,24 +72,34 @@ group { name: "elm/dayselector/base/default";
             min: 48 32;
          }
       }
+      // These macros generate the SWALLOW parts for the remaining six days,
+      // each positioned relative to the previous one to form a horizontal row.
       DAYSELECTOR_DAY(1, 0)
       DAYSELECTOR_DAY(2, 1)
       DAYSELECTOR_DAY(3, 2)
       DAYSELECTOR_DAY(4, 3)
       DAYSELECTOR_DAY(5, 4)
       DAYSELECTOR_DAY(6, 5)
+      // A clipper part ensures that the day elements do not draw outside the
+      // bounds of the container. This is essential for maintaining a clean layout,
+      // especially if the content has rounded corners or other complex shapes.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "elm.swallow.day0";
+            // The clipper is sized to span from the first to the last day.
             rel2.to: "elm.swallow.day6";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // The color #FFFFFF with 50% alpha (128) creates a translucent white overlay when disabled.
             color: 255 255 255 128; // no cc
          }
       }
+      // This part acts as an event blocker when the widget is disabled.
+      // It's an invisible rectangle that covers the entire widget.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
+            // Transparent color (#00000000).
             color: 0 0 0 0; // no cc
             visible: 0;
          }
@@ -89,21 +109,27 @@ group { name: "elm/dayselector/base/default";
          }
       }
    }
+   // Programs in this group manage the overall state of the dayselector,
+   // such as enabling/disabling it and controlling the visibility of day parts.
    programs {
+      // Handles the disabled state for the entire widget.
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "disabler";
          target: "clipper";
       }
+      // Handles the enabled state for the entire widget.
       program { signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "disabler";
          target: "clipper";
       }
+      // Makes the first day item visible.
       program { signal: "elm,day0,visible"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.swallow.day0";
       }
+      // Hides the first day item by returning it to its default state.
       program { signal: "elm,day0,default"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.day0";
@@ -111,12 +137,21 @@ group { name: "elm/dayselector/base/default";
    }
 }
 
+// This group defines the appearance and behavior of a single day item, which is
+// designed to be used as a check (toggle) button. It uses an Embryo script
+// to manage complex state changes based on position, type, and user interaction.
 group { name: "elm/check/base/dayselector/default";
    script {
+      // These public variables store the state of the day item. They are manipulated
+      // by programs in response to signals and read by script functions to update the UI.
       public check_pos; // Left, Right, Middle.
       public check_type; // Weekday, Weekend.
       public check_state = DAYSELECOR_DAY_STATE_DEFAULT; // Default, Pressed, Selected.
 
+      // This function determines the background state based on the day's position
+      // (left, middle, right) and its interaction state (default, pressed, selected).
+      // This is crucial for applying different background styles, like rounded corners
+      // on the ends of the selector and different colors for states.
       public check_bg_show() {
          if (get_int(check_pos) == DAYSELECOR_DAY_POS_LEFT) {
            if (get_int(check_state) == DAYSELECOR_DAY_STATE_DEFAULT)
@@ -141,6 +176,9 @@ group { name: "elm/check/base/dayselector/default";
              set_state(PART:"bg", "selected_middle", 0.0);
          }
       }
+      // This function controls the text style. It changes the text color for selected
+      // items and applies different styles for weekdays versus two types of weekends,
+      // allowing for flexible theming.
       public check_text_show() {
         if (get_int(check_state) == DAYSELECOR_DAY_STATE_SELECTED) {
           set_state(PART:"elm.text", "selected", 0.0);
@@ -156,17 +194,24 @@ group { name: "elm/check/base/dayselector/default";
           }
         }
       }
+      // A dedicated function to handle the pressed state of the text,
+      // ensuring immediate visual feedback to the user.
       public check_text_pressed() {
         set_state(PART:"elm.text", "pressed", 0.0);
       }
    }
    parts {
+      // The background of the day item. It is a simple RECT, but its state is
+      // dynamically changed by the 'check_bg_show' script function to select
+      // the correct color and style from the color class.
       part { name: "bg"; type: RECT;
          mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg-alt/normal/dayselector";
          }
          /* default */
+         // These states are for the default (unselected) appearance. The script
+         // selects one based on whether the day is at the left, right, or middle.
          description { state: "default_left" 0.0;
             inherit: "default" 0.0;
          }
@@ -177,6 +222,8 @@ group { name: "elm/check/base/dayselector/default";
             inherit: "default" 0.0;
          }
          /* pressed */
+         // These states are for when the user is pressing the day item.
+         // They change the color class to provide visual feedback.
          description { state: "pressed_left" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/dayselector";
@@ -190,6 +237,7 @@ group { name: "elm/check/base/dayselector/default";
             color_class: "/bg/selected/dayselector";
          }
          /* selected */
+         // These states are for when the day item is selected.
          description { state: "selected_left" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/dayselector";
@@ -203,6 +251,8 @@ group { name: "elm/check/base/dayselector/default";
             color_class: "/bg/selected/dayselector";
          }
       }
+      // The TEXT part displays the day's label (e.g., "Mon", "Tue").
+      // Its state is managed by the 'check_text_show' and 'check_text_pressed' script functions.
       part { name: "elm.text"; type: TEXT;
          mouse_events: 0;
          scale: 1;
@@ -219,6 +269,7 @@ group { name: "elm/check/base/dayselector/default";
                text_class: "button";
             }
          }
+         // Different text styles for weekends.
          description { state: "weekend_default" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/normal/dayselector/weekend";
@@ -227,23 +278,33 @@ group { name: "elm/check/base/dayselector/default";
             inherit: "default" 0.0;
             color_class: "/fg/normal/dayselector/weekend";
          }
+         // Text style for a selected day.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/dayselector";
          }
+         // Text style for a pressed day.
          description { state: "pressed" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/pressed/dayselector";
          }
       }
+      // This invisible RECT part is layered on top to capture mouse events.
+      // This is a common Edje technique to separate interaction logic from visual
+      // parts, making the design cleaner and easier to manage.
       part { name: "events"; type: RECT;
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
+            // Transparent color (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
+   // These programs connect user interactions and application signals to the script functions,
+   // orchestrating the dynamic behavior of the day item.
    programs {
+      // When the left mouse button is pressed, set the state to PRESSED
+      // and update the background and text to give immediate feedback.
       program { signal: "mouse,down,1"; source: "events";
          script {
             set_int(check_state, DAYSELECOR_DAY_STATE_PRESSED);
@@ -251,6 +312,9 @@ group { name: "elm/check/base/dayselector/default";
             check_text_pressed();
          }
       }
+      // When the mouse button is released, revert the state from PRESSED
+      // to DEFAULT and update the UI accordingly. The actual selection
+      // happens on the 'clicked' signal.
       program { signal: "mouse,up,1"; source: "events";
          script {
             set_int(check_state, DAYSELECOR_DAY_STATE_DEFAULT);
@@ -258,9 +322,13 @@ group { name: "elm/check/base/dayselector/default";
             check_text_show();
          }
       }
+      // When a click is registered, emit a signal to the application code.
+      // This lets the application logic handle the selection change.
       program { signal: "mouse,clicked,1"; source: "events";
          action: SIGNAL_EMIT "elm,action,check,toggle" "elm";
       }
+      // When the application signals that this day is selected ('on'),
+      // update the state and visuals to the SELECTED style.
       program { signal: "elm,state,check,on"; source: "elm";
          script {
             set_int(check_state, DAYSELECOR_DAY_STATE_SELECTED);
@@ -268,6 +336,8 @@ group { name: "elm/check/base/dayselector/default";
             check_text_show();
          }
       }
+      // When the application signals that this day is deselected ('off'),
+      // revert the state and visuals to the DEFAULT style.
       program { signal: "elm,state,check,off"; source: "elm";
          script {
             set_int(check_state, DAYSELECOR_DAY_STATE_DEFAULT);
@@ -275,6 +345,9 @@ group { name: "elm/check/base/dayselector/default";
             check_text_show();
          }
       }
+      // These programs receive signals from the application to set the day's
+      // position (left, middle, right). This is necessary to apply the correct
+      // background style (e.g., with rounded corners on the ends).
       program { signal: "elm,pos,check,left"; source: "elm";
          script {
             set_int(check_pos, DAYSELECOR_DAY_POS_LEFT);
@@ -293,6 +366,8 @@ group { name: "elm/check/base/dayselector/default";
             check_bg_show();
          }
       }
+      // These programs set the day type (weekday or weekend) based on application
+      // signals, which triggers the script to apply the appropriate text styling.
       program { signal: "elm,type,weekday,default"; source: "elm";
          script {
             set_int(check_type, DAYSELECOR_DAY_TYPE_WEEKDAY);
@@ -314,6 +389,8 @@ group { name: "elm/check/base/dayselector/default";
    }
 }
 
+// Undefining macros after use is a good practice to prevent conflicts
+// in larger projects where multiple .edc files are compiled together.
 #undef DAYSELECOR_DAY_POS_LEFT
 #undef DAYSELECOR_DAY_POS_RIGHT
 #undef DAYSELECOR_DAY_POS_MIDDLE

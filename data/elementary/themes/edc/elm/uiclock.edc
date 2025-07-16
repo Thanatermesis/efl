@@ -1,3 +1,7 @@
+// This macro defines a swallow part for a datetime field. A swallow part is a
+// container where external UI components, like entry widgets for year, month, etc.,
+// can be placed. The field is initially invisible and becomes visible upon
+// receiving an "enable" signal, which is handled by the programs within this macro.
 #define DATETIME_FIELD(_pos) \
    part { \
       name: "elm.field"#_pos; type: SWALLOW; \
@@ -31,6 +35,10 @@
          target: "elm.field"#_pos; \
       } \
     }
+// This macro defines a text part that acts as a separator (e.g., '/', ':')
+// between datetime fields. It includes both normal and disabled visual states.
+// The separator's visibility is tied to the enabled state of the field that
+// precedes it (_after), ensuring it only appears when the related field is active.
 #define DATETIME_SEPARATOR(_pos, _after) \
    part { \
       name: "elm.separator"#_pos; type: TEXT; \
@@ -98,19 +106,31 @@
          target: "separator"#_pos"d"; \
       } \
    }
+// This group defines the layout for the uiclock widget. It consists of a series
+// of datetime fields and separators, along with clipping rectangles to manage
+// visibility and a mechanism to handle the widget's disabled state.
 group { name: "elm/uiclock/base/default";
    parts {
+      // A transparent rectangle that serves as the background.
+      // The color is transparent (#00000000).
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // A clipping rectangle that defines the visible area for the datetime
+      // fields and separators. It spans from the first to the last separator,
+      // ensuring that only elements within this area are rendered. This is
+      // a common technique to contain child elements.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "elm.separator0";
             rel2.to: "elm.separator7";
          }
       }
+      // 'disclip' is a clipping rectangle, itself clipped by the main 'clip' part.
+      // It is visible by default and becomes invisible when the widget is disabled.
+      // This helps in hiding parts that should not be seen in the disabled state.
       part { name: "disclip"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -122,6 +142,10 @@ group { name: "elm/uiclock/base/default";
             visible: 0;
          }
       }
+      // 'disclip2' is also a clipping rectangle, clipped by 'clip'.
+      // It is invisible by default but becomes visible when the widget is disabled.
+      // This is used to show parts that are only relevant in the disabled state,
+      // such as the disabled version of separators.
       part { name: "disclip2"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -134,6 +158,9 @@ group { name: "elm/uiclock/base/default";
             visible: 1;
          }
       }
+      // This spacer part acts as an anchor for the layout, providing initial
+      // padding on the left side. The first datetime field is positioned
+      // relative to this spacer.
       part { name: "elm.separator0"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -143,6 +170,10 @@ group { name: "elm/uiclock/base/default";
             rel2.relative: 0.0 1.0;
          }
       }
+      // The following macros instantiate the swallowable fields for date and
+      // time components (e.g., Year, Month, Day, Hour, Minute, etc.) and the
+      // separators that appear between them. Each field is linked to a separator,
+      // creating a chain of UI elements.
       DATETIME_FIELD(0)
       DATETIME_SEPARATOR(1,0)
       DATETIME_FIELD(1)
@@ -159,6 +190,8 @@ group { name: "elm/uiclock/base/default";
       DATETIME_SEPARATOR(7,6)
       DATETIME_FIELD(7)
       DATETIME_SEPARATOR(8,7)
+      // A spacer part that adds trailing padding to the right of the last
+      // datetime field, ensuring balanced horizontal spacing.
       part { name: "elm.separator9"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "elm.separator7";
@@ -166,6 +199,11 @@ group { name: "elm/uiclock/base/default";
             min: 8 10;
          }
       }
+      // A transparent rectangle that covers the entire area of the fields and
+      // separators. It is invisible by default but becomes visible when the
+      // widget is disabled. Its purpose is to intercept mouse events,
+      // effectively disabling interaction with the underlying fields. The color
+      // is transparent (#00000000).
       part { name: "discover"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "elm.separator0";
@@ -178,19 +216,33 @@ group { name: "elm/uiclock/base/default";
             visible: 1;
          }
       }
+      // This is a transparent, event-repeating rectangle that covers the entire
+      // widget. It is used for accessibility purposes. Because it repeats events,
+      // it doesn't interfere with user interactions but can be detected by
+      // accessibility tools to provide information about the widget as a whole.
+      // The color is transparent (#00000000).
       part { name: "elm.access"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
    }
+   // These programs control the widget's state transitions between enabled and
+   // disabled. They are triggered by signals from the "elm" source.
    programs {
+      // When the "elm,state,disabled" signal is received, this program sets the
+      // state of 'disclip', 'disclip2', and 'discover' parts to "disabled".
+      // This makes 'disclip' invisible while 'disclip2' and 'discover' become
+      // visible, altering the widget's appearance to indicate it is disabled.
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "disclip";
          target: "disclip2";
          target: "discover";
       }
+      // When the "elm,state,enabled" signal is received, this program resets
+      // the state of 'disclip', 'disclip2', and 'discover' back to "default",
+      // restoring the widget's normal appearance.
       program { signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "disclip";

@@ -1,15 +1,27 @@
+// This group defines the menu's main background. It consists of a base
+// rectangle, a clipping area, a title, and a content swallow part.
+// The design allows for an optional title; when the title is shown, the
+// content area adjusts its position.
 group { name: "e/widgets/menu/default/background";
    parts {
+      // The 'base' part is a simple rectangle that serves as the main
+      // background of the menu. It does not handle mouse events itself.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // The color is defined by a color class, allowing for themeable colors.
             color_class: "/bg/normal/menu/base";
          }
       }
+      // The 'clip' part is a rectangle used to clip the content of the
+      // 'e.swallow.content' part. This ensures that menu items do not
+      // draw outside the menu's boundaries. It follows the geometry of 'base'.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
          }
       }
+      // The 'e.text.title' part displays the menu's title. It is initially
+      // hidden and becomes visible when the 'active' state is set.
       part { name: "e.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -27,8 +39,12 @@ group { name: "e/widgets/menu/default/background";
             }
             fixed: 0 1;
             visible: 0;
+            // 'offscale' is used for smooth animations when the part's state
+            // changes, preventing it from just appearing/disappearing abruptly.
             offscale;
          }
+         // In the 'active' state, the title becomes visible and is positioned
+         // at the top of the menu.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 1 3;
@@ -38,6 +54,9 @@ group { name: "e/widgets/menu/default/background";
             visible: 1;
          }
       }
+      // The 'e.swallow.content' part is a container where the actual menu
+      // items will be placed. It is clipped by the 'clip' part.
+      // This swallow part holds the actual icon widget. It is clipped by 'clip'.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          scale: 1;
@@ -45,6 +64,8 @@ group { name: "e/widgets/menu/default/background";
             rel1.to_y: "base";
             offscale;
          }
+         // When the title is shown ('active' state), this part is moved
+         // down to make space for the title.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 1.0;
@@ -53,12 +74,17 @@ group { name: "e/widgets/menu/default/background";
          }
       }
    }
+   // Programs define how the part states change in response to signals.
    programs {
+      // When the 'e,action,show,title' signal is received, both the title
+      // and content parts transition to the 'active' state, showing the title.
       program { signal: "e,action,show,title"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "e.text.title";
          target: "e.swallow.content";
       }
+      // When the 'e,action,hide,title' signal is received, the parts
+      // transition back to the 'default' state, hiding the title.
       program { signal: "e,action,hide,title"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.text.title";
@@ -67,13 +93,18 @@ group { name: "e/widgets/menu/default/background";
    }
 }
 
+// This group defines a visual separator used to divide items within a menu.
 group { name: "e/widgets/menu/default/separator";
    parts {
+      // The 'base' part is a 1-pixel-high rectangle that serves as the
+      // horizontal line for the separator.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets provide vertical padding around the separator line.
             rel1.offset: 0 10;
             rel2.offset: -1 -11;
+            // 'min: 0 1' ensures the separator has a minimum height of 1 pixel.
             min: 0 1;
             color_class: "/fg/normal/separator/menu";
             offscale;
@@ -82,9 +113,14 @@ group { name: "e/widgets/menu/default/separator";
    }
 }
 
+// This group defines the background for a standard menu item. It handles
+// highlighting when the item is selected. It's also aliased for submenu
+// backgrounds, promoting reuse.
 group { name: "e/widgets/menu/default/item_bg";
    alias: "e/widgets/menu/default/submenu_bg";
    parts {
+      // 'base' is a rectangle used as a selection indicator. It is hidden
+      // by default and becomes visible when the item is in the 'active' state.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/selected/menu/item/base";
@@ -95,6 +131,8 @@ group { name: "e/widgets/menu/default/item_bg";
             visible: 1;
          }
       }
+      // This swallows the item's content (e.g., icon and label). Offsets
+      // provide padding around the content.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -105,17 +143,25 @@ group { name: "e/widgets/menu/default/item_bg";
             offscale;
          }
       }
+      // The 'events' part is a transparent rectangle that covers the entire
+      // item area. Its purpose is to capture mouse events, making the whole
+      // item clickable, not just the visible content.
       part { name: "events"; type: RECT;
          description { state: "default";
+            // Color is fully transparent (RGBA: 0, 0, 0, 0 or #00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
    programs {
+      // When the 'e,state,selected' signal is emitted, the 'base' part's
+      // state is set to 'active', showing the selection highlight.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "base";
       }
+      // When unselected, the 'base' part returns to the 'default' state,
+      // hiding the highlight.
       program { signal: "e,state,unselected"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -123,13 +169,22 @@ group { name: "e/widgets/menu/default/item_bg";
    }
 }
 
+// This group is responsible for displaying an icon within a menu item.
+// It includes support for a disabled state, which visually dims the icon.
 group { name: "e/widgets/menu/default/icon";
    parts {
+      // The 'clip' part serves a dual purpose: it clips the swallowed icon
+      // and also acts as a color overlay to indicate the disabled state.
       part { name: "clip"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // In the default state, the overlay is fully opaque white
+            // (RGBA: 255, 255, 255, 255 or #FFFFFFFF), having no effect on the icon color.
             color: 255 255 255 255; // no cc
          }
          description { state: "disabled" 0.0;
+            // In the disabled state, a semi-transparent white overlay
+            // (RGBA: 255, 255, 255, 64 or #FFFFFF40) is applied, making
+            // the icon appear dimmed.
             color: 255 255 255 64; // no cc
          }
       }
@@ -145,6 +200,8 @@ group { name: "e/widgets/menu/default/icon";
       }
    }
    programs {
+      // These programs switch the state of the 'clip' part based on enable/disable
+      // signals, which in turn controls the icon's visual appearance.
       program { signal: "e,state,enable"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "clip";
@@ -156,8 +213,12 @@ group { name: "e/widgets/menu/default/icon";
    }
 }
 
+// This group defines the text label for a menu item. It supports different
+// visual states for selected, unselected, and disabled items by changing
+// its color class.
 group { name: "e/widgets/menu/default/label";
    parts {
+      // The 'e.text.label' part is the core text element of the menu item.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -167,12 +228,16 @@ group { name: "e/widgets/menu/default/label";
             min: 0 16;
             text { font: FN; size: 10;
                min: 1 1;
+               // 'ellipsis: -1' will add "..." at the end of the text if it
+               // is too long to fit in the available space.
                ellipsis: -1;
                align: 0.0 0.5;
                text_class: "menu_item";
             }
             offscale;
          }
+         // The 'selected' and 'disabled' states inherit from the default
+         // state and only override the text color.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/menu/item/text";
@@ -183,6 +248,8 @@ group { name: "e/widgets/menu/default/label";
          }
       }
    }
+   // These programs simply map selection and enable/disable signals to the
+   // corresponding visual states of the label.
    programs {
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
@@ -203,14 +270,18 @@ group { name: "e/widgets/menu/default/label";
    }
 }
 
+// This group defines the arrow indicator for a menu item that has a submenu.
 group { name: "e/widgets/menu/default/submenu";
    parts {
+      // The 'base' part is an image of a right-pointing arrow. Its color
+      // changes when the parent menu item is selected.
       part { name: "base";
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "i-arrow-r";
             rel1.offset: 4 0;
             rel2.offset: -5 -1;
+            // The size is fixed to 15x15 pixels.
             min: 15 15;
             max: 15 15;
             color_class: "/fg/normal/menu/item/arrow";
@@ -222,6 +293,8 @@ group { name: "e/widgets/menu/default/submenu";
          }
       }
    }
+   // These programs change the arrow's color by switching its state in
+   // response to the parent item's selection signals.
    programs {
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
@@ -234,8 +307,11 @@ group { name: "e/widgets/menu/default/submenu";
    }
 }
 
+// This group defines a checkable menu item, like a checkbox. It shows a
+// check mark when the item is 'on'.
 group { name: "e/widgets/menu/default/check";
    parts {
+      // 'bg' is a background rectangle for the check area.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default";
@@ -246,7 +322,11 @@ group { name: "e/widgets/menu/default/check";
             offscale;
          }
       }
+      // 'base' is the check mark image. It is invisible by default and
+      // becomes visible when the item is toggled on.
       part { name: "base";
+         // The check mark's color is determined by the 'selected' part, which
+         // acts as a color overlay, by clipping this part.
          clip_to: "selected";
          scale: 1;
          description { state: "default" 0.0;
@@ -263,6 +343,9 @@ group { name: "e/widgets/menu/default/check";
             visible: 1;
          }
       }
+      // 'selected' is a rectangle that acts as a color layer for the check
+      // mark. Its color changes based on whether the menu item is selected,
+      // which in turn colors the 'base' part it clips.
       part { name: "selected"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -274,7 +357,10 @@ group { name: "e/widgets/menu/default/check";
          }
       }
    }
+   // The programs manage the visibility and color of the check mark based
+   // on selection and on/off signals.
    programs {
+      // Handles selection state to change the check mark color.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "selected";
@@ -283,6 +369,7 @@ group { name: "e/widgets/menu/default/check";
          action: STATE_SET "default" 0.0;
          target: "selected";
       }
+      // Toggles the visibility of the check mark image.
       program { signal: "e,state,on"; source: "e";
          action: STATE_SET "on" 0.0;
          target: "base";
@@ -294,8 +381,12 @@ group { name: "e/widgets/menu/default/check";
    }
 }
 
+// This group defines a radio button menu item. It is visually distinct
+// from a checkbox and is typically used for mutually exclusive choices.
 group { name: "e/widgets/menu/default/radio";
    parts {
+      // The 'bg' part is the background of the radio icon when it is 'off'.
+      // It is hidden when the radio button is 'on'.
       part { name: "bg";
          description { state: "default" 0.0;
             image.normal: "i-radio";
@@ -308,6 +399,8 @@ group { name: "e/widgets/menu/default/radio";
             visible: 0;
          }
       }
+      // 'base' is the foreground image of the radio icon, visible when 'on'.
+      // Its color is determined by the 'selected' part via clipping.
       part { name: "base";
          scale: 1;
          clip_to: "selected";
@@ -325,6 +418,8 @@ group { name: "e/widgets/menu/default/radio";
             visible: 1;
          }
       }
+      // The 'selected' part is a clipper that colors the 'base' part. Its
+      // color changes when the item is selected.
       part { name: "selected"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -336,7 +431,9 @@ group { name: "e/widgets/menu/default/radio";
          }
       }
    }
+   // These programs manage the radio button's state.
    programs {
+      // Handles selection to change the radio icon's color.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "selected";
@@ -345,6 +442,8 @@ group { name: "e/widgets/menu/default/radio";
          action: STATE_SET "default" 0.0;
          target: "selected";
       }
+      // Toggles between the 'on' and 'off' states, affecting both the
+      // foreground ('base') and background ('bg') parts.
       program { signal: "e,state,on"; source: "e";
          action: STATE_SET "on" 0.0;
          target: "base";

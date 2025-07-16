@@ -1,4 +1,6 @@
 
+// This macro defines a common background layer for all external widget examples.
+// It consists of a clipping rectangle 'clip' and an 'under' part with a sky image.
 #define COMMON_EXTERNAL_UNDER \
          part { name: "clip"; \
             type: RECT; \
@@ -15,6 +17,10 @@
             } \
          }
 
+// This macro defines an overlay layer with a cloud image ('clo.png').
+// It includes a 'drift' state to create a horizontal scrolling animation,
+// giving a sense of moving clouds. The fill size is larger than the part
+// to allow for seamless scrolling.
 #define COMMON_EXTERNAL_OVER \
          part { name: "over"; \
             mouse_events: 0; \
@@ -48,6 +54,9 @@
             } \
          }
 
+// Defines a looping animation program that continuously moves the 'over' part.
+// On "load", it transitions to the "drift" state, then back to "default",
+// creating an infinite animation loop for the background.
 #define COMMON_EXTERNAL_PROGRAM \
          program { name: "anim1"; \
             signal: "load"; \
@@ -64,14 +73,21 @@
          }
 
 images {
+   // Defines image resources. 'COMP' indicates data is compressed.
    image: "sky.jpg" COMP;
+   // 'LOSSY 60' specifies lossy compression at 60% quality to reduce file size.
    image: "clo.png" LOSSY 60;
 }
 
 collections {
+   // This group demonstrates various configurations of elm/button external widgets.
+   // It shows how to use buttons with text, icons, both, or neither. It also
+   // demonstrates interaction between buttons, where clicking some buttons
+   // animates another.
    group { name: "external/button";
       parts {
          COMMON_EXTERNAL_UNDER
+         // An external label providing instructions for this example.
          part { name: "ext_label1";
             type: EXTERNAL;
             source: "elm/label";
@@ -85,6 +101,7 @@ collections {
                }
             }
          }
+         // Button with both an icon and a label.
          part { name: "ext_button1";
             type: EXTERNAL;
             source: "elm/button";
@@ -99,6 +116,7 @@ collections {
                }
             }
          }
+         // Button with only a label.
          part { name: "ext_button2";
             type: EXTERNAL;
             source: "elm/button";
@@ -112,6 +130,9 @@ collections {
                }
             }
          }
+         // Button with only an icon. This button will be animated
+         // by other buttons in this group. It has 'left' and 'right'
+         // states to define its animated positions.
          part { name: "ext_button3";
             type: EXTERNAL;
             source: "elm/button";
@@ -133,6 +154,7 @@ collections {
                align: 0.8 0.0;
             }
          }
+         // Button with an "anchor" style.
          part { name: "ext_button4";
             type: EXTERNAL;
             source: "elm/button";
@@ -147,6 +169,7 @@ collections {
                }
             }
          }
+         // A disabled button with both an icon and a label.
          part { name: "ext_button5";
             type: EXTERNAL;
             source: "elm/button";
@@ -165,7 +188,9 @@ collections {
          COMMON_EXTERNAL_OVER
       }
       programs {
-         COMMON_EXTERNAL_PROGRAM  
+         COMMON_EXTERNAL_PROGRAM
+         // When ext_button1 is clicked, it triggers an animation on ext_button3,
+         // moving it to the "left" state.
          program { name: "btn1_click";
             signal: "clicked";
             source: "ext_button1";
@@ -173,6 +198,7 @@ collections {
             transition: SINUSOIDAL 0.6 CURRENT;
             target: "ext_button3";
          }
+         // When ext_button2 is clicked, it moves ext_button3 to the "right" state.
          program { name: "btn2_click";
             signal: "clicked";
             source: "ext_button2";
@@ -180,6 +206,7 @@ collections {
             transition: SINUSOIDAL 0.6 CURRENT;
             target: "ext_button3";
          }
+         // When ext_button4 is clicked, it resets ext_button3 to its "default" state.
          program { name: "btn4_click";
             signal: "clicked";
             source: "ext_button4";
@@ -189,6 +216,10 @@ collections {
          }
       }
    }
+   // This group demonstrates various elm/slider widgets, both horizontal and vertical.
+   // It showcases features like inverted sliders, disabled states, and linking the
+   // value of one slider to others. It also includes an animation sequence for
+   // several widgets.
    group { name: "external/slider";
       parts {
          COMMON_EXTERNAL_UNDER
@@ -205,6 +236,7 @@ collections {
                }
             }
          }
+         // A horizontal slider that controls three vertical sliders.
          part { name: "ext_slider1";
             type: EXTERNAL;
             source: "elm/slider";
@@ -253,6 +285,8 @@ collections {
                }
             }
          }
+         // A vertical slider. Its value is linked to ext_slider1.
+         // It also has an "anim" state for positional animation.
          part { name: "ext_slider4";
             type: EXTERNAL;
             source: "elm/slider";
@@ -276,6 +310,7 @@ collections {
                rel1.offset: 140 160;
             }
          }
+         // An inverted vertical slider, also linked to ext_slider1 and animated.
          part { name: "ext_slider5";
             type: EXTERNAL;
             source: "elm/slider";
@@ -300,6 +335,7 @@ collections {
                rel1.offset: 200 160;
             }
          }
+         // A disabled vertical slider, also linked to ext_slider1 and animated.
          part { name: "ext_slider6";
             type: EXTERNAL;
             source: "elm/slider";
@@ -356,6 +392,7 @@ collections {
                rel1.offset: 30 270;
             }
          }
+         // A checkbox to disable/enable the first slider.
          part { name: "ext_check1";
             type: EXTERNAL;
             source: "elm/check";
@@ -376,7 +413,10 @@ collections {
          COMMON_EXTERNAL_OVER
       }
       programs {
-         COMMON_EXTERNAL_PROGRAM  
+         COMMON_EXTERNAL_PROGRAM
+         // This chain of programs links the value of the first horizontal slider
+         // to the three vertical sliders. When ext_slider1 changes, its value
+         // is copied to ext_slider4, then ext_slider5, then ext_slider6.
          program { name: "link";
             signal: "changed";
             source: "ext_slider1";
@@ -390,6 +430,8 @@ collections {
          program { name: "link3";
             action: PARAM_COPY "ext_slider1" "value" "ext_slider6" "value";
          }
+         // This chain of programs resets the value of all sliders to 0 when
+         // the "reset all" button is clicked.
          program { name: "reset";
             signal: "clicked";
             source: "ext_button1";
@@ -415,11 +457,18 @@ collections {
          program { name: "reset6";
             action: PARAM_SET "ext_slider6" "value" 0.0;
          }
+         // When the checkbox state changes, this program copies its state
+         // (0 or 1) to the "disabled" property of the first slider.
          program { name: "disable_first";
             signal: "changed";
             source: "ext_check1";
             action: PARAM_COPY "ext_check1" "state" "ext_slider1" "disabled";
          }
+         // This pair of programs creates a toggle animation. Clicking the "animate"
+         // button moves a set of widgets to their "anim" state. Clicking it again
+         // moves them back to their "default" state. The 'filter' property ensures
+         // that only one of these programs runs at a time, based on the current
+         // state of the 'ext_slider4' part.
          program { name: "animate";
             signal: "clicked";
             source: "ext_button2";
@@ -448,6 +497,9 @@ collections {
          }
       }
    }
+   // This group demonstrates the elm/scroller widget, which can dynamically host
+   // other Edje groups as its content. Buttons are used to switch the content
+   // of the scroller.
    group { name: "external/scroller";
       parts {
          COMMON_EXTERNAL_UNDER
@@ -463,6 +515,8 @@ collections {
                }
             }
          }
+         // The scroller widget. Its "content" parameter is initially set to the
+         // "external/slider" group. The size is defined relative to the buttons below it.
          part { name: "ext_scroller1";
             type: EXTERNAL;
             source: "elm/scroller";
@@ -525,18 +579,21 @@ collections {
          COMMON_EXTERNAL_OVER
       }
       programs {
-         COMMON_EXTERNAL_PROGRAM  
+         COMMON_EXTERNAL_PROGRAM
+         // On "content 1" button click, sets the scroller content to the "external/button" group.
          program { name: "bt1_click";
             signal: "clicked";
             source: "ext_button1";
             action: PARAM_SET "ext_scroller1" "content" "external/button";
-            
+
          }
+         // On "content 2" button click, sets the scroller content to the "external/slider" group.
          program { name: "bt2_click";
             signal: "clicked";
             source: "ext_button2";
             action: PARAM_SET "ext_scroller1" "content" "external/slider";
          }
+         // On "content unset" button click, clears the scroller content.
          program { name: "bt3_click";
             signal: "clicked";
             source: "ext_button3";
@@ -544,6 +601,10 @@ collections {
          }
       }
    }
+   // This group showcases the elm/progressbar widget. It demonstrates various styles
+   // (horizontal, vertical, inverted, wheel) and modes (normal, indeterminate/pulse).
+   // It's a key example of controlling external widgets from Edje programs,
+   // an embedded Embryo script, and (as hinted) from external C code.
    group { name: "external/pbar";
       parts {
          COMMON_EXTERNAL_UNDER
@@ -561,7 +622,7 @@ embryo script and from C code.";
                }
             }
          }
-         
+
          part { name: "ext_pbar1";
             type: EXTERNAL;
             source: "elm/progressbar";
@@ -576,6 +637,8 @@ embryo script and from C code.";
                }
             }
          }
+         // Progress bar in indeterminate (pulsing) mode, used for operations of
+         // unknown duration.
          part { name: "ext_pbar2";
             type: EXTERNAL;
             source: "elm/progressbar";
@@ -657,6 +720,8 @@ embryo script and from C code.";
                }
             }
          }
+         // A "wheel" style progress bar, also in indeterminate mode.
+         // This is a compact, circular style often used as a busy indicator.
          part { name: "ext_pbar7";
             type: EXTERNAL;
             source: "elm/progressbar";
@@ -717,7 +782,13 @@ embryo script and from C code.";
          COMMON_EXTERNAL_OVER
       }
       programs {
-         COMMON_EXTERNAL_PROGRAM  
+         COMMON_EXTERNAL_PROGRAM
+         // This long chain of programs demonstrates a complex animation sequence
+         // controlled entirely by Edje. When button 1 is clicked, it:
+         // 1. Disables all three buttons.
+         // 2. Starts the pulsing animation on indeterminate progress bars.
+         // 3. Animates the value of pbar1 from 0.0 to 1.0 in steps.
+         // 4. Re-enables the buttons and stops pulsing when done.
          program { name: "anim_with_edje";
             signal: "clicked";
             source: "ext_button1";
@@ -825,8 +896,13 @@ embryo script and from C code.";
          program { name: "stop_pulsing3";
             action: PARAM_SET "ext_pbar7" "pulsing" 0;
          }
+         // This Embryo script provides another way to animate the progress bars.
+         // Embryo is a small scripting language that can be embedded in Edje files.
          script {
+            // 'my_value' is a public variable, accessible by Edje programs.
             public my_value;
+            // This function is a timer callback. It's called repeatedly to update
+            // the progress bars' values, creating a smooth animation.
             public timer_cb(unused) {
                external_param_set_float(PART:"ext_pbar1", "value", get_float(my_value));
                external_param_set_float(PART:"ext_pbar3", "value", get_float(my_value));
@@ -848,10 +924,14 @@ embryo script and from C code.";
                }
             }
          }
+         // This program is triggered by clicking button 2. It uses the Embryo script
+         // to run an animation.
          program { name: "bt2_click";
             signal: "clicked";
             source: "ext_button2";
             script {
+               // Initializes the animation: sets the script's 'my_value' to 0,
+               // disables buttons, and starts pulsing animations.
                set_float(my_value, 0.0);
                external_param_set_bool(PART:"ext_button1", "disabled", 1);
                external_param_set_bool(PART:"ext_button2", "disabled", 1);
@@ -859,11 +939,16 @@ embryo script and from C code.";
                external_param_set_bool(PART:"ext_pbar2", "pulsing", 1);
                external_param_set_bool(PART:"ext_pbar5", "pulsing", 1);
                external_param_set_bool(PART:"ext_pbar7", "pulsing", 1);
+               // Starts the timer, which will repeatedly call the 'timer_cb' function.
                timer_cb(0);
             }
          }
       }
    }
+   // This group demonstrates building a simple video player using external widgets.
+   // It combines a video display widget, buttons for playback control, sliders for
+   // volume and seeking, and a file selector to choose a video. All interaction
+   // logic is handled within Edje.
    group { name: "external/video";
       parts {
          COMMON_EXTERNAL_UNDER
@@ -995,7 +1080,7 @@ embryo script and from C code.";
          COMMON_EXTERNAL_OVER
       }
       programs {
-         COMMON_EXTERNAL_PROGRAM  
+         COMMON_EXTERNAL_PROGRAM
          program { name: "play_clicked";
             signal: "clicked";
             source: "ext_button1";
@@ -1019,13 +1104,20 @@ embryo script and from C code.";
          program { name: "position_slider";
             signal: "changed";
             source: "ext_slider2";
+            // This script handles the logic for the seek slider.
             script {
+               // Get the total length of the video.
                new Float:len = external_param_get_float(PART:"ext_video1", "play length");
+               // Get the current value from the slider.
                new Float:val = external_param_get_float(PART:"ext_slider2", "value");
+               // Set the slider's maximum value to the video length.
                external_param_set_float(PART:"ext_slider2", "max", len);
+               // Set the video's playback position based on the slider's value.
                external_param_set_float(PART:"ext_video1", "play position", val);
             }
          }
+         // When a file is chosen in the file selector, this program runs. It copies the
+         // file path to the video widget's URI and enables all playback controls.
          program { name: "file_chosen";
             signal: "file,chosen";
             source: "ext_fsentry";
@@ -1057,9 +1149,15 @@ embryo script and from C code.";
          }
       }
    }
+   // This group demonstrates the elm/icon widget and various ways to display,
+   // scale, and animate icons. It also shows how to use Edje's mapping features
+   // for 3D-like rotations.
    group { name: "external/icon";
       parts {
          COMMON_EXTERNAL_UNDER
+         // An icon of a fixed size. The 'map' property is enabled to allow for
+         // transformations. The "rotate" state defines a 360-degree rotation
+         // on the Z-axis, which will be used for animation.
          part { name: "icon_1"; type: EXTERNAL;
             source: "elm/icon";
             clip_to: "clip";
@@ -1083,6 +1181,8 @@ embryo script and from C code.";
                map.rotation.z: 360.0;
             }
          }
+         // A semi-transparent red (#FF00007F) rectangle serving as a background
+         // for icon_3, to visually demonstrate its bounding box during animation.
          part { name: "icon_3_bg"; type: RECT;
             clip_to: "clip";
             description { state: "default" 0.0;
@@ -1096,6 +1196,9 @@ embryo script and from C code.";
                rel2.relative: 0.5 0.5;
             }
          }
+         // This icon is constrained to the 'icon_3_bg' part. 'scale up' and
+         // 'scale down' are disabled, so the icon will maintain its original
+         // size and not resize with its container.
          part { name: "icon_3"; type: EXTERNAL;
             source: "elm/icon";
             clip_to: "clip";
@@ -1119,6 +1222,8 @@ embryo script and from C code.";
                }
             }
          }
+         // This icon has both 'scale up' and 'scale down' enabled, allowing it
+         // to resize freely as its container (the whole group) changes size.
          part { name: "icon_2"; type: EXTERNAL;
             source: "elm/icon";
             clip_to: "clip";
@@ -1163,11 +1268,17 @@ embryo script and from C code.";
 
       programs {
          COMMON_EXTERNAL_PROGRAM
+         // This program listens for a signal from the parent C application
+         // ('elm_test') to start all animations in this group simultaneously.
          program { signal: "elm_test,animations,start"; source: "elm_test";
             after: "rotate_icon1";
             after: "animate_icon2";
             after: "animate_icon3";
          }
+         // This pair of programs creates a continuous rotation animation for icon_1.
+         // 'rotate_icon1' transitions to the "rotate" state, and 'loop_rotate'
+         // immediately resets it to "default" without transition, then calls
+         // 'rotate_icon1' again to create a loop.
          program { name: "rotate_icon1";
             action: STATE_SET "rotate" 0.0;
             target: "icon_1";
@@ -1179,6 +1290,8 @@ embryo script and from C code.";
             target: "icon_1";
             after: "rotate_icon1";
          }
+         // Creates a back-and-forth animation for icon_2, moving it between its
+         // "default" and "anim" positions with different easing functions.
          program { name: "animate_icon2";
             action: STATE_SET "anim" 0.0;
             transition: ACCELERATE 4.0;
@@ -1206,9 +1319,12 @@ embryo script and from C code.";
 
       }
    }
+   // This group shows a basic implementation of the elm/combobox widget.
+   // Combobox items and selection handling are typically managed from the C code.
    group { name: "external/combobox";
       parts {
          COMMON_EXTERNAL_UNDER
+         // The combobox widget. The 'guide' text is displayed when no item is selected.
          part { name: "combobox"; type: EXTERNAL;
             source: "elm/combobox";
             clip_to: "clip";
@@ -1220,6 +1336,9 @@ embryo script and from C code.";
                }
             }
          }
+         // A text part intended to display the selected combobox item.
+         // Logic to update this text would be handled by a program listening
+         // for a "changed" signal from the combobox, or in C code.
          part { name: "info"; type: TEXT;
             clip_to: "clip";
             description { state: "default" 0.;

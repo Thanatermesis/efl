@@ -4,12 +4,12 @@ images {
 /*  image: "e_logo.png"              COMP;*/
 
   image: "h_slider.png"            COMP;
-/************/   
+/************/
   image: "video_frame_left.png"    COMP;
   image: "video_frame_right.png"   COMP;
   image: "video_frame_top.png"     COMP;
   image: "video_frame_bottom.png"  COMP;
-   
+
   image: "knob.png"                COMP;
 
   image: "fr1.png"                 COMP;
@@ -61,7 +61,7 @@ collections {
                }
             }
          }
-/*       
+/*
          part { name: "logo"; mouse_events: 0;
             description { state: "default" 0.0;
                min:   120 140;
@@ -101,11 +101,11 @@ collections {
       parts {
          // need swallow parts:
          // "video_swallow"
-         // 
+         //
          // need txt parts:
          // "video_speed_txt"
          // "video_progress_txt"
-         // 
+         //
          // need dragables:
          // "video_progress" horizontal
          // "video_speed" vertical
@@ -644,12 +644,12 @@ collections {
       parts {
          // need swallow parts:
          // "video_swallow"
-         // 
+         //
          // need txt parts:
          // "video_alpha_txt"
          // "video_volume_txt"
          // "video_progress_txt"
-         // 
+         //
          // need dragables:
          // "video_progress" horizontal
          // "video_alpha" vertical
@@ -1021,7 +1021,7 @@ collections {
          // "drag" "video_progress"
          // "drag" "video_alpha"
          // "drag" "video_volume"
-         // 
+         //
          // get signals:
          // "video_state" "play"
          // "video_state" "pause"
@@ -1068,12 +1068,12 @@ collections {
       parts {
          // need swallow parts:
          // "video_swallow"
-         // 
+         //
          // need txt parts:
          // "video_alpha_txt"
          // "video_volume_txt"
          // "video_progress_txt"
-         // 
+         //
          // need dragables:
          // "video_progress" horizontal
          // "video_alpha" vertical
@@ -1484,7 +1484,7 @@ collections {
          // "video_control" "stop"
          // "drag" "video_progress"
          // "drag" "video_alpha"
-         // 
+         //
          // get signals:
          // "video_state" "play"
          // "video_state" "pause"
@@ -1526,5 +1526,5 @@ collections {
          }
       }
    }
-#endif   
+#endif
 }

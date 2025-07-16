@@ -1,16 +1,26 @@
-// Define this to enable blur background to winlist
+// Define this to enable blur background to winlist.
+// This is commented out by default as it can be resource-intensive on older hardware.
 //#define BLUR_WINLIST 1
 
-// Some values used if blur is enabled
+// Defines the amount of blur to be applied if BLUR_WINLIST is enabled.
+// This value is used in the filter.code of the bg_blur snapshot part.
 #define BLUR_WINLIST_AMOUNT "48"
 
+// This group defines the main layout of the winlist widget. It serves as the
+// container for the title, icon, and the list of windows.
 group { name: "e/widgets/winlist/main";
    parts {
+      // The base part is a simple rectangle that acts as the background.
+      // 'mouse_events: 0' ensures it doesn't interact with the mouse,
+      // allowing events to pass through to elements behind it.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/normal/winlist/base";
          }
       }
+      // This part displays the title of the winlist.
+      // 'offscale' prevents this part from being scaled by global edje scaling,
+      // ensuring the text size remains consistent.
       part { name: "e.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -30,6 +40,8 @@ group { name: "e/widgets/winlist/main";
             offscale;
          }
       }
+      // A SWALLOW part is a placeholder where external Evas objects can be
+      // "swallowed" or embedded. This one is for an icon, positioned below the title.
       part { name: "e.swallow.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -44,6 +56,9 @@ group { name: "e/widgets/winlist/main";
             offscale;
          }
       }
+      // A SPACER part is invisible but occupies space, useful for layout.
+      // This spacer defines a square region to the right of 'e.swallow.icon'
+      // that will be used as a reference for the window preview.
       part { name: "win"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -57,11 +72,15 @@ group { name: "e/widgets/winlist/main";
             offscale;
          }
       }
+      // This swallows the window preview, positioned by referencing the 'win' spacer.
+      // Using a spacer for positioning allows for more complex and maintainable layouts.
       part { name: "e.swallow.win"; type: SWALLOW;
          description { state: "default" 0.0;
             rel.to: "win";
          }
       }
+      // This is a text label, typically for showing additional information.
+      // It is positioned to the right of the 'win' spacer.
       part { name: "e.text.label"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -81,6 +100,8 @@ group { name: "e/widgets/winlist/main";
             offscale;
          }
       }
+      // This RECT part acts as a clipping mask. Any part that has 'clip_to'
+      // set to "list_clip" will only be visible within the bounds of this rectangle.
       part { name: "list_clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -91,6 +112,8 @@ group { name: "e/widgets/winlist/main";
             offscale;
          }
       }
+      // This swallows the actual list of windows. It's clipped by 'list_clip',
+      // so scrolling the list will appear contained within the defined area.
       part { name: "e.swallow.list"; type: SWALLOW;
          clip_to: "list_clip";
          description { state: "default" 0.0;
@@ -101,8 +124,13 @@ group { name: "e/widgets/winlist/main";
    }
 }
 
+// This group defines the appearance and behavior of a single item in the winlist.
+// It handles different states like 'selected', 'iconified', etc.
 group { name: "e/widgets/winlist/item";
    parts {
+      // This is a highlight rectangle, visible only when the item is selected.
+      // It uses two descriptions for 'default' (visible: 0) and 'selected' (visible: 1)
+      // states to toggle its visibility.
       part { name: "sel_base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/selected/winlist/item/base";
@@ -113,6 +141,9 @@ group { name: "e/widgets/winlist/item";
             visible: 1;
          }
       }
+      // These two RECT parts are used as mutually exclusive clipping masks to create
+      // different layouts for normal and iconified states. 'clip_normal' is visible
+      // by default, while 'clip_iconified' becomes visible in the 'iconified' state.
       part { name: "clip_normal"; type: RECT;
          description { state: "default" 0.0;
             visible: 1;
@@ -131,6 +162,8 @@ group { name: "e/widgets/winlist/item";
             visible: 1;
          }
       }
+      // This is the main text label for the item, clipped by 'clip_normal', so it's
+      // only visible in the normal state.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          clip_to: "clip_normal";
          scale: 1;
@@ -153,6 +186,10 @@ group { name: "e/widgets/winlist/item";
             color_class: "/fg/selected/winlist/item/text/normal";
          }
       }
+      // This is a second text part, clipped by 'clip_iconified'. It cleverly uses
+      // 'text_source: "e.text.label"' to mirror the text of the main label without
+      // needing the application to set the text on both. This is useful for
+      // showing the same text but with a different style or position in another state.
       part { name: "label2"; type: TEXT; mouse_events: 0;
          clip_to: "clip_iconified";
          scale: 1;
@@ -171,6 +208,9 @@ group { name: "e/widgets/winlist/item";
             color_class: "/fg/selected/winlist/item/text/iconified";
          }
       }
+      // These SPACER parts define regions for the icon and window preview, respectively.
+      // Using spacers helps to organize the layout and makes it easier to position
+      // other elements relative to these areas.
       part { name: "icon"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -196,6 +236,8 @@ group { name: "e/widgets/winlist/item";
             offscale;
          }
       }
+      // This part swallows the window's icon. In the 'iconified' state, it is
+      // scaled down to 50% of its size (from 0.25 to 0.75 in both axes).
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -206,6 +248,7 @@ group { name: "e/widgets/winlist/item";
             rel2.relative: 0.75 0.75;
         }
       }
+      // This part swallows the window preview thumbnail, also scaled down when iconified.
       part { name: "e.swallow.win"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "win";
@@ -216,6 +259,9 @@ group { name: "e/widgets/winlist/item";
             rel2.relative: 0.75 0.75;
         }
       }
+      // This is a transparent rectangle covering the entire item, used to capture
+      // mouse events. It is invisible in the 'iconified' state.
+      // The color is set to transparent black (#00000000).
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -226,24 +272,31 @@ group { name: "e/widgets/winlist/item";
          }
       }
    }
+   // Programs define how the widget reacts to signals.
    programs {
+      // When the "e,state,selected" signal is received from the application ("e"),
+      // the 'selected' state is applied to the specified target parts.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "label2";
       }
+      // Reverts to the 'default' state when unselected.
       program { signal: "e,state,unselected"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "label2";
       }
+      // When the window is iconified, the 'iconified' state is set on the clippers.
+      // This effectively changes the layout.
       program { signal: "e,state,iconified"; source: "e";
          action: STATE_SET "iconified" 0.0;
          target: "clip_normal";
          target: "clip_iconified";
       }
+      // Note that invisible windows are handled the same way as iconified ones.
       program { signal: "e,state,invisible"; source: "e";
          action: STATE_SET "iconified" 0.0;
          target: "clip_normal";
@@ -257,6 +310,10 @@ group { name: "e/widgets/winlist/item";
 
 ////////////////////////////////////////////////////////////////////////////
 
+// This group defines the background of the large-style winlist.
+// It includes optional blur and shadow effects.
+// The 'alias' allows this group to be referenced as "e/widgets/winlist/bg",
+// which provides a convenient fallback mechanism for themes.
 group { name: "e/widgets/winlist/large/bg";
    alias: "e/widgets/winlist/bg";
 // disable blur and the circular shadow - they are pricey - esp blur by far
@@ -265,6 +322,10 @@ group { name: "e/widgets/winlist/large/bg";
 // turnns on costly expensive things like this
 //   images.image: "screen_circular_shadow.png" COMP;
    parts {
+      // This part controls the overall visibility of the background. It is
+      // transparent white (#FFFFFFFF) and fully opaque in the 'visible' state,
+      // and fully transparent in the 'default' state, effectively clipping
+      // any parts that are children of it.
       part { name: "bg_clip"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -277,6 +338,10 @@ group { name: "e/widgets/winlist/large/bg";
          }
       }
 #ifdef BLUR_WINLIST
+      // A SNAPSHOT part captures the content of the canvas behind it and can apply
+      // filters. Here, a blur filter is used. 'filter.code' contains a small
+      // script that animates the blur radius based on the transition state's position ('state.pos').
+      // 'state.pos' goes from 0.0 to 1.0 during a transition.
       snapshot { "bg_blur";
          clip_to: "bg_clip";
          description { state: "default" 0.0;
@@ -290,6 +355,7 @@ group { name: "e/widgets/winlist/large/bg";
          }
       }
 #endif
+      // A simple rectangle to darken the background, for better contrast.
       part { name: "bg_darken"; type: RECT;
          clip_to: "bg_clip";
          description { state: "default" 0.0;
@@ -297,6 +363,11 @@ group { name: "e/widgets/winlist/large/bg";
          }
       }
 #ifdef BLUR_WINLIST
+      // This part creates a shadow effect. In the 'default' state, it's scaled
+      // to be much larger than its container (from -1.0 to 2.0 on both axes), making it
+      // effectively zoomed in and partially hidden. When transitioning to the 'visible'
+      // state, it scales down to fit the container (0.0 to 1.0), creating a
+      // zoom-in and fade-in effect for the shadow.
       part { name: "shadow"; mouse_events: 0;
          clip_to: "bg_clip";
          description { state: "default" 0.0;
@@ -316,6 +387,9 @@ group { name: "e/widgets/winlist/large/bg";
 #endif
    }
    programs {
+      // This program triggers the fade-in animation when "e,state,visible,on" is received.
+      // It uses a DECELERATE transition for a smooth easing-out effect.
+      // 'after: "show2"' chains this program with 'show2'.
       program { signal: "e,state,visible,on"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1 CURRENT;
@@ -326,9 +400,13 @@ group { name: "e/widgets/winlist/large/bg";
 #endif
          after: "show2";
       }
+      // After the fade-in animation, this program emits a "e,action,show,done" signal
+      // back to the application, allowing for synchronization.
       program { name: "show2";
          action: SIGNAL_EMIT "e,action,show,done" "e";
       }
+      // This program handles the fade-out animation with an ACCELERATE transition
+      // and notifies the application when done, similar to the show animation.
       program { signal: "e,state,visible,off"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: ACCELERATE 0.2 USE_DURATION_FACTOR 1 CURRENT;
@@ -345,9 +423,15 @@ group { name: "e/widgets/winlist/large/bg";
    }
 }
 
+// This group defines the foreground of the large-style winlist. By default, it's
+// minimal and mainly serves as a placeholder for themes to extend.
+// The programs simply relay show/hide done signals, ensuring proper sequencing
+// even if a theme doesn't add content here.
 group { name: "e/widgets/winlist/large/fg";
    alias: "e/widgets/winlist/fg";
    parts {
+      // This part is currently defined but not used (always invisible).
+      // It can be overridden by themes to add foreground effects.
       part { name: "fg_darken"; type: RECT;
          description { state: "default" 0.0;
             visible: 0;
@@ -364,9 +448,14 @@ group { name: "e/widgets/winlist/large/fg";
    }
 }
 
+// This group is the main container for the large winlist content.
 group { name: "e/widgets/winlist/large";
+   // 'data.item' provides arbitrary key-value metadata that can be queried from
+   // the C application. "noshadow" "1" likely signals to the window manager
+   // that this widget handles its own shadow and shouldn't have one drawn for it.
    data.item: "noshadow" "1";
    parts {
+      // A clipping rectangle for the list of windows.
       part { name: "list_clip"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -384,8 +473,11 @@ group { name: "e/widgets/winlist/large";
    }
 }
 
+// Defines the layout for a single item in the large-style winlist.
+// This layout is more complex, typically showing larger previews and icons.
 group { name: "e/widgets/winlist/item_large";
    parts {
+      // A highlight rectangle for the selected state.
       part { name: "sel_base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             color_class: "/bg/selected/winlist/large/item";
@@ -396,6 +488,9 @@ group { name: "e/widgets/winlist/item_large";
             visible: 1;
          }
       }
+      // This spacer defines the area for the item's icon. It is cleverly positioned
+      // relative to the bottom-right of the window preview ('e.swallow.win'),
+      // which allows the text label to be aligned with it.
       part { name: "icon"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -408,6 +503,7 @@ group { name: "e/widgets/winlist/item_large";
             offscale;
          }
       }
+      // This part swallows the large window preview thumbnail.
       part { name: "e.swallow.win"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.offset: 16 16;
@@ -419,6 +515,8 @@ group { name: "e/widgets/winlist/item_large";
             rel2.relative: 0.75 0.75;
         }
       }
+      // A backing rectangle placed behind the text label and icon, providing
+      // a background that changes color upon selection.
       part { name: "backing"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -433,6 +531,7 @@ group { name: "e/widgets/winlist/item_large";
             color_class: "/dim/selected/winlist/item/text";
          }
       }
+      // The text label for the item, positioned above the icon.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -456,6 +555,7 @@ group { name: "e/widgets/winlist/item_large";
             color_class: "/fg/selected/winlist/item/text/normal";
          }
       }
+      // Swallows the item's icon, positioned using the 'icon' spacer.
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -466,6 +566,7 @@ group { name: "e/widgets/winlist/item_large";
             rel2.relative: 0.75 0.75;
         }
       }
+      // A transparent event-catching rectangle.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -476,19 +577,24 @@ group { name: "e/widgets/winlist/item_large";
          }
       }
    }
+   // Programs to handle state changes for the large item view.
    programs {
+      // Handles the 'selected' state.
       program { signal: "e,state,selected"; source: "e";
          action: STATE_SET "selected" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "backing";
       }
+      // Handles the 'unselected' state.
       program { signal: "e,state,unselected"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "sel_base";
          target: "e.text.label";
          target: "backing";
       }
+      // For iconified or invisible states, only the icon is changed.
+      // Unlike the normal item, there isn't a completely separate layout.
       program { signal: "e,state,iconified"; source: "e";
          action: STATE_SET "iconified" 0.0;
          target: "e.swallow.icon";

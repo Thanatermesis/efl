@@ -1,21 +1,54 @@
+// This group defines the appearance of a textpath object, which is used
+// to render text along a given path.
 group { name: "efl/textpath";
+   // Custom data item, here defining a version for this EDC theme.
+   // This can be used by the application to check for compatibility.
    data.item: "version" "123";
+   // The 'styles' block is used to define reusable text styles that can be applied
+   // to TEXTBLOCK parts. This helps in maintaining a consistent look and feel.
    styles {
+      // Defines a style named 'textpath_style2'.
       style { name: "textpath_style2";
+         // The 'base' property sets the default text style attributes.
+         // 'font="FN"' and 'font_size=10' define the font and its size. FN is a macro for font name.
+         // 'wrap=none' prevents text from wrapping to the next line.
+         // 'align=left' sets the horizontal alignment to the left.
+         // 'color=cc:/fg/normal/text' uses a color class for the text color, ensuring
+         // it matches the theme's foreground color for normal text.
          base: "font="FN" font_size=10 text_class=tb_plain wrap=none align=left color=cc:/fg/normal/text";
+         // The 'tag' property allows defining custom markup tags.
+         // Here, '<br>' is mapped to a newline character, for line breaks.
          tag: "br" "\n";
+         // '<b>' tag is defined to switch to a bold font (FNBD macro) and apply
+         // a 'tb_light' text class, modifying the base style.
          tag: "b" "+ font="FNBD" text_class=tb_light";
+         // This macro enables a predefined set of standard text formatting tags
+         // like <i> for italics, <p> for paragraphs, etc.
          ENABLED_TEXTBLOCK_TAGS
       }
    }
+   // The 'parts' block contains all the graphical elements of the group.
    parts {
+      // Defines a TEXTBLOCK part named 'efl.text', which is a standard name
+      // for the main text element in EFL widgets.
       part { name: "efl.text"; type: TEXTBLOCK;
+         // 'scale: 1' enables scaling for this part, allowing it to resize
+         // proportionally with the parent object.
          scale: 1;
+         // A 'description' block defines the properties of a part for a given state.
+         // "default" is the default state, and 0.0 is the state value.
          description { state: "default" 0.0;
+            // Aligns the part itself to the top-left corner (0.0, 0.0) of the group area.
             align: 0.0 0.0;
+            // The 'text' block specifies properties for the text content within the TEXTBLOCK part.
             text {
+               // Applies the previously defined style to the text.
                style: "textpath_style2";
+               // 'min: 0 1' sets the minimum size hint. The width can be 0, but the height
+               // must be at least 1, preventing the text object from disappearing vertically.
                min: 0 1;
+               // Aligns the text itself within the part's boundaries.
+               // 0.0 for left horizontal alignment and 0.5 for center vertical alignment.
                align: 0.0 0.5;
             }
          }

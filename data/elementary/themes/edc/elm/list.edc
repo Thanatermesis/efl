@@ -1,3 +1,6 @@
+// ODD Macro: Creates a style for odd-numbered list items, giving them an
+// alternate background color for a "zebra stripe" effect. It inherits from a
+// base style and overrides the background color.
 #define ODD(_NAME, _SRC) \
    group { name: _NAME; \
       inherit: _SRC; \
@@ -9,6 +12,9 @@
          } \
       } \
    }
+// COMPRESS Macro: Creates a "compressed" list item style where the text does
+// not show an ellipsis (...) if it's too long, effectively clipping it.
+// This is useful for compact list views where showing partial text is acceptable.
 #define COMPRESS(_NAME, _SRC) \
    group { name: _NAME; \
       inherit: _SRC; \
@@ -29,6 +35,9 @@
          } \
       } \
    }
+// COMPRESS_ODD Macro: Combines the "ODD" and "COMPRESS" styles. This is for
+// odd-numbered items in a compressed list, featuring both the alternate
+// background color and clipped text.
 #define COMPRESS_ODD(_NAME, _SRC) \
    group { name: _NAME; \
       inherit: _SRC; \
@@ -55,10 +64,16 @@
       } \
    }
 
+// Group "elm/list/item/default": Defines the default appearance and behavior of a
+// standard vertical list item. It includes parts for event handling, background,
+// selection highlight, text, and placeholders for an icon and an end widget.
 group { name: "elm/list/item/default";
 //   data.item: "selectraise" "on";
 //   data.item: "focusraise" "on";
    parts {
+      // "event" part: A transparent rectangle covering the entire item, used to
+      // capture mouse events. It's invisible (color is transparent black, #00000000)
+      // but is the primary target for clicks.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -68,24 +83,33 @@ group { name: "elm/list/item/default";
             visible: 0;
          }
       }
+      // Program: When the list item is disabled, this program hides the "event"
+      // part, effectively disabling input for this item.
       program {
          signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "event";
       }
+      // Program: Re-enables the "event" part when the list item is enabled.
       program {
          signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "event";
       }
+      // "base" part: The main background of the list item. It's a simple
+      // rectangle that defines the item's background color.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/list/item";
          }
+         // "odd" state: Used for "zebra striping" in lists. When an item is
+         // designated as "odd", its background color changes.
          description { state: "odd" 0.0;
             color_class: "/bg-alt/normal/list/item";
          }
       }
+      // Programs: These switch the "base" part's state between "default" and "odd"
+      // based on signals from the core widget, allowing for dynamic row styling.
       program {
          signal: "elm,state,odd"; source: "elm";
          action: STATE_SET "odd" 0.0;
@@ -96,17 +120,24 @@ group { name: "elm/list/item/default";
          action: STATE_SET "default" 0.0;
          target: "base";
       }
+      // "sel" part: A rectangle used as a selection indicator. It is overlaid on
+      // top of the "base" part and is invisible by default. `mouse_events: 0`
+      // ensures that it doesn't block events from reaching the "event" part.
       part { name: "sel"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "base";
             color_class: "/bg/selected/list/item";
             visible: 0;
          }
+         // "selected" state: Makes the selection rectangle visible when the item
+         // is selected, providing visual feedback to the user.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
       }
+      // Programs: Toggle the visibility of the "sel" part by changing its state
+      // to "selected" or "default" when the item's selection status changes.
       program {
          signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "selected" 0.0;
@@ -119,11 +150,18 @@ group { name: "elm/list/item/default";
       }
 
       //##//
+      // "elm.text" part: Displays the main text of the list item. It is set to
+      // ignore mouse events to allow clicks to pass through to the "event" part.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // offscale: Prevents the text from being scaled with the rest of the
+            // object, avoiding blurriness on scaled interfaces.
             offscale;
             min: 0 15;
+            // Positioned between the icon and end content areas, with padding.
+            // rel1.to_x: "elm.swallow.icon" - left edge is relative to icon's right edge.
+            // rel2.to_x: "elm.swallow.end" - right edge is relative to end's left edge.
             rel1.offset: 4 4;
             rel1.relative: 1.0 0.0;
             rel1.to_x: "elm.swallow.icon";
@@ -133,11 +171,16 @@ group { name: "elm/list/item/default";
             color_class: "/fg/normal/list/item";
             text { font: FN; size: 10;
                min: 1 1;
+               // ellipsis: -1; means if the text overflows, an ellipsis (...) will be
+               // displayed at the end of the text.
                ellipsis: -1;
+               // align: 0.0 0.5; Horizontally left-aligned, vertically center-aligned.
                align: 0.0 0.5;
                text_class: "list_item";
             }
          }
+         // The following states change the text color based on the item's
+         // selection or disabled status.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/list/item";
@@ -147,6 +190,9 @@ group { name: "elm/list/item/default";
             color_class: "/fg/disabled/list/item";
          }
       }
+      // Programs: These listen for state changes (selected, unselected, disabled,
+      // enabled) from the widget and update the "elm.text" part's state accordingly,
+      // which changes the text color.
       program {
          signal: "elm,state,selected"; source: "elm";
          action: STATE_SET "selected" 0.0;
@@ -168,11 +214,14 @@ group { name: "elm/list/item/default";
          target: "elm.text";
       }
       //##//
+      // "elm.swallow.icon" part: A container (SWALLOW part) for an optional icon
+      // at the beginning of the list item. External Evas objects can be placed here.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          scale;
          description { state: "default" 0.0;
             offscale;
             min: ICMIN ICMIN;
+            // fixed: 1 0; The icon has a fixed width but flexible height.
             fixed: 1 0;
             align: 0.0 0.5;
             rel1.offset: 4 4;
@@ -180,12 +229,16 @@ group { name: "elm/list/item/default";
             rel2.offset: 4 -5;
          }
       }
+      // "elm.swallow.end" part: Another container for content at the end of the
+      // list item, like a checkbox or a badge.
       part { name: "elm.swallow.end"; type: SWALLOW;
          scale;
          description { state: "default" 0.0;
             offscale;
             min: ICMIN ICMIN;
+            // fixed: 1 0; This part has a fixed width and flexible height.
             fixed: 1 0;
+            // align: 1.0 0.5; Aligned to the right edge and vertical center.
             align: 1.0 0.5;
             rel1.offset: -5 4;
             rel1.relative: 1.0 0.0;
@@ -204,19 +257,10 @@ COMPRESS_ODD("elm/list/item_compress_odd/default", "elm/list/item/default")
 // elm/list/h_item_compress/default
 // elm/list/h_item_compress_odd/default
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Group "elm/list/h_item/default": Defines the style for a horizontal list item.
+// Its structure is very similar to the vertical item ("elm/list/item/default"),
+// but with layout adjustments for a horizontal orientation. Most parts and
+// programs function identically.
 group { name: "elm/list/h_item/default";
 //   data.item: "selectraise" "on";
 //   data.item: "focusraise" "on";
@@ -281,10 +325,16 @@ group { name: "elm/list/h_item/default";
       }
 
       //##//
+      // "elm.text" part for horizontal item: The layout is adjusted for a
+      // vertical flow of content.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             offscale;
+            // The text is positioned vertically between the icon (top) and end
+            // (bottom) content areas.
+            // rel1.to_y: "elm.swallow.icon" - top edge is relative to icon's bottom edge.
+            // rel2.to_y: "elm.swallow.end" - bottom edge is relative to end's top edge.
             rel1.offset: 4 4;
             rel1.relative: 0.0 1.0;
             rel1.to_y: "elm.swallow.icon";
@@ -295,6 +345,7 @@ group { name: "elm/list/h_item/default";
             text { font: FN; size: 10;
                min: 1 1;
                ellipsis: -1;
+               // align: 0.5 0.5; Center-aligned horizontally and vertically.
                align: 0.5 0.5;
                text_class: "list_item";
             }
@@ -329,24 +380,30 @@ group { name: "elm/list/h_item/default";
          target: "elm.text";
       }
       //##//
+      // "elm.swallow.icon" part for horizontal item: Positioned at the top of the item.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          scale;
          description { state: "default" 0.0;
             offscale;
+            // fixed: 0 1; The icon has a flexible width but a fixed height.
             fixed: 0 1;
             min: ICMIN ICMIN;
+            // align: 0.5 0.0; Aligned to the horizontal center and top edge.
             align: 0.5 0.0;
             rel1.offset: 4 4;
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 4;
          }
       }
+      // "elm.swallow.end" part for horizontal item: Positioned at the bottom of the item.
       part { name: "elm.swallow.end"; type: SWALLOW;
          scale;
          description { state: "default" 0.0;
             offscale;
+            // fixed: 0 1; This part has a flexible width and a fixed height.
             fixed: 0 1;
             min: ICMIN ICMIN;
+            // align: 0.5 1.0; Aligned to the horizontal center and bottom edge.
             align: 0.5 1.0;
             rel1.offset: 4 -5;
             rel1.relative: 0.0 1.0;

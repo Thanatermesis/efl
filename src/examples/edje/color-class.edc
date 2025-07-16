@@ -1,18 +1,26 @@
+// This block defines a set of color classes that can be reused across different
+// UI parts. Using color classes centralizes color definitions, making it easy
+// to maintain a consistent color scheme and apply themes.
 color_classes {
     color_class {
        name: "red_class";
+       // A class for the color red (RGBA: 255 0 0 255, HEX: #FF0000FF).
+       // 'color', 'color2', and 'color3' are defined to style different
+       // properties of a part (e.g., main color, shadow, outline).
        color: 255 0 0 255;       /* red */
        color2: 255 0 0 255;      /* red */
        color3: 255 0 0 255;      /* red */
     }
     color_class {
        name: "green_class";
+       // A class for the color green (RGBA: 0 255 0 255, HEX: #00FF00FF).
        color: 0 255 0 255;       /* green */
        color2: 0 255 0 255;      /* green */
        color3: 0 255 0 255;      /* green */
     }
     color_class {
        name: "blue_class";
+       // A class for the color blue (RGBA: 0 0 255 255, HEX: #0000FFFF).
        color: 0 0 255 255;       /* blue */
        color2: 0 0 255 255;      /* blue */
        color3: 0 0 255 255;      /* blue */
@@ -20,57 +28,79 @@ color_classes {
 }
 
 collections {
+   // A group defines a single UI component. This group is named 'example_color_class'
+   // and demonstrates how color classes can be used to style different parts.
    group {
       name: "example_color_class";
+      // Sets the maximum and minimum size for this UI component.
       max: 500 500;
       min: 50 50;
 
+      // The 'parts' block contains all the visual elements of this group.
       parts {
+         // This part is a rectangle that occupies the top-left quadrant of the group.
          part {
             name: "part_one";
             type: RECT;
             scale: 1;
+            // A description defines the state of a part, in this case, the "default" state.
             description {
                state: "default" 0.0;
+               // This is a fallback color (white) used only if the color_class is not found
+               // or does not specify a 'color' property.
                color: 255 255 255 255;
+               // Applies 'blue_class'. The rectangle's color will be set to the 'color'
+               // value from "blue_class", overriding the local 'color' property above.
                color_class: "blue_class";
                rel1.relative: 0.0 0.0;
                rel2.relative: 0.5 0.5;
             }
          }
 
+         // This rectangle is placed in the top-right quadrant.
          part {
             name: "part_two";
             type: RECT;
             description {
                state: "default" 0.0;
                color: 255 255 255 255;
+               // It uses 'green_class' for its color.
                color_class: "green_class";
                rel1.relative: 0.5 0.0;
                rel2.relative: 1.0 0.5;
             }
          }
+         // This rectangle occupies the entire bottom half of the group.
          part {
             name: "part_three";
             type: RECT;
             description {
                state: "default" 0.0;
                color: 255 255 255 255;
+               // It uses 'red_class' for its color.
                color_class: "red_class";
                rel1.relative: 0.0 0.5;
                rel2.relative: 1.0 1.0;
             }
          }
+         // This TEXT part is positioned over "part_three". It demonstrates how a single
+         // color_class can style multiple color properties of a part.
          part {
             name: "part_four";
             type: TEXT;
+            // The OUTLINE_SHADOW effect uses up to three colors.
             effect: OUTLINE_SHADOW;
             description {
                state: "default" 0.0;
                min: 50 50;
+               // These local colors (all white) are fallbacks. 'color' is for the text itself,
+               // 'color2' is for the outline, and 'color3' is for the shadow.
                color: 255 255 255 255;
                color2: 255 255 255 255;
                color3: 255 255 255 255;
+               // 'blue_class' is applied. 'color', 'color2', and 'color3' from the class
+               // will be used for the text, outline, and shadow respectively, overriding
+               // the local definitions above.
                color_class: "blue_class";
                rel1.relative: 0.0 0.5;
                rel2.relative: 1.0 1.0;

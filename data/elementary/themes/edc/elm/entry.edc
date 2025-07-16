@@ -1,70 +1,97 @@
+// This group defines the appearance of a scrollable entry.
+// It builds upon the base scroller style and adds entry-specific features like
+// validation feedback and focus highlighting.
 group { name: "elm/scroller/entry/default";
    inherit: "elm/scroller/base/default";
    parts {
+      // The 'bg' part is the main background of the entry.
+      // It uses a color class, allowing theming to change its color.
       part { name: "bg";
          description { state: "default" 0.0;
             color_class: "/bg/normal/entry";
          }
       }
+      // 'validation_glow' is a rectangle used to visually indicate the validation status of the entry's content.
+      // It's normally transparent and placed after 'elm.swallow.background'.
+      // It changes color based on 'pass' or 'fail' states. 'mouse_events: 0' ensures it doesn't block interactions.
       part { name: "validation_glow"; type: RECT; mouse_events: 0;
          insert_after: "elm.swallow.background";
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, Transparent
          }
          description { state: "pass" 0.0;
+            // Uses a color class for a 'pass' visual state.
             color_class: "/bg/selected/entry/validate-pass";
          }
          description { state: "fail" 0.0;
+            // Uses a color class for a 'fail' visual state.
             color_class: "/bg/selected/entry/validate-fail";
          }
       }
+      // This program is triggered by the 'validation,default,fail' signal from the 'elm' source.
+      // It sets the 'validation_glow' part to the 'fail' state.
       program { name: "validation_fail";
          signal: "validation,default,fail";
          source: "elm";
          action: STATE_SET "fail" 0.0;
          target: "validation_glow";
       }
+      // Triggered by 'validation,default,pass' signal, it sets 'validation_glow' to the 'pass' state.
       program { name: "validation_pass";
          signal: "validation,default,pass";
          source: "elm";
          action: STATE_SET "pass" 0.0;
          target: "validation_glow";
       }
+      // This program resets the validation glow to its default (transparent) state.
       program { name: "validation_off";
          signal: "validation,default";
          source: "elm";
          action: STATE_SET "default" 0.0;
          target: "validation_glow";
       }
+      // 'glow' is another rectangle, used for providing a focus highlight effect.
+      // It is inserted before the content, so it appears behind it.
+      // 'scale: 1' enables smooth scaling animations.
       part { name: "glow"; type: RECT; mouse_events: 0;
          insert_before: "elm.swallow.content";
          scale: 1;
+         // Default state: invisible and positioned relative to the bottom of the 'bg' part.
+         // 'offscale' ensures it's scaled down to zero, preparing for a scaling animation.
          description { state: "default" 0.0;
             rel.to: "bg";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 0;
             color_class: "/bg/selected/entry/focus";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, Transparent white
             visible: 0;
             offscale;
          }
+         // Focused state: becomes visible, fully opaque white, and slightly offset for a visual effect.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 0 -3;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, Opaque white
             visible: 1;
          }
       }
+      // This program shows the focus highlight.
+      // On 'elm,action,focus_highlight,show' signal, it transitions 'glow' to the 'focused' state.
+      // The transition is a 0.3-second deceleration curve, creating a smooth animation.
       program { signal: "elm,action,focus_highlight,show"; source: "elm";
          action: STATE_SET "focused" 0.0;
          transition: DECELERATE 0.3;
          target: "glow";
       }
+      // This program hides the focus highlight with the same smooth transition.
       program { signal: "elm,action,focus_highlight,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.3;
          target: "glow";
       }
+      // This is the main content area of the entry, where the actual text widget will be placed.
+      // It's a SWALLOW part, meaning it can host external Evas objects.
+      // Its position is relative to the icon and end parts, so it resizes to fill the available space between them.
       part { name: "elm.swallow.content";
          scale: 1;
          clip_to: "clipper";
@@ -78,6 +105,8 @@ group { name: "elm/scroller/entry/default";
             offscale;
          }
       }
+      // 'elm.swallow.icon' is a container for an optional icon at the start of the entry.
+      // It is invisible by default.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
@@ -91,6 +120,8 @@ group { name: "elm/scroller/entry/default";
             align: 0.0 0.5;
             offscale;
          }
+         // When in the 'visible' state, it appears and is given a minimum size.
+         // 'aspect_preference' and 'aspect' help maintain the icon's proportions.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
             visible: 1;
@@ -101,6 +132,7 @@ group { name: "elm/scroller/entry/default";
             aspect: 1.0 1.0;
          }
       }
+      // Programs to control the visibility of the icon.
       program { signal: "elm,action,show,icon"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.swallow.icon";
@@ -109,6 +141,8 @@ group { name: "elm/scroller/entry/default";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.icon";
       }
+      // 'elm.swallow.end' is a container for an optional widget at the end of the entry (e.g., a clear button).
+      // Similar to the icon part, it's invisible by default.
       part { name: "elm.swallow.end"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
@@ -132,6 +166,7 @@ group { name: "elm/scroller/entry/default";
             aspect: 1.0 1.0;
          }
       }
+      // Programs to control the visibility of the end widget.
       program { signal: "elm,action,show,end"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.swallow.end";
@@ -143,16 +178,23 @@ group { name: "elm/scroller/entry/default";
    }
 }
 
+// This group defines a single-line entry, often used in widgets like combo boxes.
+// It includes a circular vertical shadow image and enables focus highlighting by default.
 group { name: "elm/scroller/entry_single/default";
    alias: "elm/scroller/entry_single/combobox_vertical/default";
    images.image: "shadow_circle_vert.png" COMP;
 
+   // This data item enables the focus highlight feature for this widget.
    data.item: "focus_highlight" "on";
    parts {
+      // 'clipper' is a rectangle used to clip the content of the entry, ensuring nothing is drawn outside its bounds.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // These parts define the components for a vertical scrollbar.
+      // Even though this is a single-line entry, these parts might be included for structural consistency
+      // with multi-line entries, but are set to 'visible: 0' so they don't appear.
       part { name: "sb_vbar_base"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -173,6 +215,7 @@ group { name: "elm/scroller/entry_single/default";
             visible: 0;
          }
       }
+      // Similarly, these parts are for a horizontal scrollbar, also hidden.
       part { name: "sb_hbar_base"; type: RECT;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -194,6 +237,9 @@ group { name: "elm/scroller/entry_single/default";
          }
 
       }
+      // The following parts ('bg', 'elm.swallow.background', 'validation_glow', 'glow', 'elm.swallow.content',
+      // 'elm.swallow.icon', and 'elm.swallow.end') serve similar purposes as in the 'elm/scroller/entry/default'
+      // group, defining the background, content areas, and visual feedback elements.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.background";
@@ -207,7 +253,7 @@ group { name: "elm/scroller/entry_single/default";
       }
       part { name: "validation_glow"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, Transparent
          }
          description { state: "pass" 0.0;
             color_class: "/bg/selected/entry/validate-pass";
@@ -223,17 +269,18 @@ group { name: "elm/scroller/entry_single/default";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 0;
             color_class: "/bg/selected/entry/focus";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, Transparent white
             visible: 0;
             offscale;
          }
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             rel1.offset: 0 -3;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, Opaque white
             visible: 1;
          }
       }
+      // The focus highlight animation is slightly faster here (0.2s vs 0.3s).
       program { signal: "elm,action,focus_highlight,show"; source: "elm";
          action: STATE_SET "focused" 0.0;
          transition: DECELERATE 0.2;
@@ -320,6 +367,8 @@ group { name: "elm/scroller/entry_single/default";
          target: "elm.swallow.end";
       }
 
+      // 'elm.swallow.overlay' is a container that spans the entire area between the icon and end parts.
+      // It can be used to display an overlay on top of the entry content, for example, a custom guide text or icon.
       part { name: "elm.swallow.overlay"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -328,11 +377,13 @@ group { name: "elm/scroller/entry_single/default";
          }
       }
 
+      // 'sh_left' part creates a shadow effect on the left side of the entry.
+      // It uses the 'shadow_circle_vert.png' image and is invisible by default.
       part { name: "sh_left"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
          description { state: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, Transparent white
             color_class: "/shadow/normal/entry";
             rel.to: "bg";
             rel1.offset: -1 0;
@@ -342,14 +393,16 @@ group { name: "elm/scroller/entry_single/default";
             visible: 0;
             offscale;
          }
+         // When visible, the shadow becomes opaque and is offset to appear correctly.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, Opaque white
             rel1.offset: -16 0;
             rel2.offset: 15 -1;
             visible: 1;
          }
       }
+      // Programs to animate the appearance and disappearance of the left shadow.
       program { signal: "elm,action,show,left"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
@@ -360,11 +413,12 @@ group { name: "elm/scroller/entry_single/default";
          transition: DECELERATE 0.3;
          target: "sh_left";
       }
+      // 'sh_right' provides a similar shadow effect for the right side of the entry.
       part { name: "sh_right"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
          description { state: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, Transparent white
             color_class: "/shadow/normal/entry";
             rel.to: "bg";
             rel1.relative: 1.0 0.0;
@@ -376,12 +430,13 @@ group { name: "elm/scroller/entry_single/default";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, Opaque white
             rel1.offset: -16 0;
             rel2.offset: 15 -1;
             visible: 1;
          }
       }
+      // Programs to animate the right shadow.
       program { signal: "elm,action,show,right"; source: "elm";
         action: STATE_SET "visible" 0.0;
         transition: DECELERATE 0.3;
@@ -393,12 +448,16 @@ group { name: "elm/scroller/entry_single/default";
         target: "sh_right";
       }
 
+      // 'sh_clip' is a clipping rectangle for the shadows, ensuring they don't spill outside the widget's background area.
       part { name: "sh_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.background";
          }
       }
    }
+   // This block groups programs that apply to the whole group.
+   // These programs handle validation signals, controlling the state of 'validation_glow'
+   // to show 'pass' or 'fail' feedback, or reset it to the default state.
    programs {
       program { signal: "validation,default,fail"; source: "elm";
          action: STATE_SET "fail" 0.0;
@@ -415,9 +474,12 @@ group { name: "elm/scroller/entry_single/default";
    }
 }
 
+// This group defines the appearance and behavior of the text cursor in an entry field.
 group { name: "elm/entry/cursor/default";
    min: 1 0;
    parts {
+      // The 'cursor' part is the visual representation of the text cursor.
+      // It's a rectangle with a minimum width of 1 and height of 10.
       part { name: "cursor"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clipper";
@@ -431,6 +493,8 @@ group { name: "elm/entry/cursor/default";
             visible: 1;
          }
       }
+      // 'clipper' is used to hide the cursor. When the text is selected,
+      // the cursor should not be visible. This is achieved by making the clipper invisible.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "cursor";
@@ -443,10 +507,12 @@ group { name: "elm/entry/cursor/default";
       }
    }
    programs {
+      // When text selection changes, hide the cursor by setting the clipper to its 'hidden' state.
       program { signal: "selection,changed"; source: "elm.text";
          action: STATE_SET "hidden" 0.0;
          target: "clipper";
       }
+      // When selection is cleared or reset, show the cursor again.
       program { signal: "selection,cleared"; source: "elm.text";
          action: STATE_SET "default" 0.0;
          target: "clipper";
@@ -455,6 +521,9 @@ group { name: "elm/entry/cursor/default";
          action: STATE_SET "default" 0.0;
          target: "clipper";
       }
+      // When the entry gains focus, this program starts the cursor blinking animation.
+      // 'ACTION_STOP' stops any ongoing cursor animations before starting a new one.
+      // It targets all cursor-related programs and then calls 'cursor_show' to start the blinking.
       program { signal: "elm,action,focus"; source: "elm";
          action: ACTION_STOP;
          target: "cursor_show";
@@ -463,6 +532,7 @@ group { name: "elm/entry/cursor/default";
          target: "cursor_hide_timer";
          after: "cursor_show";
       }
+      // When the entry loses focus, this program stops the blinking and hides the cursor.
       program { signal: "elm,action,unfocus"; source: "elm";
          action: ACTION_STOP;
          target: "cursor_show";
@@ -471,6 +541,7 @@ group { name: "elm/entry/cursor/default";
          target: "cursor_hide_timer";
          after: "cursor_hide_stop";
       }
+      // Manually trigger the cursor to show.
       program { signal: "elm,action,show,cursor"; source: "elm";
          action: ACTION_STOP;
          target: "cursor_show";
@@ -479,6 +550,12 @@ group { name: "elm/entry/cursor/default";
          target: "cursor_hide_timer";
          after: "cursor_show";
       }
+      // This set of programs creates the blinking effect for the cursor.
+      // 'cursor_show' makes the cursor visible and starts a timer.
+      // 'cursor_show_timer' waits for 0.5 seconds then calls 'cursor_hide'.
+      // 'cursor_hide' makes the cursor invisible and starts another timer.
+      // 'cursor_hide_timer' waits for 0.3 seconds then calls 'cursor_show', completing the loop.
+      // 'cursor_hide_stop' is used to permanently hide the cursor when unfocused.
       program { name: "cursor_hide_stop";
          action: STATE_SET "default" 0.0;
          target: "cursor";
@@ -504,8 +581,10 @@ group { name: "elm/entry/cursor/default";
    }
 }
 
+// This group defines the appearance of the text selection highlight.
 group { name: "elm/entry/selection/default";
    parts {
+      // The 'base' part is a simple rectangle that uses a color class to style the selection area.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/entry/selection";
@@ -514,8 +593,11 @@ group { name: "elm/entry/selection/default";
    }
 }
 
+// Defines the visual style for text anchors, which are typically used to mark hyperlink-like regions in text.
 group { name: "elm/entry/anchor/default";
    parts {
+      // The 'bar' part is a rectangle that appears under the anchor text.
+      // It's positioned relative to the bottom of the anchor's geometry.
       part { name: "bar"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -530,24 +612,35 @@ group { name: "elm/entry/anchor/default";
    }
 }
 
+// This is the base group for a standard, multi-line text entry.
 group { name: "elm/entry/base/default";
+   // The 'styles' block defines various text styles used within the entry.
+   // These can be applied to the textblock parts.
    styles {
+      // Default style for the entry text.
+      // 'wrap=word' enables word wrapping. 'FN' is a macro for the default font name.
+      // 'color=cc:' makes the color themeable via a color class.
       style { name: "entry_style";
          base: "font="FN" font_size=10 color=cc:/fg/normal/entry/text wrap=word text_class=entry_text left_margin=2 right_margin=2";
+         // This macro includes a set of tags that can be used to format the text (e.g., bold, italic).
          ENABLED_TEXTBLOCK_TAGS
       }
+      // A style for text that should not wrap.
       style { name: "entry_nowrap_style";
          base: "font="FN" font_size=10 color=cc:/fg/normal/entry/text text_class=entry_text left_margin=2 right_margin=2";
          ENABLED_TEXTBLOCK_TAGS
       }
+      // Style for the entry when it is disabled.
       style { name: "entry_disabled_style";
          base: "font="FN" font_size=10 color=cc:/fg/disabled/entry/text wrap=word text_class=entry_text_disabled left_margin=2 right_margin=2";
+         // In disabled state, formatting tags are usually turned off.
          DISABLED_TEXTBLOCK_TAGS
       }
       style { name: "entry_nowrap_disabled_style";
          base: "font="FN" font_size=10 color=cc:/fg/disabled/entry/text text_class=entry_text_disabled left_margin=2 right_margin=2";
          DISABLED_TEXTBLOCK_TAGS
       }
+      // Style for the guide text (placeholder). It has a different color and no ellipsis.
       style { name: "entry_guide_style";
          base: "font="FN" font_size=10 color=cc:/fg/normal/entry/text/guide wrap=word text_class=entry_guide_text left_margin=2 right_margin=2 ellipsis=0.0";
          DISABLED_TEXTBLOCK_TAGS
@@ -555,10 +648,13 @@ group { name: "elm/entry/base/default";
    }
 //   data.item: "context_menu_orientation" "horizontal";
    parts {
+      // A swallow part for the background, which can be provided by the user of the widget.
       part { name: "elm.swallow.background"; type: SWALLOW;
          description { state: "default" 0.0;
          }
       }
+      // The 'elm.guide' part displays the placeholder text when the entry is empty.
+      // It's a TEXTBLOCK and is positioned relative to the main text part.
       part { name: "elm.guide"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -573,27 +669,34 @@ group { name: "elm/entry/base/default";
             visible: 0;
          }
       }
+      // This is the main TEXTBLOCK part for the entry's text.
       part { name: "elm.text"; type: TEXTBLOCK;
          scale: 1;
+         // 'entry_mode: EDITABLE' allows the user to modify the text.
          entry_mode: EDITABLE;
+         // 'select_mode: DEFAULT' enables standard text selection behavior.
          select_mode: DEFAULT;
 //         select_mode: EXPLICIT;
+         // 'cursor_mode: BEFORE' places the cursor before the character it's at.
          cursor_mode: BEFORE;
+         // 'multiline: 1' allows the entry to have multiple lines of text.
          multiline: 1;
-         source: "elm/entry/selection/default"; // selection under
+         // These 'source' properties link to other EDC groups to style different aspects of the text.
+         source: "elm/entry/selection/default"; // Style for text selection, rendered under the text.
 //         source2: "X"; // selection over
 //         source3: "X"; // cursor under
-         source4: "elm/entry/cursor/default"; // cursorover
+         source4: "elm/entry/cursor/default"; // Style for the cursor, rendered over the text.
 //         source5: "elm/entry/anchor/default"; // anchor under
-         source6: "elm/entry/anchor/default"; // anchor over
+         source6: "elm/entry/anchor/default"; // Style for anchors, rendered over the text.
          description { state: "default" 0.0;
             /* we gotta use 0 0 here, because of scrolled entries */
+            // 'fixed: 0 0' allows the textblock to resize freely. Important for scrolled entries.
             fixed: 0 0;
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
             text { style: "entry_style";
                min: 0 1;
-               align: 0.0 0.0;
+               align: 0.0 0.0; // Left-align text.
             }
             offscale;
          }
@@ -604,10 +707,12 @@ group { name: "elm/entry/base/default";
       }
    }
    programs {
+      // On load, set the focus to the main text part.
       program { signal: "load"; source: "";
          action: FOCUS_SET;
          target: "elm.text";
       }
+      // These programs switch the text part between 'default' and 'disabled' states based on signals from elm.
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "elm.text";
@@ -616,6 +721,7 @@ group { name: "elm/entry/base/default";
          action: STATE_SET "default" 0.0;
          target: "elm.text";
       }
+      // These programs control the visibility of the guide text.
       program { signal: "elm,guide,disabled"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "elm.guide";
@@ -624,13 +730,22 @@ group { name: "elm/entry/base/default";
          action: STATE_SET "default" 0.0;
          target: "elm.guide";
       }
+      // This program demonstrates an inline script, a powerful feature of Edje.
+      // It triggers on every keydown event in the text entry.
       program { signal: "entry,keydown"; source: "elm.text";
+         // The script runs a small piece of Embryo code (a Pawn-like scripting language).
          script {
+            // 'new buf[32];' declares a character buffer.
             new buf[32];
+            // 'snprintf' creates a string like "key-down1", "key-down2", etc., by picking a random number from 1 to 5.
             snprintf(buf, 31, "key-down%i", (rand() % 5) + 1);
+            // 'run_program(get_program_id(buf));' executes one of the 'key-down' programs defined below.
+            // This is a clever way to add variety, playing a random sound for each key press.
             run_program(get_program_id(buf));
          }
       }
+      // These programs are triggered by the script above. Each one plays a different 'key-tap' sound sample.
+      // 'PLAY_SAMPLE' action plays a pre-loaded sound. The 'INPUT' flag indicates it's a UI feedback sound.
       program { name: "key-down1";
          action: PLAY_SAMPLE "key-tap1" 1.0 INPUT;
       }
@@ -649,6 +764,8 @@ group { name: "elm/entry/base/default";
    }
 }
 
+// An entry variant that uses 'mixed' word wrapping.
+// This mode wraps text at word boundaries, but will break words if a single word is longer than the line.
 group { name: "elm/entry/base-mixedwrap/default";
    inherit: "elm/entry/base/default";
    styles {
@@ -690,6 +807,7 @@ group { name: "elm/entry/base-mixedwrap/default";
    }
 }
 
+// An entry variant that uses 'char' wrapping, breaking lines at any character.
 group { name: "elm/entry/base-charwrap/default";
    inherit: "elm/entry/base/default";
    styles {
@@ -732,6 +850,7 @@ group { name: "elm/entry/base-charwrap/default";
    }
 }
 
+// An entry variant where text does not wrap.
 group { name: "elm/entry/base-nowrap/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -749,6 +868,7 @@ group { name: "elm/entry/base-nowrap/default";
          description { state: "default" 0.0;
             text { style: "entry_nowrap_style";
                min: 1 1;
+               // 'ellipsis: -1' makes the text fade out at the end if it's too long to fit.
                ellipsis: -1;
             }
          }
@@ -762,6 +882,7 @@ group { name: "elm/entry/base-nowrap/default";
    }
 }
 
+// Defines a single-line entry.
 group { name: "elm/entry/base-single/default";
    inherit: "elm/entry/base/default";
    alias: "elm/entry/base-single/combobox_vertical/default";
@@ -794,6 +915,7 @@ group { name: "elm/entry/base-single/default";
          }
       }
       part { name: "elm.text";
+         // 'multiline: 0' restricts the entry to a single line.
          multiline: 0;
          description { state: "default" 0.0;
             text { style: "entry_single_style";
@@ -811,6 +933,7 @@ group { name: "elm/entry/base-single/default";
    }
 }
 
+// A single-line entry variant for spinners, where the text is centered.
 group { name: "elm/entry/base-single/spinner/default";
    alias: "elm/entry/base-single/spinner/vertical";
    inherit: "elm/entry/base-single/default";
@@ -829,13 +952,16 @@ group { name: "elm/entry/base-single/spinner/default";
    }
 }
 
+// A non-editable, single-line entry. Useful for displaying text that can be selected but not changed.
 group { name: "elm/entry/base-single-noedit/default";
    inherit: "elm/entry/base/default";
    parts {
       part { name: "elm.text";
+         // 'entry_mode: PLAIN' makes the text non-editable.
          entry_mode: PLAIN;
          multiline: 0;
          source: "elm/entry/selection/default"; // selection under
+         // No cursor is needed since the text is not editable.
          source4: ""; // cursorover
          source6: "elm/entry/anchor/default"; // anchor over
          description { state: "default" 0.0;
@@ -854,6 +980,7 @@ group { name: "elm/entry/base-single-noedit/default";
    }
 }
 
+// A non-editable, multi-line entry.
 group { name: "elm/entry/base-noedit/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -873,6 +1000,7 @@ group { name: "elm/entry/base-noedit/default";
    }
 }
 
+// A non-editable entry with mixed wrapping.
 group { name: "elm/entry/base-noedit-mixedwrap/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -893,6 +1021,7 @@ group { name: "elm/entry/base-noedit-mixedwrap/default";
    }
 }
 
+// A non-editable entry with character wrapping.
 group { name: "elm/entry/base-noedit-charwrap/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -913,6 +1042,7 @@ group { name: "elm/entry/base-noedit-charwrap/default";
    }
 }
 
+// A non-editable entry with no text wrapping.
 group { name: "elm/entry/base-nowrap-noedit/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -937,6 +1067,7 @@ group { name: "elm/entry/base-nowrap-noedit/default";
    }
 }
 
+// Defines a password entry field.
 group { name: "elm/entry/base-password/default";
    inherit: "elm/entry/base/default";
    parts {
@@ -951,6 +1082,7 @@ group { name: "elm/entry/base-password/default";
          }
       }
       part { name: "elm.text";
+         // 'entry_mode: PASSWORD' ensures that entered characters are replaced by a replacement character.
          entry_mode: PASSWORD;
          multiline: 0;
          source: "elm/entry/selection/default"; // selection under
@@ -958,6 +1090,7 @@ group { name: "elm/entry/base-password/default";
          source6: "elm/entry/anchor/default"; // anchor under
          description { state: "default" 0.0;
             text { style: "entry_single_style";
+               // 'repch: "*"' sets the replacement character to an asterisk.
                repch: "*";
                min: 1 1;
                ellipsis: -1;
@@ -973,11 +1106,14 @@ group { name: "elm/entry/base-password/default";
    }
 }
 
+// This group defines the appearance of a text magnifier, which can be shown to help with text selection on touch devices.
 group { name: "elm/entry/magnifier/default";
    parts {
+      // The shadow for the magnifier window.
       part { name: "shadow"; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bg";
+            // The WIN_SHADOW macro provides a standard window shadow effect.
             WIN_SHADOW;
             color_class: "/shadow/normal/entry/magnifier";
          }
@@ -1026,14 +1162,17 @@ group { name: "elm/entry/magnifier/default";
    }
 }
 
+// This group defines the start handle for text selection.
 group { name: "elm/entry/handler/start/default";
    images.image: "handle_pick_up_left.png" COMP;
    parts {
+      // The 'base' part is the visual representation of the handle.
       part { name: "base"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "handle_pick_up_left.png";
             min: 21 27; // 42 54
+            // 'align' property adjusts the handle's hotspot for precise positioning.
             align: (29/42) (11/54);
             color_class: "/fg/normal/entry/handler/start";
             visible: 0;
@@ -1043,11 +1182,13 @@ group { name: "elm/entry/handler/start/default";
             visible: 1;
          }
       }
+      // 'event' is an invisible rectangle that serves as the touch/mouse event area for the handle,
+      // making it easier to grab.
       part { name: "event"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel.to: "base";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, Transparent
             min: 32 32;
             visible: 0;
          }
@@ -1071,6 +1212,7 @@ group { name: "elm/entry/handler/start/default";
    }
 }
 
+// This group defines the end handle for text selection, using a right-pointing image.
 group { name: "elm/entry/handler/end/default";
    images.image: "handle_pick_up_right.png" COMP;
    parts {
@@ -1116,6 +1258,8 @@ group { name: "elm/entry/handler/end/default";
    }
 }
 
+// This group seems to be for a more generic text component, possibly part of a newer API (efl_ui_text).
+// It's structured to swallow a text object rather than defining a textblock itself.
 group { name: "elm/efl_ui_text/base/default";
 //   data.item: "context_menu_orientation" "horizontal";
    parts {
@@ -1123,6 +1267,8 @@ group { name: "elm/efl_ui_text/base/default";
          description { state: "default" 0.0;
          }
       }
+      // This part swallows the actual text component, providing a container for it.
+      // The properties like 'entry_mode', 'select_mode' etc. are passed to the swallowed object.
       part { name: "elm.text"; type: SWALLOW;
          scale: 1;
          entry_mode: EDITABLE;
@@ -1200,6 +1346,10 @@ group { name: "elm/efl_ui_text/base/default";
 // Tanya - Latvia
 // http://lazycrazy.deviantart.com/
 // http://lazycrazy.deviantart.com/art/Very-Emotional-Emoticons-144461621
+//
+// The following groups define a set of emoticons that can be used within an entry.
+// Each group defines a single emoticon, linking its name (e.g., 'angry') to an image file.
+// The entry widget can then parse text like ':angry:' and replace it with the corresponding image.
 group { name: "elm/entry/emoticon/angry/default"; images.image:
    "emo-angry.png" COMP; parts { part { name: "icon"; mouse_events: 0; description { state: "default" 0.0; max: 64 64; image.normal:
             "emo-angry.png"; } } } }

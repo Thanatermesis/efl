@@ -1,7 +1,17 @@
+// Defines the visual style and behavior for a single taskbar item. This group
+// is designed for a horizontal taskbar layout. It manages different states
+// like default, focused, and iconic, and handles user interactions.
 group { name:"e/modules/tasks/item";
    script {
+      // This script manages the visual state of the task item by tracking
+      // whether it is focused or iconified. The public variables 'focused'
+      // and 'iconic' are accessible from the C code.
       public focused;
       public iconic;
+      // eval_mode() is the core logic that determines the current state
+      // (iconic, focused, or default) and emits a corresponding signal.
+      // This centralizes state management. The "int" source on the signal
+      // distinguishes it from signals emitted by C code (source "e").
       public eval_mode() {
          new is_focused = get_int(focused);
          new is_iconic  = get_int(iconic);
@@ -9,6 +19,8 @@ group { name:"e/modules/tasks/item";
          else if (is_focused) { emit("state,focused", "int"); }
          else                 { emit("state,default", "int"); }
       }
+      // These functions are called by programs in response to signals from
+      // the C code, allowing the UI to react to application state changes.
       public set_focused(m) {
          set_int(focused, m);
          eval_mode();
@@ -19,6 +31,9 @@ group { name:"e/modules/tasks/item";
       }
    }
    parts {
+      // "base" is the background rectangle for the task item. Its color
+      // changes based on the item's state by referencing themeable color
+      // classes.
       part { name: "base"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          scale: 1;
@@ -37,11 +52,15 @@ group { name:"e/modules/tasks/item";
             color_class: "/bg/normal/gadgets/tasks/base/focused";
          }
       }
+      // "click" provides visual feedback when the item is clicked. It's an
+      // invisible rectangle that becomes visible on "clicked" state.
       part { name: "click"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
             color_class: "/bg/pressed/gadgets/tasks/base";
+            // The color is transparent white (#FFFFFF00). "no cc" means this
+            // color is not from a color class.
             color: 255 255 255 0; // no cc
             rel1.offset: 0 (0 - SHELFPAD);
             rel2.offset: -1 (SHELFPAD - 1);
@@ -49,9 +68,12 @@ group { name:"e/modules/tasks/item";
          }
          description { state: "clicked" 0.0;
             inherit: "default" 0.0;
+            // On click, the color becomes opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
+      // "urgent" is an overlay that flashes to indicate an urgent state (e.g.,
+      // a new notification).
       part { name: "urgent"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -63,6 +85,10 @@ group { name:"e/modules/tasks/item";
             color: 255 255 255 255; // no cc
          }
       }
+      // "label_clip" and "icon_clip" are clipping rectangles used to toggle
+      // the visibility of the text label and the icon, implementing the
+      // "icon_only" and "text_only" modes. This is a common technique for
+      // conditional layouts.
       part { name: "label_clip"; type: RECT; mouse_events: 0;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -88,6 +114,10 @@ group { name:"e/modules/tasks/item";
             visible: 1;
          }
       }
+      // These clipping parts manage which version of the label (normal,
+      // focused, or iconic) is displayed. Only one is visible at a time.
+      // They are themselves clipped by "label_clip", allowing all text to be
+      // hidden simultaneously in "icon_only" mode.
       part { name: "normal_clip"; type: RECT; mouse_events: 0;
          clip_to: "label_clip";
          description { state: "default" 0.0;
@@ -102,6 +132,9 @@ group { name:"e/modules/tasks/item";
             visible: 0;
          }
       }
+      // The default text label. It is visible only in the "default" state as
+      // it is clipped by "normal_clip". The "e." prefix is a convention for
+      // parts accessible from C code.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          clip_to: "normal_clip";
          scale: 1;
@@ -137,6 +170,10 @@ group { name:"e/modules/tasks/item";
             visible: 0;
          }
       }
+      // The text label for the "focused" state, using a bold font (FNBD).
+      // 'text_source' is a key optimization: it links this part's text to
+      // "e.text.label", so the text content is shared and only needs to be
+      // set once.
       part { name: "label_focused"; type: TEXT; mouse_events: 0;
          clip_to: "focused_clip";
          scale: 1;
@@ -173,6 +210,8 @@ group { name:"e/modules/tasks/item";
             visible: 1;
          }
       }
+      // The text label for the "iconic" state, which also sources its text
+      // from "e.text.label".
       part { name: "label_iconic"; type: TEXT; mouse_events: 0;
          clip_to: "iconic_clip";
          scale: 1;
@@ -195,6 +234,9 @@ group { name:"e/modules/tasks/item";
             color_class: "/fg/pressed/gadgets/tasks/text/iconified";
          }
       }
+      // "icon" is a SPACER that defines the area for the application icon.
+      // It resizes and repositions for different modes ("icon_only",
+      // "text_only"). A SPACER is efficient as it only reserves space.
       part { name: "icon"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -222,6 +264,9 @@ group { name:"e/modules/tasks/item";
             fixed: 1 1;
          }
       }
+      // "icon2" is another SPACER, relative to "icon". It is used to create
+      // a subtle zoom effect on the icon when the state changes to "iconic".
+      // The actual icon ("e.swallow.icon") is relative to this part.
       part { name: "icon2"; type: SPACER;
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -236,6 +281,8 @@ group { name:"e/modules/tasks/item";
             rel2.relative: 0.8 0.8;
          }
       }
+      // "bar" is a thin rectangle at the bottom, acting as an indicator for
+      // the "focused" state. It animates in when focused.
       part { name: "bar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clip";
@@ -256,6 +303,9 @@ group { name:"e/modules/tasks/item";
             min: 0 5;
          }
       }
+      // This SWALLOW part is where the actual application icon object is
+      // placed by the C code. It is clipped by "icon_clip" to hide it in
+      // "text_only" mode and is relative to "icon2" for animation.
       part { name: "e.swallow.icon"; type: SWALLOW; mouse_events: 0;
          clip_to: "icon_clip";
          description { state: "default" 0.0;
@@ -263,12 +313,19 @@ group { name:"e/modules/tasks/item";
             rel.to: "icon2";
          }
       }
+      // This invisible "event" rectangle covers the entire item to capture
+      // mouse events. This simplifies event handling by providing a single
+      // source for clicks. ON_HOLD is ignored to allow drag-and-drop.
       part { name: "event"; type: RECT;
          ignore_flags: ON_HOLD;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // "clip" and "sel_clip" are used to hide the item when it is in a
+      // 'selected' or 'iconic' state, likely during a transition where another
+      // object represents the item. The large negative offsets ensure the
+      // clipping area is initially large enough not to clip anything.
       part { name: "clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -303,6 +360,8 @@ group { name:"e/modules/tasks/item";
       }
    }
    programs {
+      // Handles mouse clicks. "mouse,down,1" on the "event" part triggers
+      // the "clicked" state for visual feedback.
       program { signal: "mouse,down,1"; source: "event";
          action: STATE_SET "clicked" 0.0;
          target: "click";
@@ -310,6 +369,7 @@ group { name:"e/modules/tasks/item";
          target: "label_focused";
          target: "label_iconic";
       }
+      // "mouse,up,1" reverts the state to "default".
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
          target: "click";
@@ -317,10 +377,15 @@ group { name:"e/modules/tasks/item";
          target: "label_focused";
          target: "label_iconic";
       }
+      // If the mouse is released while still inside the button ("clicked"
+      // state), it emits a signal to the C code to perform the click action.
+      // The "*" is a glob that matches any mouse up on button 1 in this state.
       program { signal: "mouse,up,clicked,1*"; source: "event";
          action: SIGNAL_EMIT "e,action,click" "";
       }
 
+      // These programs control the "bar" indicator. When C code (source "e")
+      // signals focus, the bar animates into view; on unfocus, it animates out.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          transition: ACCELERATE 0.2 USE_DURATION_FACTOR 1;
@@ -332,6 +397,10 @@ group { name:"e/modules/tasks/item";
          target: "bar";
       }
 
+      // These programs react to signals from the script's eval_mode() function.
+      // For each state ("default", "focused", "iconic"), one program instantly
+      // sets the state of clipping parts and the base, while another animates
+      // the "icon2" part for a smooth visual transition.
       program { signal: "state,default"; source: "int";
          action: STATE_SET "default" 0.0;
          target: "normal_clip";
@@ -369,6 +438,9 @@ group { name:"e/modules/tasks/item";
          target: "icon2";
       }
 
+      // These programs are the bridge from C code to the EDC script. They
+      // call script functions to update the internal state based on
+      // application events like focus changes or iconification.
       program { signal: "e,state,focused"; source: "e";
          script { set_focused(1); }
       }
@@ -382,6 +454,8 @@ group { name:"e/modules/tasks/item";
          script { set_iconic(0); }
       }
 
+      // Implements the blinking effect for an "urgent" task. "urg1" starts
+      // the animation upon receiving the "e,state,urgent" signal.
       program { name: "urg1";
          signal: "e,state,urgent"; source: "e";
          action: STATE_SET "urgent" 0.0;
@@ -390,12 +464,16 @@ group { name:"e/modules/tasks/item";
          target: "urgent";
          after: "urg2";
       }
+      // "urg2" chains back to "urg1" using 'after', creating a loop that
+      // toggles the "urgent" part's state to make it blink.
       program { name: "urg2";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.2;
          target: "urgent";
          after: "urg1";
       }
+      // When the urgent state ends, this stops the animation loop and ensures
+      // the "urgent" part is hidden via the "noturg2" program.
       program { signal: "e,state,not_urgent"; source: "e";
          action: ACTION_STOP;
          target: "urg1";
@@ -407,6 +485,9 @@ group { name:"e/modules/tasks/item";
          target: "urgent";
       }
 
+      // These programs handle requests from C code to change the layout to
+      // show only the icon or only the text, by setting the state on the
+      // relevant clipping parts.
       program { signal: "e,state,icon_only"; source: "e";
          action: STATE_SET "icon_only" 0.0;
          target: "icon";
@@ -422,8 +503,14 @@ group { name:"e/modules/tasks/item";
    }
 }
 
+// Defines the style for a vertical taskbar item. It inherits from the
+// horizontal "item" group and overrides specific parts to adjust the layout
+// for a vertical orientation.
 group { name:"e/modules/tasks/item_vert";
    inherit: "e/modules/tasks/item";
+   // This script block is identical to the one in the parent group and serves
+   // the same purpose of managing focused/iconic states. In EDC, inherited
+   // scripts are not merged, so it needs to be redefined here.
    script {
       public focused;
       public iconic;
@@ -444,6 +531,8 @@ group { name:"e/modules/tasks/item_vert";
       }
    }
    parts {
+      // The "base" part is overridden to adjust its padding for a vertical
+      // layout, using SHELFPAD on the horizontal axis instead of vertical.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.offset: (0 - SHELFPAD) 0;
@@ -458,6 +547,9 @@ group { name:"e/modules/tasks/item_vert";
             color_class: "/bg/selected/gadgets/tasks/base/focused";
          }
       }
+      // In the vertical layout, all text labels are hidden by default as the
+      // primary mode is to show only the icon. Their geometry is tied to the
+      // icon's, but they are made invisible.
       part { name: "e.text.label";
          description { state: "default" 0.0;
             rel.to: "icon";
@@ -494,6 +586,9 @@ group { name:"e/modules/tasks/item_vert";
             color_class: "/fg/pressed/gadgets/tasks/text/iconified";
          }
       }
+      // The "icon" SPACER is adjusted to fill the available space, centering
+      // the icon within the item. `aspect_preference: BOTH` allows it to
+      // scale while maintaining aspect ratio, fitting within the bounds.
       part { name: "icon";
          description { state: "default" 0.0;
             aspect_preference: BOTH;
@@ -513,6 +608,8 @@ group { name:"e/modules/tasks/item_vert";
             max: 0 0;
          }
       }
+      // The focus indicator "bar" is repositioned to the right edge for the
+      // vertical layout, changing from a horizontal to a vertical bar.
       part { name: "bar"; type: RECT;
          description { state: "default" 0.0;
             align: 1.0 0.5;

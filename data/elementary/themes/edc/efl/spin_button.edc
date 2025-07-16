@@ -68,24 +68,35 @@ Group: efl/spin_button/vertical/inc_button (@since 1.23)
 	 Signal: efl,state,disabled
 	 Signal: efl,state,enabled
 */
+// This group defines the horizontal layout for a spin button.
+// It consists of an entry for displaying values, increment and decrement
+// buttons, and a text button. It manages visibility and state changes
+// for these components based on incoming EFL signals.
 group { "efl/spin_button/horizontal";
    data.item: "version" "123";
    parts {
+      // The "clip" rectangle is used as a clipping mask for the "efl.entry".
+      // This ensures that the entry part does not draw outside its designated area,
+      // which is aligned with the "efl.text_button".
       rect { "clip";
          desc { "default";
             rel.to: "efl.text_button";
          }
       }
+      // "bg" serves as the background for the entire widget.
       rect { "bg";
          desc { "default";
             color_class: "/bg/normal/spinner/base";
          }
       }
+      // The "access" part is an invisible rectangle used for accessibility.
+      // It becomes visible when the widget is in an 'active' accessibility state,
+      // providing a focus highlight.
       rect { "access";
          repeat;
          desc { "default";
             fixed: 1 1;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Transparent color (#00000000)
             rel.to: "bg";
             hid;
          }
@@ -94,6 +105,9 @@ group { "efl/spin_button/horizontal";
             vis;
          }
       }
+      // "efl.entry" is a swallow part where the actual entry widget will be placed.
+      // It's clipped by the "clip" rectangle. Its visibility is toggled
+      // between 'default' (hidden) and 'active' (visible) states.
       swallow { "efl.entry"; required;
          clip: "clip";
          desc { "default";
@@ -106,6 +120,8 @@ group { "efl/spin_button/horizontal";
             vis;
          }
       }
+      // The "efl.dec_button" is a swallow part for the decrement button.
+      // It's positioned on the left side of the widget.
       swallow { "efl.dec_button"; required;
          scale;
          desc { "default";
@@ -115,6 +131,8 @@ group { "efl/spin_button/horizontal";
             max: 23 23;
          }
       }
+      // The "efl.inc_button" is a swallow part for the increment button.
+      // It's positioned on the right side of the widget.
       swallow { "efl.inc_button"; required;
          scale;
          desc { "default";
@@ -124,6 +142,8 @@ group { "efl/spin_button/horizontal";
             max: 23 23;
          }
       }
+      // "efl.text_button" is a swallow part that displays the current value when not in entry mode.
+      // It is positioned between the increment and decrement buttons.
       swallow { "efl.text_button"; required;
          scale;
          desc { "default";
@@ -145,11 +165,13 @@ group { "efl/spin_button/horizontal";
             hid;
          }
       }
+      // "disabler" is a transparent rectangle that covers the widget when disabled.
+      // This prevents mouse events from reaching other parts.
       rect { "disabler";
          norepeat;
          nomouse;
          desc { "default";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Transparent color (#00000000)
             hid;
          }
          desc { "disabled";
@@ -159,36 +181,46 @@ group { "efl/spin_button/horizontal";
       }
    }
    programs {
+      // This program makes the "efl.entry" part visible when the "efl,entry,visible,on"
+      // signal is received, effectively switching to entry mode.
       program { "entry_active"; signal: "efl,entry,visible,on";
          source: "efl";
          action: STATE_SET "active";
          target: "efl.entry";
       }
+      // This program hides the "efl.entry" part, returning to text display mode.
       program { "entry_inactive"; signal: "efl,entry,visible,off";
          source: "efl";
          action: STATE_SET "default";
          target: "efl.entry";
       }
+      // Controls visibility of the text button. When "efl,button,visible,on" is signaled,
+      // the "efl.text_button" part is set to its default (visible) state.
       program { signal: "efl,button,visible,on"; source: "efl";
          action: STATE_SET "default";
          target: "efl.text_button";
       }
+      // When "efl,button,visible,off" is signaled, "efl.text_button" becomes inactive (hidden).
       program { signal: "efl,button,visible,off"; source: "efl";
          action: STATE_SET "inactive";
          target: "efl.text_button";
       }
+      // When accessibility is active, the "access" rectangle is made visible.
       program { signal: "efl,state,access,active"; source: "efl";
          action:  STATE_SET "active";
          target: "access";
       }
+      // Hides the "access" rectangle when accessibility is inactive.
       program { signal: "efl,state,access,inactive"; source: "efl";
          action:  STATE_SET "default";
          target: "access";
       }
+      // Shows the "disabler" part when the widget is disabled.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled";
          target: "disabler";
       }
+      // Hides the "disabler" part when the widget is enabled.
       program { signal: "efl,state,enabled"; source: "efl";
          action: STATE_SET "default";
          target: "disabler";
@@ -196,6 +228,9 @@ group { "efl/spin_button/horizontal";
    }
 }
 
+// This group defines the vertical layout for a spin button.
+// It inherits the horizontal layout and overrides the positions of the
+// increment/decrement buttons and the text button to arrange them vertically.
 group { "efl/spin_button/vertical";
    inherit: "efl/spin_button/horizontal";
    data.item: "version" "123";
@@ -205,6 +240,7 @@ group { "efl/spin_button/vertical";
             min: 40 69;
          }
       }
+      // The increment button is placed at the top of the widget.
       swallow { "efl.inc_button"; required;
          scale;
          desc { "default";
@@ -212,6 +248,7 @@ group { "efl/spin_button/vertical";
             align: 0.5 0.0;
          }
       }
+      // The decrement button is placed at the bottom.
       swallow { "efl.dec_button"; required;
          scale;
          desc { "default";
@@ -219,6 +256,7 @@ group { "efl/spin_button/vertical";
             align: 0.5 1.0;
          }
       }
+      // The text button is placed between the increment and decrement buttons.
       swallow { "efl.text_button"; required;
          scale;
          desc { "default";
@@ -243,13 +281,22 @@ group { "efl/spin_button/vertical";
    }
 }
 
+// This group defines the appearance and behavior of the horizontal increment button.
+// It includes an arrow image, an overlay for mouse events, and logic to handle
+// single clicks and multi-press (hold) events.
 group { "efl/spin_button/horizontal/inc_button";
    data.item: "version" "123";
+   // This script manages the button's state to distinguish between single clicks
+   // and continuous presses (multi-down).
+   // 'mouse_down' tracks if the mouse button is currently pressed.
+   // 'multi_down' is a flag set externally to indicate a long press is active.
    script {
       public mouse_down = 0;
       public multi_down = 0;
    }
    parts {
+      // The visual representation of the increment button, typically a right-facing arrow.
+      // It changes color class based on its state (default, pressed, disabled).
       part { name: "arrow.image";
          scale: 1;
          description { state: "default" 0.0;
@@ -270,17 +317,20 @@ group { "efl/spin_button/horizontal/inc_button";
             color_class: "/fg/disabled/spinner/arrow";
          }
       }
+      // An invisible rectangle that captures mouse events for the entire button area.
+      // 'repeat_events' allows it to continuously receive mouse events while pressed.
       part { name: "over"; type: RECT;
          repeat_events: 1;
          scale;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Transparent color (#00000000)
             min: 23 23;
          }
       }
+      // Similar to the main disabler, this part covers the button when disabled.
       part { name: "disabler"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Transparent color (#00000000)
             visible: 0;
          }
          description { state: "disabled" 0.0;
@@ -290,6 +340,9 @@ group { "efl/spin_button/horizontal/inc_button";
       }
    }
    programs {
+      // When the mouse button is pressed down, this program checks if it's a new press.
+      // If it is (not a multi-down and not already down), it sets the 'mouse_down' flag
+      // and triggers the "button_press2" program.
       program { signal: "mouse,down,1"; source: "over";
          script {
             if ((get_int(multi_down) == 0) &&
@@ -299,14 +352,19 @@ group { "efl/spin_button/horizontal/inc_button";
             }
          }
       }
+      // Emits the "efl,action,press" signal to notify the application code.
+      // This is followed by an animation.
       program { name: "button_press2";
          action: SIGNAL_EMIT "efl,action,press" "";
          after: "button_press_anim";
       }
+      // Animates the button to the "pressed" state.
       program { name: "button_press_anim";
          action: STATE_SET "pressed" 0.0;
          target: "arrow.image";
       }
+      // On mouse up, if the button was considered pressed, it resets the 'mouse_down' flag
+      // and triggers the unpress signal and animation.
       program { signal: "mouse,up,1"; source: "over";
          script {
             if (get_int(mouse_down) == 1) {
@@ -316,13 +374,16 @@ group { "efl/spin_button/horizontal/inc_button";
             }
          }
       }
+      // Emits the "efl,action,unpress" signal.
       program { name: "button_unpress2";
          action: SIGNAL_EMIT "efl,action,unpress" "";
       }
+      // Animates the button back to its default state.
       program { name: "button_unpress_anim";
          action: STATE_SET "default" 0.0;
          target: "arrow.image";
       }
+      // On a full click, if not in multi-down mode, emits the "efl,action,click" signal.
       program { signal: "mouse,clicked,1"; source: "over";
          script {
             if (get_int(multi_down) == 0) {
@@ -330,25 +391,32 @@ group { "efl/spin_button/horizontal/inc_button";
             }
          }
       }
+      // The application can signal "efl,action,unpressed" to trigger the unpress animation.
       program { signal: "efl,action,unpressed"; source: "efl";
          after: "button_unpress_anim";
       }
+      // The application can signal "efl,action,pressed" to trigger the press animation.
       program { signal: "efl,action,pressed"; source: "efl";
          after: "button_press_anim";
       }
       program { name: "button_click2";
          action: SIGNAL_EMIT "efl,action,click" "";
       }
+      // Accessibility action to show a pressed state animation.
       program { signal: "efl,state,animation,activated"; source: "efl";
          action: STATE_SET "pressed" 0.0;
          target: "arrow.image";
          after: "access_pressed_anim";
       }
+      // This program defines the animation back to the default state for the
+      // accessibility "activated" signal. It uses a decelerate transition
+      // to create a smooth visual effect.
       program { name: "access_pressed_anim";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.1;
          target: "arrow.image";
       }
+      // These programs toggle the visual state between enabled and disabled.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "arrow.image";
@@ -359,6 +427,8 @@ group { "efl/spin_button/horizontal/inc_button";
          target: "arrow.image";
          target: "disabler";
       }
+      // These programs set and clear the 'multi_down' flag, which is used to
+      // manage continuous press behavior.
       program { signal: "efl,action,multi,down"; source: "efl";
          script {
             set_int(multi_down, 1);
@@ -372,12 +442,18 @@ group { "efl/spin_button/horizontal/inc_button";
    }
 }
 
+// This group defines the entry part of the spin button.
+// It inherits from "efl/text" to provide standard text properties.
+// The alias makes it available for the vertical layout as well.
 group { "efl/spin_button/horizontal/entry";
    alias: "efl/spin_button/vertical/entry";
    inherit: "efl/text";
    data.item: "version" "123";
 }
 
+// This group defines the horizontal decrement button.
+// It inherits all the behavior from the increment button and simply
+// overrides the arrow image to point left.
 group { "efl/spin_button/horizontal/dec_button";
    inherit: "efl/spin_button/horizontal/inc_button";
    data.item: "version" "123";
@@ -396,16 +472,23 @@ group { "efl/spin_button/horizontal/dec_button";
    }
 }
 
+// This group defines the text button part, which displays the spinner's
+// value when not in entry mode. It provides a clickable area that can
+// switch the spinner to entry mode. The alias makes it available for the
+// vertical layout as well.
 group { "efl/spin_button/horizontal/text_button";
    alias: "efl/spin_button/vertical/text_button";
    data.item: "version" "123";
    parts {
+      // A spacer that serves as a background and defines the area of the text.
       part { name: "bg";
          type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
          }
       }
+      // The TEXT part that displays the value. It has properties for font,
+      // size, class, and ellipsis handling.
       part { name: "efl.text"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -425,10 +508,11 @@ group { "efl/spin_button/horizontal/text_button";
             color_class: "/fg/disabled/spinner/text";
          }
       }
+      // An invisible overlay to capture mouse clicks over the text area.
       part { name: "over"; type: RECT;
          repeat_events: 1;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Transparent color (#00000000)
          }
       }
       part { name: "disabler"; type: RECT;
@@ -443,6 +527,8 @@ group { "efl/spin_button/horizontal/text_button";
       }
    }
    programs {
+      // When the "over" part is clicked, it emits an "efl,action,click" signal,
+      // which is typically used to switch to entry mode.
       program { signal: "mouse,clicked,1"; source: "over";
          script {
             run_program(PROGRAM:"button_click2");
@@ -451,6 +537,7 @@ group { "efl/spin_button/horizontal/text_button";
       program { name: "button_click2";
          action: SIGNAL_EMIT "efl,action,click" "";
       }
+      // These programs toggle the state between enabled and disabled.
       program { signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "disabler";
@@ -464,6 +551,8 @@ group { "efl/spin_button/horizontal/text_button";
    }
 }
 
+// This group defines the vertical increment button. It inherits from the
+// horizontal version and changes the arrow image to point up.
 group { "efl/spin_button/vertical/inc_button";
    inherit: "efl/spin_button/horizontal/inc_button";
    data.item: "version" "123";
@@ -482,6 +571,8 @@ group { "efl/spin_button/vertical/inc_button";
    }
 }
 
+// This group defines the vertical decrement button. It inherits from the
+// horizontal version and changes the arrow image to point down.
 group { "efl/spin_button/vertical/dec_button";
    inherit: "efl/spin_button/horizontal/dec_button";
    data.item: "version" "123";

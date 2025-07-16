@@ -1,24 +1,38 @@
+// This group defines the cslider widget, a color selector slider.
+// It's composed of several parts that create its visual appearance and interactive behavior.
 group { name: "e/widgets/cslider";
    parts {
+      // "bg" is the background rectangle of the slider.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets create a small margin around the background.
             rel1.offset: 2 2;
             rel2.offset: -3 -3;
+            // Uses a color class for theming, ensuring a consistent look.
             color_class: "/bg-dark/normal/cslider/base";
+            // offscale prevents the part from being scaled with the rest of the widget.
             offscale;
          }
       }
+      // "clipper" is a rectangle used as a clipping mask for other parts.
+      // This ensures that the content and cursor do not draw outside the designated area.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
+            // It is sized to match the "e.swallow.content" part.
             rel.to: "e.swallow.content";
          }
+         // The "disabled" state overlays a semi-transparent white color to give a faded look.
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // color: #FFFFFF40 (White, 25% opaque)
             color: 255 255 255 64; // no cc
          }
       }
+      // "e.swallow.content" is a SWALLOW part, which acts as a container
+      // for content provided by the application, like a color gradient.
       part { name: "e.swallow.content"; type: SWALLOW;
+         // It's clipped by the "clipper" part.
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -27,31 +41,48 @@ group { name: "e/widgets/cslider";
             offscale;
          }
       }
+      // "e.dragable.cursor" is an invisible, draggable part that serves as the logic for the slider's handle.
+      // It captures drag events to control the position of the visible cursor. `mouse_events: 0` makes it transparent to mouse clicks.
       part { name: "e.dragable.cursor"; type: RECT; mouse_events: 0;
+         // The drag is confined within the "e.swallow.content" area.
          dragable.confine: "e.swallow.content";
+         // Allows dragging along the X-axis (horizontal) in steps of 1 pixel.
          dragable.x: 1 1 0;
+         // Disables dragging along the Y-axis. The -1 step value prevents movement.
          dragable.y: -1 1 0;
          description { state: "default" 0.0;
+            // A 1x1 pixel invisible rectangle.
             fixed: 1 1;
             min: 1 1;
             max: 1 1;
             visible: 0;
+            // Positioned relative to the content area.
             rel.to: "e.swallow.content";
             rel1.relative: 0.5 0.0;
             rel2.relative: 0.5 0.5;
          }
       }
+      // "cursor" is the visible indicator of the slider's current value.
+      // It is not interactive itself (`mouse_events: 0`) and is clipped by "clipper".
       part { name: "cursor"; type: RECT; mouse_events: 0;
          clip_to: "clipper";
+         // This is the default state for a horizontal slider. It renders a vertical line.
          description { state: "default" 0.0;
+            // The cursor's horizontal position and width are bound to "e.dragable.cursor".
+            // Its vertical position and height are bound to the content area.
             rel1.to_x: "e.dragable.cursor";
             rel1.to_y: "e.swallow.content";
             rel2.to_x: "e.dragable.cursor";
             rel2.to_y: "e.swallow.content";
+            // color: #FFFFFFC0 (White, 75% opaque)
             color: 255 255 255 192; // no cc
          }
+         // This state is for a vertical slider. It renders a horizontal line.
          description { state: "vertical" 0.0;
             inherit: "default" 0.0;
+            // The positioning is swapped from the default state. The cursor's vertical
+            // position is now bound to "e.dragable.cursor", and its horizontal
+            // extent is bound to the content area.
             rel1.to_x: "e.swallow.content";
             rel1.to_y: "e.dragable.cursor";
             rel2.to_x: "e.swallow.content";
@@ -59,19 +90,31 @@ group { name: "e/widgets/cslider";
          }
       }
    }
+   // Programs define the widget's behavior in response to signals from application code or user interaction.
    programs {
+      // This program is triggered by the application code to switch the slider to a vertical orientation.
       program { signal: "e,state,direction,v"; source: "e";
+         // When the signal "e,state,direction,v" is received from the EFL code (source "e"),
+         // it changes the state of the "cursor" part to "vertical".
          action: STATE_SET "vertical" 0.0;
          target: "cursor";
       }
+      // This program is likely unused or a leftover, as there is no "inset" part defined in this group.
+      // It is intended to emit a signal when the (non-existent) "inset" part is clicked.
       program { signal: "mouse,clicked,1"; source: "inset";
          action: SIGNAL_EMIT "e,action,click" "";
       }
+      // Handles the disabled state for the widget.
       program { signal: "e,state,disabled"; source: "e";
+         // When the "e,state,disabled" signal is received from the widget's code, it sets the "clipper" part's
+         // state to "disabled", causing the content to appear faded.
          action: STATE_SET "disabled" 0.0;
          target: "clipper";
       }
+      // Reverts the widget to its enabled state.
       program { signal: "e,state,enabled"; source: "e";
+         // When the "e,state,enabled" signal is received, it reverts the "clipper"
+         // part back to its "default" state.
          action: STATE_SET "default" 0.0;
          target: "clipper";
       }

@@ -1,29 +1,44 @@
+// This group defines the base theme for the slideshow widget. It handles
+// different transition animations between slides and supports multiple layouts.
 group { name: "elm/slideshow/base/default";
+   // Data items that provide metadata to the application.
+   // 'transitions' lists the available animation types, while 'layouts'
+   // specifies the supported layout modes.
    data {
       item: transitions "fade black_fade horizontal vertical square";
       item: layouts "fullscreen not_fullscreen";
    }
    parts {
+      // A black background rectangle that covers the entire widget area.
+      // This is visible during certain transitions, like 'black_fade'.
       part { name: "whole"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 255; // no cc
+            color: 0 0 0 255; // #000000FF, no cc
          }
       }
+      // This part acts as a container for the first image view (e.g., the current slide).
+      // It's a rectangle that is animated during transitions. The actual image content
+      // is placed inside 'elm.swallow.1', which is clipped to this part.
       part { name: "image_1_whole"; type: RECT;
          description { state: "default" 0.0;
          }
+         // For the 'fade' transition, this container becomes transparent.
          description { state: "fade_prev_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
+         // For 'black_fade', the initial state is fully opaque white.
          description { state: "black_fade_prev_next_init" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
+         // Then it transitions to opaque black.
          description { state: "black_fade_prev_next" 0.0;
             inherit: "default" 0.0;
-            color: 0 0 0 255; // no cc
+            color: 0 0 0 255; // #000000FF, no cc
          }
+         // The 'horizontal' transitions slide this container off-screen.
+         // 'next' slides it to the left, 'previous' to the right.
          description { state: "horizontal_next_init" 0.0;
             inherit: "default" 0.0;
          }
@@ -40,6 +55,8 @@ group { name: "elm/slideshow/base/default";
             rel1.relative: 1.0 0.0;
             rel2.relative: 2.0 1.0;
          }
+         // The 'vertical' transitions operate similarly, but slide up/down.
+         // 'next' slides it up, 'previous' slides it down.
          description { state: "vertical_next_init" 0.0;
             inherit: "default" 0.0;
          }
@@ -56,91 +73,105 @@ group { name: "elm/slideshow/base/default";
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 2.0;
          }
+         // For the 'square' transition, this container fades out.
          description { state: "square_prev_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
       }
+      // This part is the container for the second image view (e.g., the next/previous slide).
+      // Its animations are complementary to "image_1_whole". When one slides out, the other
+      // slides in.
       part { name: "image_2_whole"; type: RECT;
+         // By default, it's transparent and invisible.
          description { state: "default" 0.0;
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // #FFFFFF00, no cc
          }
+         // For the 'fade' transition, this container becomes opaque, revealing the new image.
          description { state: "fade_prev_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "black_fade_prev_next_init" 0.0;
             inherit: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, no cc
          }
          description { state: "black_fade_prev_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "horizontal_next_init" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 1.0 0.0;
             rel2.relative: 2.0 1.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "horizontal_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "horizontal_prev_init" 0.0;
             inherit: "default" 0.0;
             rel1.relative: -1.0 0.0;
             rel2.relative: 0.0 1.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "horizontal_prev" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "vertical_next_init" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 2.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "vertical_next" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "vertical_prev_init" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 -1.0;
             rel2.relative: 1.0 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
          description { state: "vertical_prev" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
+         // For the 'square' transition, this container starts as a point at the center.
          description { state: "square_prev_next_init" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
+         // It then expands to fill the entire area.
          description { state: "square_prev_next" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF, no cc
          }
       }
+      // This is a SWALLOW part, a container where the application can place
+      // an Evas object (the actual image). It is clipped to "image_1_whole",
+      // meaning its content will only be visible within the bounds of "image_1_whole",
+      // inheriting its animations (movement, fading, etc.).
       part { name: "elm.swallow.1"; type: SWALLOW;
          clip_to: "image_1_whole";
          description { state: "default" 0.0;
             rel.to: "image_1_whole";
          }
+         // The 'not_fullscreen' state adds a 10% margin around the content.
          description { state: "not_fullscreen" 0.0;
             rel.to: "image_1_whole";
             rel1.relative: 0.1 0.1;
             rel2.relative: 0.9 0.9;
          }
       }
+      // This is the SWALLOW part for the second image, clipped to "image_2_whole".
       part { name: "elm.swallow.2"; type: SWALLOW;
          clip_to: "image_2_whole";
          description {
@@ -153,13 +184,20 @@ group { name: "elm/slideshow/base/default";
             rel2.relative: 0.9 0.9;
          }
       }
+      // This is a transparent rectangle covering the whole area. 'repeat_events: 1'
+      // passes events (like clicks) to widgets below. Its purpose is to give the
+      // application a single object to listen to for slideshow navigation events
+      // without interfering with content.
       part { name: "events_catcher"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // #00000000, no cc
          }
       }
    }
    programs {
+      // These programs handle layout changes, triggered by signals from the application.
+      // They smoothly transition the swallow parts between 'fullscreen' (default state)
+      // and 'not_fullscreen' states.
       program { signal: "elm,layout,fullscreen"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.1";
@@ -172,20 +210,25 @@ group { name: "elm/slideshow/base/default";
          target: "elm.swallow.2";
          transition: SINUSOIDAL 1.0;
       }
-      //
+
+      // --- FADE TRANSITION ---
+      // Animates a cross-fade between the two images.
       program { signal: "elm,fade,next"; source: "elm";
+         // 1. Reset both image containers to their default states to ensure a clean start.
          action: STATE_SET "default" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
          after: "fade_next_2";
       }
       program { name: "fade_next_2";
+         // 2. Set 'fade_prev_next' state, making image_1 transparent and image_2 opaque.
          action: STATE_SET "fade_prev_next" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
          transition: SINUSOIDAL 1.5;
          after: "end";
       }
+      // The 'previous' transition is identical to 'next' for this effect.
       program { signal: "elm,fade,previous"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "image_1_whole";
@@ -199,19 +242,24 @@ group { name: "elm/slideshow/base/default";
          transition: SINUSOIDAL 1.5;
          after: "end";
       }
+      // --- BLACK FADE TRANSITION ---
+      // Fades the current image to black, then fades the new image in from black.
       program { signal: "elm,black_fade,next"; source: "elm";
+         // 1. Set initial state: image_1 opaque white, image_2 transparent.
          action: STATE_SET "black_fade_prev_next_init" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
          after: "black_fade_next_2";
       }
       program { name: "black_fade_next_2";
+         // 2. Fade image_1 to black.
          action: STATE_SET "black_fade_prev_next" 0.0;
          target: "image_1_whole";
          transition: SINUSOIDAL 0.75;
          after: "black_fade_next_3";
       }
       program { name: "black_fade_next_3";
+         // 3. Fade image_2 in from black.
          action: STATE_SET "black_fade_prev_next" 0.0;
          target: "image_2_whole";
          transition: SINUSOIDAL 0.75;
@@ -235,13 +283,16 @@ group { name: "elm/slideshow/base/default";
          transition: SINUSOIDAL 0.75;
          after: "end";
       }
+      // --- HORIZONTAL SLIDE TRANSITION ---
       program { signal: "elm,horizontal,next"; source: "elm";
+         // 1. Set initial positions: image_1 visible, image_2 off-screen to the right.
          action: STATE_SET "horizontal_next_init" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
          after: "horizontal_next_2";
       }
       program { name: "horizontal_next_2";
+         // 2. Animate both: image_1 slides out left, image_2 slides in from right.
          action: STATE_SET "horizontal_next" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
@@ -250,6 +301,7 @@ group { name: "elm/slideshow/base/default";
       }
       program { name: "horizontal_previous";
          signal: "elm,horizontal,previous"; source: "elm";
+         // Sets up for reverse slide: image_1 visible, image_2 off-screen to the left.
          action: STATE_SET "horizontal_prev_init" 0.0;
          target: "image_1_whole";
          target: "image_2_whole";
@@ -262,6 +314,8 @@ group { name: "elm/slideshow/base/default";
          transition: SINUSOIDAL 1.5;
          after: "end";
       }
+
+      // --- VERTICAL SLIDE TRANSITION ---
       program { signal: "elm,vertical,next"; source: "elm";
          action: STATE_SET "vertical_next_init" 0.0;
          target: "image_1_whole";
@@ -288,23 +342,30 @@ group { name: "elm/slideshow/base/default";
          transition: SINUSOIDAL 1.5;
          after: "end";
       }
+      // --- SQUARE ZOOM TRANSITION ---
       program { signal: "elm,square,next"; source: "elm";
+         // 1. Set image_2's initial state to a point at the center.
          action: STATE_SET "square_prev_next_init" 0.0;
          target: "image_2_whole";
          after: "square_next_2";
       }
       program { name: "square_next_2";
+         // 2. Simultaneously expand image_2 from the center and fade out image_1.
          action: STATE_SET "square_prev_next" 0.0;
          target: "image_2_whole";
          target: "image_1_whole";
          transition: SINUSOIDAL 1.5;
          after: "end";
       }
+      // 'previous' uses the same animation as 'next'.
       program { signal: "elm,square,previous"; source: "elm";
          action: STATE_SET "square_prev_next_init" 0.0;
          target: "image_2_whole";
          after: "square_next_2";
       }
+      // --- NO TRANSITION ---
+      // This provides an immediate change by instantly setting the final state of
+      // the fade transition, effectively skipping the animation.
       program { signal: "elm,none,next"; source: "elm";
          action: STATE_SET "fade_prev_next" 0.0;
          target: "image_1_whole";
@@ -317,9 +378,14 @@ group { name: "elm/slideshow/base/default";
          target: "image_2_whole";
          after: "end";
       }
+      // This program is called at the end of every transition chain.
       program { name: "end";
+         // It emits a signal back to the application to notify that the
+         // transition has completed.
          action: SIGNAL_EMIT "elm,end" "elm";
       }
+      // This program allows the application to abort any running animation
+      // and reset the slideshow to its default state.
       program { signal: "elm,anim,end"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "image_1_whole";

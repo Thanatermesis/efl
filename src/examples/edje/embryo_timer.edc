@@ -1,11 +1,21 @@
+// An Edje file is composed of a collection of groups.
 collections {
+   // A group is a self-contained UI layout or component.
+   // This "main" group defines the entire interface for this example.
    group { name: "main";
+      // Embryo script block, providing dynamic behavior.
+      // Embryo is a small, fast scripting language similar to C.
       script {
+         // A public function that can be called from programs or other scripts.
+         // This function is a timer callback, executed repeatedly.
+         // 'val' is a counter for how many times the timer has fired.
          public timer_cb(val) {
             new x, y, w, h;
             new buf[32];
 
             /* set labels with object info */
+            // Get the current position and size of the "red_rect" part.
+            // This demonstrates how scripts can interact with and query UI elements.
             get_geometry(PART:"red_rect", x, y, w, h);
             snprintf(buf, sizeof(buf), "Timer called %d times.", val);
             set_text(PART:"label1", buf)
@@ -13,19 +23,28 @@ collections {
             set_text(PART:"label2", buf)
 
             /* renew the timer */
+            // Schedule the next execution of this timer callback.
+            // It's set to run at approximately 30 frames per second (1 / 30).
+            // 'val + 1' increments the counter for the next call.
             timer(1 / 30, "timer_cb", val + 1);
          }
       }
+      // The 'parts' block defines all the visual elements of the group.
       parts {
+         // A simple white background rectangle that fills the entire window.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: White (#FFFFFFFF)
                color: 255 255 255 255;
             }
          }
+         // A text part to display the timer call count.
+         // Its text is updated by the 'timer_cb' script.
          part { name: "label1";
             type: TEXT;
             description { state: "default" 0.0;
+               // Color: Black (#000000FF)
                color: 0 0 0 255;
                text {
                   text: "";
@@ -35,9 +54,12 @@ collections {
                }
             }
          }
+         // A text part to display the geometry of the "red_rect" part.
+         // Its text is also updated by the 'timer_cb' script.
          part { name: "label2";
             type: TEXT;
             description { state: "default" 0.0;
+               // Color: Black (#000000FF)
                color: 0 0 0 255;
                text {
                   font: "Sans";
@@ -46,42 +68,64 @@ collections {
                }
             }
          }
+         // A rectangle that animates back and forth.
+         // It has two states defined in its descriptions, which allows for animation between them.
          part { name: "red_rect";
             type: RECT;
+            // The 'default' 0.0 state is the starting point of the animation.
             description { state: "default" 0.0;
+               // Color: Red (#FF0000FF)
                color: 255 0 0 255;
                max: 30 30;
                align: 0.1 0.2;
             }
+            // The 'default' 1.0 state is the ending point of the animation.
+            // 'inherit' copies all properties from the 'default' 0.0 state,
+            // so we only need to specify what changes.
             description { state: "default" 1.0;
                inherit: "default" 0.0;
+               // Color: Blue (#0000FFFF)
                color: 0 0 255 255;
                max: 50 30;
                align: 0.9 0.2;
             }
          }
       }
+      // Programs define the logic and animations of the interface.
+      // They respond to signals (events) and can change the state of parts.
       programs {
          /* move the red rect back an forth in a loop */
+         // This program starts the animation when the UI is loaded.
          program { name: "init";
+            // Triggered by the "load" signal, which is emitted when the object is created.
             signal: "load";
             source: "";
+            // Animates the "red_rect" part to its "default" 1.0 state.
             action: STATE_SET "default" 1.0;
+            // The animation takes 1.0 second and uses a sinusoidal interpolator for smooth easing.
             transition: SINUSOIDAL 1.0;
             target: "red_rect";
+            // After this program finishes, it runs the "loop" program.
             after: "loop";
          }
+         // This program animates the rectangle back to its starting state, completing the cycle.
          program { name: "loop";
+            // Animates the "red_rect" part back to its "default" 0.0 state.
             action: STATE_SET "default" 0.0;
             transition: SINUSOIDAL 1.0;
             target: "red_rect";
+            // After finishing, it runs the "init" program again, creating an infinite animation loop.
             after: "init";
          }
          /* run the timer_cb for the first time */
+         // This program starts the Embryo script timer.
          program { name: "init2";
+            // Also triggered on "load". Multiple programs can respond to the same signal.
             signal: "load";
             source: "";
             script {
+                // Calls the 'timer_cb' function for the first time with an initial value of 0.
+                // The timer then reschedules itself from within the script.
                 timer_cb(0);
             }
          }

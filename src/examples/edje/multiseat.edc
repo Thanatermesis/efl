@@ -3,17 +3,23 @@ efl_version: 1 22;
 collections {
 
    styles {
+      // Defines a reusable style for text entries.
+      // This ensures consistency across different textblock parts.
       style {
          name: "entry_style";
          base: "font="sans" font_size=10 color=#000 wrap="word" left_margin=2 right_margin=2";
       }
    }
 
+   // This is the main group for the multiseat example UI.
+   // It demonstrates how different input devices (seats) can interact with
+   // UI elements independently.
    group {
       name: "example/main";
       min: 400 400;
 
       parts {
+         // A basic rectangle for the background of the window.
          part {
             name: "bg";
             type: RECT;
@@ -23,12 +29,14 @@ collections {
             }
          }
 
+         // A simple title for the example window.
          part {
             name: "title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: #000000FF
                color: 0 0 0 255;
                rel1 {
                   relative: 0.0 0.0;
@@ -49,12 +57,15 @@ collections {
             }
          }
 
+         // This is a container that defines the boundaries for the draggable knob.
+         // It is a black vertical line where the knob can be moved.
          part {
             name: "drag_area1";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: #000000FF
                color: 0 0 0 255;
                rel1 {
                   relative: 0.1 0.25;
@@ -67,6 +78,9 @@ collections {
             }
          }
 
+         // This is a draggable knob. Its movement is confined to "drag_area1".
+         // The 'dragable' property confines movement along the y-axis within 'drag_area1'.
+         // It changes color to indicate which seat is currently dragging it.
          part {
             name: "example/knob1";
             type: RECT;
@@ -79,20 +93,27 @@ collections {
             description {
                state: "default" 0.0;
                min: 10 10;
+               // color: #C8C8C8FF
                color: 200 200 200 255;
             }
+            // State when dragged by seat1.
             description {
                state: "focused,s1" 0.0;
                inherit: "default" 0.0;
+               // color: #C80000FF (Red)
                color: 200 0 0 255;
             }
+            // State when dragged by seat2.
             description {
                state: "focused,s2" 0.0;
                inherit: "default" 0.0;
+               // color: #00C800FF (Green)
                color: 0 200 0 255;
             }
          }
 
+         // A second drag area and knob, demonstrating that multiple draggable
+         // elements can be handled independently.
          part {
             name: "drag_area2";
             type: RECT;
@@ -123,20 +144,25 @@ collections {
             description {
                state: "default" 0.0;
                min: 10 10;
+               // color: #C8C8C8FF
                color: 200 200 200 255;
             }
             description {
                state: "focused,s1" 0.0;
                inherit: "default" 0.0;
+               // color: #C80000FF (Red)
                color: 200 0 0 255;
             }
             description {
                state: "focused,s2" 0.0;
                inherit: "default" 0.0;
+               // color: #00C800FF (Green)
                color: 0 200 0 255;
             }
          }
 
+         // This is the background for the first text entry.
+         // It changes color to indicate which seat has focus on the text entry.
          part {
             name: "bg_text1";
             type: RECT;
@@ -146,20 +172,29 @@ collections {
                min: 10 50;
                rel1.relative: 0.3 0.25;
                rel2.relative: 0.9 0.4;
+               // color: #C8C8C8FF
                color: 200 200 200 255;
             }
+            // When focused by seat1, the background becomes red.
             description {
                state: "focused,s1" 0.0;
                inherit: "default" 0.0;
+               // color: #C80000FF
                color: 200 0 0 255;
             }
+            // When focused by seat2, the background becomes green.
             description {
                state: "focused,s2" 0.0;
                inherit: "default" 0.0;
+               // color: #00C800FF
                color: 0 200 0 255;
             }
          }
 
+         // An editable textblock. It is positioned inside "bg_text1".
+         // 'source' and 'source4' are used to theme the selection and cursor,
+         // pointing to other groups ("example/selection", "example/cursor") that
+         // define their appearance. This is a powerful feature for custom styling.
          part {
             name: "example/text1";
             type: TEXTBLOCK;
@@ -190,6 +225,7 @@ collections {
             }
          }
 
+         // The background for the second text entry field.
          part {
             name: "bg_text2";
             type: RECT;
@@ -199,20 +235,24 @@ collections {
                min: 10 50;
                rel1.relative: 0.3 0.45;
                rel2.relative: 0.9 0.6;
+               // color: #C8C8C8FF
                color: 200 200 200 255;
             }
             description {
                state: "focused,s1" 0.0;
                inherit: "default" 0.0;
+               // color: #C80000FF
                color: 200 0 0 255;
             }
             description {
                state: "focused,s2" 0.0;
                inherit: "default" 0.0;
+               // color: #00C800FF
                color: 0 200 0 255;
             }
          }
 
+         // The second editable textblock.
          part {
             name: "example/text2";
             type: TEXTBLOCK;
@@ -243,6 +283,8 @@ collections {
             }
          }
 
+         // A large clickable area that acts as a button. It demonstrates how
+         // different regions can react to mouse_over and focus from multiple seats.
          part {
             name: "button_bg";
             type: RECT;
@@ -251,10 +293,13 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.45 0.65;
                rel2.relative: 0.9 0.9;
+               // color: #C8C8C8FF
                color: 200 200 200 255;
             }
          }
 
+         // An invisible rectangle defining the inner area of the button where
+         // feedback indicators will be displayed.
          part {
             name: "button_area";
             type: RECT;
@@ -273,6 +318,9 @@ collections {
             }
          }
 
+         // Visual indicator for mouse-over from seat1.
+         // It's a semi-transparent red rectangle (#FF000064) that becomes
+         // fully opaque (#FF0000FF) on mouse-over.
          part {
             name: "button_left_over";
             type: RECT;
@@ -314,6 +362,8 @@ collections {
             }
          }
 
+         // Visual indicator for focus from seat1.
+         // This also becomes fully opaque red when the button is focused by seat1.
          part {
             name: "button_left_focus";
             type: RECT;
@@ -355,6 +405,7 @@ collections {
             }
          }
 
+         // Visual indicator for mouse-over from seat2, colored green.
          part {
             name: "button_right_over";
             type: RECT;
@@ -396,6 +447,7 @@ collections {
             }
          }
 
+         // Visual indicator for focus from seat2, colored green.
          part {
             name: "button_right_focus";
             type: RECT;
@@ -437,6 +489,8 @@ collections {
             }
          }
 
+         // An invisible, clickable area that covers the whole window.
+         // Clicking it removes focus from any focused object for a given seat.
          part {
             name: "unfocus_area";
             type: RECT;
@@ -448,6 +502,8 @@ collections {
             }
          }
 
+         // A SWALLOW part acts as a container for an external Evas object.
+         // This allows native C code to inject widgets into the Edje layout.
          part {
             name: "example/swallow";
             type: SWALLOW;
@@ -461,6 +517,7 @@ collections {
       }
 
       programs {
+         // On load, set the initial focus for "seat1" to the first text entry.
          program {
             name: "focus";
             signal: "load";
@@ -469,6 +526,8 @@ collections {
             target: "example/text1";
          }
 
+         // --- Text Entry Focus Logic ---
+         // When text1 is clicked by seat1, it gains focus for seat1.
          program {
             name: "focus,t1,s1";
             signal: "seat,seat1,mouse,clicked,1";
@@ -477,6 +536,8 @@ collections {
             target: "example/text1";
          }
 
+         // When text1 gains focus from seat1, its background ("bg_text1")
+         // changes to the "focused,s1" state (red).
          program {
             name: "focus,color,t1,s1";
             signal: "seat,seat1,focus,part,in";
@@ -485,6 +546,7 @@ collections {
             target: "bg_text1";
          }
 
+         // When text1 loses focus from seat1, its background reverts to default.
          program {
             name: "unfocus,color,t1,s1";
             signal: "seat,seat1,focus,part,out";
@@ -492,6 +554,8 @@ collections {
             action: STATE_SET "default" 0.0;
             target: "bg_text1";
          }
+
+         // The following programs repeat the focus logic for text2 and for both seats.
 
          program {
             name: "focus,t2,s1";
@@ -565,6 +629,9 @@ collections {
             target: "bg_text2";
          }
 
+         // --- Button Interaction Logic for Seat 1 (Left Indicators) ---
+
+         // When seat1's cursor enters the button, show the "over" state for the left indicator.
          program {
             name: "button,left,in";
             signal: "seat,seat1,mouse,in";
@@ -573,6 +640,7 @@ collections {
             target: "button_left_over";
          }
 
+         // When seat1's cursor leaves, revert the "over" state.
          program {
             name: "button,left,out";
             signal: "seat,seat1,mouse,out";
@@ -581,6 +649,7 @@ collections {
             target: "button_left_over";
          }
 
+         // When clicked by seat1, the button itself gets focus for seat1.
          program {
             name: "button,left,focus";
             signal: "seat,seat1,mouse,clicked,1";
@@ -589,6 +658,7 @@ collections {
             target: "button_bg";
          }
 
+         // When the button gains focus from seat1, show the "focus" state for the left indicator.
          program {
             name: "button,left,focused";
             signal: "seat,seat1,focus,part,in";
@@ -597,6 +667,7 @@ collections {
             target: "button_left_focus";
          }
 
+         // When focus from seat1 is lost, revert the "focus" state.
          program {
             name: "button,left,unfocused";
             signal: "seat,seat1,focus,part,out";
@@ -605,6 +676,7 @@ collections {
             target: "button_left_focus";
          }
 
+         // --- Button Interaction Logic for Seat 2 (Right Indicators) ---
          program {
             name: "button,right,in";
             signal: "seat,seat2,mouse,in";
@@ -645,6 +717,8 @@ collections {
             target: "button_right_focus";
          }
 
+         // --- Knob Drag Logic ---
+         // When knob1 is dragged by seat1, it changes to its "focused,s1" state (red).
          program {
             name: "knob1,s1";
             signal: "seat,seat1,drag,start";
@@ -653,6 +727,7 @@ collections {
             target: "example/knob1";
          }
 
+         // When knob1 is dragged by seat2, it changes to its "focused,s2" state (green).
          program {
             name: "knob1,s2";
             signal: "seat,seat2,drag,start";
@@ -661,6 +736,8 @@ collections {
             target: "example/knob1";
          }
 
+         // When dragging stops (by any seat, hence the '*' wildcard),
+         // the knob reverts to its default state.
          program {
             name: "knob1,seat1";
             signal: "seat,*,drag,stop";
@@ -668,6 +745,8 @@ collections {
             action: STATE_SET "default" 0.0;
             target: "example/knob1";
          }
+
+         // The logic is repeated for the second knob.
 
          program {
             name: "knob2,s1";
@@ -693,6 +772,9 @@ collections {
             target: "example/knob2";
          }
 
+         // --- Swallowed Object Focus Logic ---
+         // When the swallow part is clicked by seat1, focus is given to the
+         // object contained within it for seat1.
          program {
             name: "rect,focus,s1";
             signal: "seat,seat1,mouse,clicked,1";
@@ -701,10 +783,13 @@ collections {
             target: "example/swallow";
          }
 
+         // When the unfocus area is clicked by seat1, it unfocuses the object.
          program {
             name: "rect,unfocus,s1";
             signal: "seat,seat1,mouse,clicked,1";
             source: "unfocus_area";
+            // The target is intentionally omitted. This special syntax means
+            // "unfocus whatever object has focus" for the given seat.
             action: FOCUS_OBJECT "seat1";
          }
 
@@ -725,6 +810,8 @@ collections {
       }
    }
 
+   // This group defines the visual appearance of text selection.
+   // It's referenced by the 'source' property of the TEXTBLOCK parts.
    group {
       name: "example/selection";
 
@@ -735,12 +822,15 @@ collections {
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // color: #B4B4B4FF
                color: 180 180 180 255;
             }
          }
       }
    }
 
+   // This group defines the appearance and animation of the text cursor.
+   // It's referenced by the 'source4' property of the TEXTBLOCK parts.
    group {
       name: "example/cursor";
       min: 1 0;
@@ -753,6 +843,7 @@ collections {
             description {
                state: "default" 0.0;
                min: 2 12;
+               // color: #000000FF
                color: 0 0 0 255;
             }
             description {
@@ -764,6 +855,10 @@ collections {
       }
 
       programs {
+         // This set of programs creates a blinking cursor animation.
+         // It works like a state machine, using 'after' to chain programs with delays.
+
+         // 1. On load, "cursor_hide" starts, fading out the cursor over 0.2s.
          program {
             name: "cursor_hide";
             signal: "load";
@@ -773,17 +868,22 @@ collections {
             transition: SINUSOIDAL 0.2;
             after: "cursor_hide_timer";
          }
+         // 2. After the transition ends, "cursor_hide_timer" does nothing but
+         //    wait for 0.2s then trigger "cursor_show".
          program {
             name: "cursor_hide_timer";
             in: 0.2 0.0;
             after: "cursor_show";
          }
+         // 3. "cursor_show" makes the cursor visible again.
          program {
             name: "cursor_show";
             action: STATE_SET "default" 0.0;
             target: "cursor";
             after: "cursor_show_timer";
          }
+         // 4. "cursor_show_timer" waits for 0.5s (the 'on' duration) and then
+         //    triggers "cursor_hide", restarting the cycle.
          program {
             name: "cursor_show_timer";
             in: 0.5 0.0;

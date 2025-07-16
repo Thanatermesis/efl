@@ -1,12 +1,23 @@
 collections {
+   // This group defines a theme for an Elementary layout. The name follows the
+   // convention "elm/widget_name/style". In this case, it's for a custom layout
+   // named "mylayout".
    group {
       name: "elm/example/mylayout/default";
 
+      // The 'data' block is used to store arbitrary key-value pairs of strings
+      // within the group. This data can be queried at runtime. Here, it sets a
+      // title for this UI component.
       data {
          item: "title" "elm_codegen Example";
       }
 
+      // The 'parts' block contains all the graphical elements of the layout.
+      // Each 'part' is a distinct component, like a text label, a button, or a
+      // container for other widgets.
       parts {
+         // This is a TEXT part used as a title. It's positioned at the top 20%
+         // of the layout.
          part {
             name: "example/title";
             api: "title" "The example title";
@@ -14,36 +25,57 @@ collections {
 
                description {
                state: "default" 0.0;
+               // Color is black with full alpha (#000000FF).
                color: 0 0 0 255;
+               // 'rel1' defines the top-left corner of the part.
                rel1 {
+                  // 'relative' positions the corner relative to the container's
+                  // size (from 0.0 to 1.0). Here, it's at the top-left corner.
                   relative: 0.0 0.0;
                   offset: 0 0;
                }
+               // 'rel2' defines the bottom-right corner of the part.
                rel2 {
+                  // Positioned at 100% width and 20% height of the container.
+                  // The offset of -1 on both axes makes the part one pixel
+                  // smaller in each dimension, ensuring it fits perfectly within
+                  // the calculated area.
                   relative: 1.0 0.2;
                   offset: -1 -1;
                }
+               // The 'text' block specifies the properties of the text to be
+               // displayed.
                text {
                   text: "Using elementary_codegen";
                   size: 16;
                   font: "sans";
                   min: 1 1;
+                  // 'ellipsis' determines where the "..." is shown if the text
+                  // overflows. A value of -1 (or 1.0) places it at the end.
                   ellipsis: -1;
                }
             }
          }
 
+         // This is a SWALLOW part, which acts as a container for an external
+         // Evas_Object. The application can "swallow" a widget into this part.
          part {
             name: "example/custom";
             api: "custom" "The swallow part";
             type: SWALLOW;
 
+            // This 'description' defines the 'default' state of the part.
+            // It has a fixed size and is aligned towards the top-center.
             description {
                state: "default" 0.0;
                min: 160 50;
                max: 160 50;
                align: 0.5 0.4;
             }
+            // This 'description' defines the 'big' state. It inherits all
+            // properties from the 'default' state and then overrides the min/max
+            // size to make the part larger. This is efficient as it avoids
+            // redeclaring common properties like alignment.
             description {
                state: "big" 0.0;
                inherit: "default" 0.0;
@@ -52,6 +84,8 @@ collections {
             }
          } // example/custom
 
+         // A BOX part is a container that arranges multiple child items
+         // according to a specified layout.
          part {
             name: "example/box";
             api: "box" "The box part";
@@ -59,14 +93,20 @@ collections {
 
             description {
                state: "default" 0.0;
+               // The 'box' block defines the properties of the box layout.
                box {
+                  // 'horizontal_homogeneous' layout arranges children
+                  // horizontally, giving each the same amount of space.
                   layout: "horizontal_homogeneous";
                }
+               // Positioned to occupy the vertical space from 50% to 60% of
+               // the layout's height.
                rel1.relative: 0.0 0.5;
                rel2.relative: 1.0 0.6;
             }
          } // box
 
+         // A TABLE part is a container that arranges children in a grid.
          part {
             name: "example/table";
             api: "table" "The table part";
@@ -74,21 +114,36 @@ collections {
 
             description {
                state: "default" 0.0;
+               // Positioned to occupy the bottom 20% of the layout's height.
                rel1.relative: 0.0 0.8;
                rel2.relative: 1.0 1.0;
             }
          } // table
 
+         // 'programs' define the interactive logic and animations of the layout.
+         // They respond to signals (events) and change the state of parts.
          programs {
+            // This program handles the growth animation of the 'example/custom'
+            // swallow part.
             program {
                name: "swallow,grow";
                api: "swallow_grow" "Executed when the button enlarges";
+               // Triggered by the "button,enlarge" signal, which could be
+               // emitted by another part or the application code.
                signal: "button,enlarge";
+               // This action changes the state of the target part.
                action: STATE_SET "big" 0.0;
+               // The state change is animated over 0.5 seconds with a linear
+               // interpolation.
                transition: LINEAR 0.5;
+               // The part to be modified is "example/custom".
                target: "example/custom";
+               // After this program completes, it triggers the "emit,changed"
+               // program. This is useful for chaining actions.
                after: "emit,changed";
             }
+            // This program handles the shrink animation, returning the part to
+            // its 'default' state.
             program {
                name: "swallow,shrink";
                api: "swallow_shrink" "Executed when the button reduces";
@@ -98,8 +153,12 @@ collections {
                target: "example/custom";
                after: "emit,changed";
             }
+            // This program's sole purpose is to emit a signal, which is useful
+            // for notifying the application code that something has changed in
+            // the layout.
             program {
                name: "emit,changed";
+               // Emits the "size,changed" signal with an empty source string.
                action: SIGNAL_EMIT "size,changed" "";
                api: "size_changed" "Emit the signal size,changed";
             }

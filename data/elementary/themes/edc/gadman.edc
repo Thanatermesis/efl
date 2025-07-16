@@ -1,12 +1,19 @@
 // FIXME: FLAT: improve for flat
 
+// This group defines the style for a gadget popup window, which is a simple
+// container with a background and a content area.
 group { name: "e/gadman/popup";
    parts {
+      // The background of the popup. Its color is determined by the theme
+      // through the 'color_class'.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/gadgets/pop";
          }
       }
+      // A container for the actual content of the popup. It is clipped by the
+      // 'clip' part to ensure content does not spill outside the popup's bounds.
+      // The offsets provide a small padding around the content.
       part { name: "e.swallow.content"; type: SWALLOW; clip_to: "clip";
          scale: 1;
          description { state: "default" 0.0;
@@ -15,6 +22,8 @@ group { name: "e/gadman/popup";
             offscale;
          }
       }
+      // A clipping rectangle that defines the visible area for the
+      // 'e.swallow.content' part.
       part { name: "clip"; type: RECT;
          description { state: "default";
          }
@@ -22,59 +31,83 @@ group { name: "e/gadman/popup";
    }
 }
 
+// This group defines a full-screen background, typically used during gadget
+// manipulation (like moving or resizing) to dim the rest of the screen and
+// provide a clear context for the operation.
 group { name: "e/gadman/full_bg";
    parts {
+      // The main background layer. It's invisible by default and fades in to
+      // dim the screen. 'mouse_events: 0' ensures it doesn't block input.
       part { name: "bg"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Color is transparent white (#FFFFFF00), making it invisible.
             color: 255 255 255 0; // no cc
+            // The color class will be used by the theme to set a dimming color.
             color_class: "/dim/normal/gadgets/full-bg";
             visible: 0;
          }
          description { state: "visible" 0.0;
+            // Fallback color is opaque white (#FFFFFFFF) if no color class is set.
             color: 255 255 255 255; // no cc
          }
       }
+      // An alternative background that can be used for custom visuals, separate
+      // from the standard dimming effect.
       part { name: "custom_bg"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
+            // Opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
+      // A swallow part to display a custom background object, clipped by 'custom_bg'.
       part { name: "e.swallow.bg"; type: SWALLOW; mouse_events: 0;
          clip_to: "custom_bg";
          description { state: "default" 0.0;
          }
       }
+      // A transparent rectangle that covers the entire area. This can be used
+      // to capture all mouse events, acting as a grabber.
       part { name: "grabber"; type: RECT;
          description { state: "default" 0.0;
+            // Fully transparent (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
    programs {
+      // This program is triggered by the "e,state,visibility,show" signal.
+      // It smoothly fades in the 'bg' part to its "visible" state.
       program { signal: "e,state,visibility,show"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.4 USE_DURATION_FACTOR 1;
          target: "bg";
       }
+      // This variant shows the background instantly without animation.
       program { signal: "e,state,visibility,show,now"; source: "e";
          action: STATE_SET "visible" 0.0;
          target: "bg";
       }
+      // Fades out the 'bg' part back to its "default" (invisible) state.
+      // After the animation, it runs the "hide_stop" program.
       program { signal: "e,state,visibility,hide"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.4 USE_DURATION_FACTOR 1;
          target: "bg";
          after: "hide_stop";
       }
+      // Hides the background instantly and then runs "hide_stop".
       program { signal: "e,state,visibility,hide,now"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "bg";
          after: "hide_stop";
       }
+      // The following programs control the visibility of 'custom_bg',
+      // mirroring the logic for the main 'bg' part.
       program { signal: "e,state,visibility,show,custom"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.4 USE_DURATION_FACTOR 1;
@@ -95,14 +128,20 @@ group { name: "e/gadman/full_bg";
          target: "custom_bg";
          after: "hide_stop";
       }
+      // This program is run after a hide animation completes. It emits a
+      // signal to notify the application code that the hide action is finished.
       program { name: "hide_stop";
          action: SIGNAL_EMIT "e,action,hide,stop" "";
       }
    }
 }
 
+// This group defines a simple frame for a gadget, essentially a container
+// for the gadget's content with some padding.
 group { name: "e/gadman/frame";
    parts {
+      // A swallow part that holds the gadget's main content. The offsets
+      // create a small border around the content.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -114,10 +153,14 @@ group { name: "e/gadman/frame";
    }
 }
 
+// This group defines the control frame for a gadget, which appears when the
+// gadget is selected. It includes a border, resize handles, and a move area.
 group { name: "e/gadman/control";
    images.image: "outline.png" COMP;
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // A tiled pattern part, 'pat', that provides a visual texture for the
+      // control frame's background. It is placed just inside the 'base' border.
       part { name: "pat"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.to: "base";
@@ -129,6 +172,9 @@ group { name: "e/gadman/control";
             TILED_PATTERN(240, 240)
          }
       }
+      // The main border of the control frame. It uses a 9-patch image
+      // ('outline.png') to scale correctly. It does not handle mouse events
+      // itself.
       part { name: "base"; mouse_events: 0;
          description { state: "default" 0.0;
             image.normal: "outline.png";
@@ -137,11 +183,21 @@ group { name: "e/gadman/control";
             fill.smooth: 0;
             color_class: "/bg/normal/gadgets/control/outline";
          }
+         // When the gadget is active (focused), a different color class is used
+         // to highlight the border.
          description { state: "active" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/gadgets/control/outline";
          }
       }
+      // The following 'av*' and 'ah*' parts are arrows that indicate resizability.
+      // They are normally invisible ('visible: 0'). When the mouse hovers over a
+      // resize handle, they become visible and pulse. The pulse is a two-state
+      // animation ("pulse0", "pulse1") that moves the arrow and fades it out,
+      // creating a "breathing" effect.
+      // 'av*' parts are for vertical resizing (up/down arrows).
+      // 'ah*' parts are for horizontal resizing (left/right arrows).
+      // Each resize handle has a pair of arrows.
       part { name: "av10"; mouse_events: 0;
          scale;
          description { state: "default" 0.0;
@@ -326,6 +382,8 @@ group { name: "e/gadman/control";
             color: 255 255 255 0; // no cc
          }
       }
+      // A transparent rectangle covering the gadget's area, used as a handle
+      // for moving the gadget. It can be hidden by setting its state to "off".
       part { name: "move"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "base";
@@ -337,6 +395,10 @@ group { name: "e/gadman/control";
             visible: 0;
          }
       }
+      // The following 'resize*' parts are transparent rectangles that act as
+      // hot-spots for resizing. 'v' parts are for vertical, 'h' for horizontal.
+      // The 'max' property restricts their size to create thin trigger areas.
+      // They can be hidden by setting their state to "off".
       part { name: "resizev1"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "base";
@@ -395,6 +457,9 @@ group { name: "e/gadman/control";
       }
    }
    programs {
+      // These programs toggle the visibility of the resize handles based on
+      // signals from the application. For instance, a gadget might only be
+      // horizontally resizable.
       program { signal: "e,state,hsize,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "resizeh1";
@@ -415,6 +480,7 @@ group { name: "e/gadman/control";
          target: "resizev1";
          target: "resizev2";
       }
+      // These programs toggle the visibility of the move handle.
       program { signal: "e,state,move,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "move";
@@ -423,6 +489,8 @@ group { name: "e/gadman/control";
          action: STATE_SET "off" 0.0;
          target: "move";
       }
+      // These programs change the state of the 'base' border to provide
+      // visual feedback when the gadget gains or loses focus.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "base";
@@ -431,6 +499,10 @@ group { name: "e/gadman/control";
          action: STATE_SET "default" 0.0;
          target: "base";
       }
+// This macro defines a set of programs to create a pulsing animation for the
+// resize arrows. When the mouse enters a resize handle, it triggers a looping
+// animation that cycles between two states. When the mouse leaves, the
+// animation is stopped and the arrows are hidden.
 #define ARROWPULSE(_NAME, _SRC, _DST1, _DST2) \
       program { name: _NAME"0"; \
          signal: "mouse,in"; source: _SRC; \
@@ -469,6 +541,10 @@ group { name: "e/gadman/control";
       ARROWPULSE("pulse3", "resizeh1", "ah10", "ah11")
       ARROWPULSE("pulse4", "resizeh2", "ah20", "ah21")
 #undef ARROWPULSE
+// This macro defines programs to translate mouse events on a handle into
+// signals for the application code. It's used for move and resize actions.
+// It emits "start", "stop", and "go" signals corresponding to mouse down,
+// up, and move events.
 #define PROGSET(_SRC, _ACT) \
       program { signal: "mouse,down,1"; source: _SRC; \
          action: SIGNAL_EMIT "e,action,"_ACT",start" ""; \

@@ -1,5 +1,8 @@
 collections {
 
+   // Color classes are used to define reusable colors that can be dynamically
+   // changed at runtime. The colors below are the default for the button
+   // backgrounds, a light grey (#C8C8C8).
    color_classes {
       color_class {
          name: "button_bg,1";
@@ -19,11 +22,16 @@ collections {
       }
    }
 
+   // The main group defines the primary layout of the interface.
    group {
       name: "example/main";
       min: 400 400;
 
+      // 'parts' are the visual elements of the UI.
       parts {
+         // This is a simple background rectangle that fills the entire window.
+         // 'mouse_events: 0' ensures it doesn't intercept mouse input, which is
+         // important for performance and for elements layered on top.
          part {
             name: "bg";
             type: RECT;
@@ -33,13 +41,16 @@ collections {
             }
          }
 
+         // The title text for the window.
          part {
             name: "title";
             type: TEXT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Text color is black (#000000).
                color: 0 0 0 255;
+               // It is positioned relative to the 'bg' part, at the top.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 0 0;
@@ -50,6 +61,7 @@ collections {
                   offset: -1 -1;
                   to: "bg";
                }
+               // Defines the text content and its properties.
                text {
                   text: "Dynamic Multiseat Example";
                   size: 16;
@@ -59,6 +71,9 @@ collections {
             }
          }
 
+         // This is an invisible container used for positioning the four buttons.
+         // Using a container part simplifies layout management, as all buttons
+         // can be positioned relative to this single element.
          part {
             name: "buttons";
             type: RECT;
@@ -67,16 +82,20 @@ collections {
                state: "default" 0.0;
                rel1.relative: 0.2 0.3;
                rel2.relative: 0.8 0.9;
+               // The color is fully transparent (#FFFFFF00), making it invisible.
                color: 255 255 255 0;
             }
          }
 
+         // This part is the background of the first button, which reacts to mouse
+         // events ('mouse_events: 1'). Its color will change on hover.
          part {
             name: "button_bg,1";
             type: RECT;
             mouse_events: 1;
             description {
                state: "default" 0.0;
+               // Positioned in the top-left quadrant of the 'buttons' container.
                rel1 {
                   to: "buttons";
                   relative: 0.1 0.1;
@@ -85,16 +104,21 @@ collections {
                   to: "buttons";
                   relative: 0.45 0.45;
                }
+               // Its color is managed by a color_class, allowing dynamic changes.
                color_class: "button_bg,1";
             }
          }
 
+         // This part is a smaller, purely visual rectangle inside the button
+         // background. It creates an inset border effect. 'mouse_events: 0' means
+         // it is not interactive.
          part {
             name: "button1";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // Positioned relative to 'button_bg,1' with a 10px margin.
                rel1 {
                   to: "button_bg,1";
                   offset: 10 10;
@@ -103,6 +127,7 @@ collections {
                   to: "button_bg,1";
                   offset: -11 -11;
                }
+               // It has a static light grey color (#C8C8C8).
                color: 200 200 200 255;
             }
          }
@@ -216,16 +241,28 @@ collections {
          }
       }
 
+      // The script block allows for complex logic using the Embryo scripting
+      // language. The 'public' variables declared here can be accessed and
+      // modified by both the C application code and the programs below.
       script {
+         // These integer lists will store the R, G, B color components for each
+         // connected seat.
          public red;
          public green;
          public blue;
+         // This integer will keep track of the number of active seats.
          public seat_count;
       }
 
+      // Programs define how the interface reacts to signals (events). These
+      // can be user actions (like mouse clicks) or signals emitted from the
+      // application code.
       programs {
+         // This program is triggered when a new seat is added.
          program {
             name: "seat,added";
+            // It listens for a global signal starting with "seat,added,". The '*'
+            // is a wildcard that matches any following characters.
             signal: "seat,added,*";
             source: "";
             script {
@@ -233,6 +270,7 @@ collections {
                new buf[256];
                new r, g, b;
 
+               // Generate a random color for the new seat.
                r = rand() * 255 / 65535;
                append_int(red, r);
                g = rand() * 255 / 65535;
@@ -240,10 +278,17 @@ collections {
                b = rand() * 255 / 65535;
                append_int(blue, b);
 
+               // Increment the seat counter.
                set_int(seat_count, get_int(seat_count) + 1);
 
+               // This logic is for extracting the seat name from the signal, but
+               // it's flawed. A better approach would be to parse the signal
+               // more carefully in C code and pass simpler arguments.
                strncpy(seat_name, sig[strlen("seat,added,")],
                        strchr(sig[strlen("seat,added,")], ","));
+               // Emit a new signal back to the application containing the color
+               // assigned to the new seat. This allows the C code to be aware
+               // of the color chosen by the theme.
                snprintf(buf, sizeof(buf),
                         "seat,color,%s,r=%i,g=%i,b=%i", seat_name,
                         r, g, b);
@@ -251,27 +296,41 @@ collections {
             }
          }
 
+         // This program handles the mouse-in event for any button background.
          program {
             name: "button,in";
+            // It triggers when any seat's cursor enters one of the button
+            // backgrounds. The signal contains the seat name (e.g., "seat0").
             signal: "seat,*,mouse,in";
+            // 'source' specifies that this program only applies to parts named
+            // "button_bg,*". 'src' in the script will refer to the specific
+            // part that triggered the signal.
             source: "button_bg,*";
             script {
                new idx, r, g, b;
 
+               // Extract the seat number from the signal (e.g., "seat0" -> 0)
+               // to use as an index for the color arrays.
                idx = atoi(sig[strlen("seat,seat")]) - 1;
+               // Fetch the stored color for this seat.
                r = fetch_int(red, idx);
                g = fetch_int(green, idx);
                b = fetch_int(blue, idx);
 
+               // Change the color of the hovered button background ('src') to the
+               // seat-specific color.
                set_color_class(src, r, g, b, 255);
             }
          }
 
+         // This program handles the mouse-out event to reset the button's appearance.
          program {
             name: "button,out";
             signal: "seat,*,mouse,out";
             source: "button_bg,*";
             script {
+               // Resets the button background color to its default light grey
+               // (#C8C8C8) when the mouse cursor leaves.
                set_color_class(src, 200, 200, 200, 255);
             }
          }

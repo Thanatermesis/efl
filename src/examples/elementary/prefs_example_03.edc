@@ -1,12 +1,18 @@
+// Define a message ID for velocity updates. This allows external code to
+// communicate with the EDJE object to change the animation speed.
 #define MSG_ID_VEL (1)
 
 collections {
+   // This group defines the main interface, "prefs_edje", with a specified
+   // min and max size. It contains all the parts and logic for the animation.
    group {
       name: "prefs_edje";
       max: 450 450;
       min: 50 50;
 
       parts {
+         // A transparent background part that defines the object's boundaries.
+         // It's set to be fully transparent (alpha 0).
          part {
             name: "bg";
             type: RECT;
@@ -20,6 +26,8 @@ collections {
             }
          }
 
+         // This is the first of two squares that will be animated.
+         // It has two states: "default" and "invert".
          part {
             name: "square1";
             type: RECT;
@@ -28,17 +36,21 @@ collections {
                state: "default" 0.0;
                min: 50 50;
                max: 50 50;
+               // "default" state: blue color (#0000FFFF), positioned on the left.
                color: 0 0 255 255;
                align: 0.0 0.5;
             }
             description {
                state: "invert" 0.0;
                inherit: "default" 0.0;
+               // "invert" state: green color (#00FF00FF), positioned on the right.
                color: 0 255 0 255;
                align: 1 0.5;
             }
          }
 
+         // The second square, which mirrors the first one's animation but with
+         // swapped colors. This creates a visually appealing symmetric motion.
          part {
             name: "square2";
             type: RECT;
@@ -46,18 +58,23 @@ collections {
                state: "default" 0.0;
                min: 50 50;
                max: 50 50;
+               // "default" state: green color (#00FF00FF), positioned at the top.
                color: 0 255 0 255;
                align: 0.5 0.0;
             }
             description {
                state: "invert" 0.0;
                inherit: "default" 0.0;
+               // "invert" state: blue color (#0000FFFF), positioned at the bottom.
                color: 0 0 255 255;
                align: 0.5 1.0;
             }
          }
       }
 
+      // This program is triggered by an external "start" signal from a source
+      // named "animation". It's the entry point for starting the animation sequence.
+      // After it runs, it chains to the "animation,clear" program.
       program {
          name: "animation_start";
          signal: "start";
@@ -65,6 +82,10 @@ collections {
          after: "animation,clear";
       }
 
+      // This program is responsible for initiating the first animation state.
+      // It cancels any ongoing animation, then starts "animation_1" with the
+      // current speed (global_speed). It also sets a flag 'anim_n' to 1
+      // to track the current animation state.
       program {
          name: "call_animation,state1";
          script {
@@ -74,6 +95,8 @@ collections {
          }
       }
 
+      // This program initiates the second animation state, which is the reverse
+      // of the first. It starts "animation_2" and sets 'anim_n' to 2.
       program {
          name: "call_animation,state2";
          script {
@@ -83,6 +106,8 @@ collections {
          }
       }
 
+      // This program is triggered by a "stop" signal and halts the currently
+      // running animation by its ID.
       program {
          name: "animation,stop";
          signal: "stop";
@@ -92,6 +117,11 @@ collections {
          }
       }
 
+      // This program cleans up animation state. It is run after "animation_start".
+      // When switching from anim_n=2 back to 1, it reverses the animation
+      // position. This ensures that if the animation is paused and restarted, it
+      // continues smoothly from where it left off, but in the opposite direction.
+      // The formula (get_float(anim_pos) - 1) * (-1) is equivalent to 1.0 - anim_pos.
       program {
          name: "animation,clear";
          script {
@@ -102,17 +132,35 @@ collections {
          after: "call_animation,state1";
       }
 
+      // The script block contains Embryo script code that controls the animation logic.
+      // It defines public variables that can be accessed from programs or external
+      // code, a message handler for communication, and the animation functions.
       script {
+         // These are public variables accessible throughout the EDJE object.
+         // global_speed: Controls the duration of the animation.
+         // anim_id: Stores the ID of the current running animation.
+         // anim_pos: Stores the current position (0.0 to 1.0) of the animation.
+         // anim_n: Tracks which animation state (1 or 2) is active.
          public global_speed;
          public anim_id;
          public anim_pos;
          public anim_n;
 
+         // This function handles incoming messages sent to the EDJE object.
+         // It listens for a message with the ID MSG_ID_VEL and a FLOAT payload,
+         // and uses it to update the global_speed variable.
          public message(Msg_Type:type, id, ...) {
             if ((type == MSG_FLOAT) && (id == MSG_ID_VEL))
               set_float(global_speed, Float:getarg(2));
          }
 
+         // This function defines the first half of the animation.
+         // 'pos' is the animation position from 0.0 to 1.0.
+         // It tweens the states of square1 and square2 from "default" to "invert".
+         // The condition `pos >= get_float(anim_pos)` ensures the animation only
+         // moves forward, which is useful for resuming.
+         // When the animation completes (pos >= 1), it triggers the program for
+         // the second animation state.
          public animation_1(val, Float:pos) {
            if (pos >= get_float(anim_pos) && get_int(anim_n) == 1)
              {
@@ -129,6 +177,10 @@ collections {
              }
          }
 
+         // This function defines the second half of the animation, which runs in reverse.
+         // It tweens the states from "invert" back to "default".
+         // When complete, it triggers the program for the first animation state,
+         // creating an infinite loop.
          public animation_2(val, Float:pos) {
            if (pos >= get_float(anim_pos) && get_int(anim_n) == 2)
              {
@@ -147,4 +199,6 @@ collections {
       }
 }
 
+// It's good practice to undefine macros after use to avoid name clashes in
+// other files that might include this one.
 #undef MSG_ID_VEL

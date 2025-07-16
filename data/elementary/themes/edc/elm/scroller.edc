@@ -1,3 +1,7 @@
+// This is the main group for the scroller widget. It defines the basic
+// structure, including background, content area, and scrollbars.
+// It's aliased by other widgets like lists and grids, making it a
+// fundamental component for scrollable views in Elementary.
 group { name: "elm/scroller/base/default";
    alias: "elm/list/base/default";
    alias: "elm/genlist/base/default";
@@ -7,12 +11,17 @@ group { name: "elm/scroller/base/default";
    alias: "elm/scroller/base/popup/default";
    alias: "elm/scroller/base/popup/transparent";
 
+   // Pre-loads images used for edge shadows to ensure they are ready for rendering.
    images.image: "shadow_circle_horiz.png" COMP;
    images.image: "shadow_circle_vert.png" COMP;
 
+   // Enables the default focus highlight behavior for this widget.
    data.item: "focus_highlight" "on";
 
    parts {
+      // This script runs once when the group is loaded. It emits a "reload"
+      // signal, which can be used by the C code to perform any necessary
+      // post-initialization tasks for the scroller widget.
       program { signal: "load"; source: "";
          script {
             emit("reload", "elm");
@@ -20,28 +29,35 @@ group { name: "elm/scroller/base/default";
       }
 
       //////////////////////////////////////////////////////////////////////
+      // A background rectangle, sized to the swallow background area.
+      // It uses a color class to allow for theme-wide color changes.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.background";
             color_class: "/bg/normal/scroller/base";
          }
       }
+      // This part acts as a clipping mask for all content, background, and
+      // overlay swallows. Anything outside this rectangle will not be visible.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "elm.swallow.content";
          }
       }
+      // A swallow part for custom background content, provided from the C side.
       part { name: "elm.swallow.background"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
          }
       }
+      // The main content area where the scrollable content is placed.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "elm.swallow.background";
          }
       }
+      // A swallow part for overlay content, which appears on top of the main content.
       part { name: "elm.swallow.overlay"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -49,11 +65,15 @@ group { name: "elm/scroller/base/default";
          }
       }
 
+      // This part creates the shadow at the top edge, visible when content can be scrolled up.
+      // It's initially hidden ('offscale' and transparent) and fades in when scrolling is possible.
+      // Mouse events are disabled as it's purely decorative.
       part { name: "sh_top"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
          description { state: "default" 0.0;
             color_class: "/shadow/normal/scroller";
+            // Color is transparent white (#FFFFFF00), making the shadow texture invisible by default.
             color: 255 255 255 0; // no cc
             rel.to: "elm.swallow.content";
             rel1.offset: 0 -1;
@@ -65,23 +85,28 @@ group { name: "elm/scroller/base/default";
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF), making the shadow texture visible.
             color: 255 255 255 255; // no cc
             rel1.offset: 0 -16;
             rel2.offset: -1 15;
             visible: 1;
          }
       }
+      // When "elm,action,show,up" is signaled from the C code, this program animates
+      // the shadow into the "visible" state with a deceleration effect.
       program { signal: "elm,action,show,up"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
          target: "sh_top";
       }
+      // Hides the top shadow when scrolling up is no longer possible.
       program { signal: "elm,action,hide,up"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.3;
          target: "sh_top";
       }
 
+      // Bottom edge shadow, using the same mechanism as the top shadow.
       part { name: "sh_bottom"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -104,6 +129,8 @@ group { name: "elm/scroller/base/default";
             visible: 1;
          }
       }
+      // These programs control the visibility of the bottom shadow, triggering on
+      // "show,down" and "hide,down" signals respectively.
       program { signal: "elm,action,show,down"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
@@ -115,6 +142,7 @@ group { name: "elm/scroller/base/default";
          target: "sh_bottom";
       }
 
+      // Left edge shadow, using a vertical shadow image.
       part { name: "sh_left"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -137,6 +165,7 @@ group { name: "elm/scroller/base/default";
             visible: 1;
          }
       }
+      // These programs control the visibility of the left shadow.
       program { signal: "elm,action,show,left"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
@@ -148,6 +177,7 @@ group { name: "elm/scroller/base/default";
          target: "sh_left";
       }
 
+      // Right edge shadow, using a vertical shadow image.
       part { name: "sh_right"; mouse_events: 0;
          scale: 1;
          clip_to: "sh_clip";
@@ -170,6 +200,7 @@ group { name: "elm/scroller/base/default";
             visible: 1;
          }
       }
+      // These programs control the visibility of the right shadow.
       program { signal: "elm,action,show,right"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.3;
@@ -181,6 +212,8 @@ group { name: "elm/scroller/base/default";
          target: "sh_right";
       }
 
+      // This is a clipper for all the shadow parts. By default it is the same
+      // as the main clipper.
       part { name: "sh_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "clipper";
@@ -189,6 +222,14 @@ group { name: "elm/scroller/base/default";
       //////////////////////////////////////////////////////////////////////
 
 // vert bar ////////////////////////////////////////////////////////////////
+      // The vertical scrollbar is composed of several parts:
+      // - sb_vbar: The track area for the scrollbar.
+      // - elm.dragable.vbar: The draggable thumb.
+      // - sb_vbar_p1/p2: Invisible rectangles for page-up/page-down clicks.
+      // - sb_vbar_over: A larger, invisible area to make mouse interaction easier.
+      // - base_vbar/color_vbar: The visual representation of the thumb.
+
+      // This part acts as a container to show or hide the vertical scrollbar area.
       part { name: "sb_vbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -197,6 +238,8 @@ group { name: "elm/scroller/base/default";
             visible: 0;
          }
       }
+      // Defines the track for the vertical scrollbar. It's positioned on the right
+      // side of the scroller and avoids the horizontal scrollbar area.
       part { name: "sb_vbar"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -214,9 +257,11 @@ group { name: "elm/scroller/base/default";
             max: 0 999999;
          }
       }
+      // Invisible area above the scrollbar thumb. Clicking here scrolls up by one page.
       part { name: "sb_vbar_p1"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
+            // Transparent (#00000000).
             color: 0 0 0 0; // no cc
             rel1.to: "sb_vbar";
             rel2.relative: 1.0 0.0;
@@ -224,9 +269,11 @@ group { name: "elm/scroller/base/default";
             fixed: 1 1;
          }
       }
+      // Invisible area below the scrollbar thumb for page-down scrolling.
       part { name: "sb_vbar_p2"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
+            // Transparent (#00000000).
             color: 0 0 0 0; // no cc
             rel1.relative: 0.0 1.0;
             rel1.to: "elm.dragable.vbar";
@@ -234,6 +281,9 @@ group { name: "elm/scroller/base/default";
             fixed: 1 1;
          }
       }
+      // The draggable thumb of the vertical scrollbar. It is confined to the sb_vbar track.
+      // The `dragable` properties make this part interactive, responding to user drags
+      // to scroll the content vertically.
       part { name: "elm.dragable.vbar"; type: RECT;
          clip_to: "sb_vbar";
          scale: 1;
@@ -257,6 +307,9 @@ group { name: "elm/scroller/base/default";
             inherit: "default" 0.0;
          }
       }
+      // This is an invisible, larger "hotspot" area around the vertical scrollbar.
+      // It's wider than the visible bar to make it easier for the mouse to trigger
+      // the "over" state, which provides visual feedback by enlarging the scrollbar thumb.
       part { name: "sb_vbar_over"; type: RECT;
          repeat_events: 1;
          scale: 1;
@@ -279,6 +332,9 @@ group { name: "elm/scroller/base/default";
          transition: DECELERATE 0.2;
          target: "base_vbar";
       }
+      // These SPACER parts are likely used for layout calculations or as anchors
+      // for other elements, but they are not visible. Their exact purpose might be
+      // tied to specific C code logic that interacts with them.
       part { name: "y_vbar_up_mapper"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -347,6 +403,8 @@ group { name: "elm/scroller/base/default";
             max: 0 0;
          }
       }
+      // This program is triggered by the "elm,action,show,vbar" signal to make
+      // all parts of the vertical scrollbar visible.
       program { signal: "elm,action,show,vbar"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "sb_vbar";
@@ -357,6 +415,7 @@ group { name: "elm/scroller/base/default";
          target: "y_vbar_down_mapper";
          target: "y_vbar_down";
       }
+      // Hides all parts of the vertical scrollbar when it's not needed.
       program { signal: "elm,action,hide,vbar"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "sb_vbar";
@@ -367,10 +426,13 @@ group { name: "elm/scroller/base/default";
          target: "y_vbar_down_mapper";
          target: "y_vbar_down";
       }
+      // Triggered on mouse down on the page-up area. It scrolls the content
+      // up by one page length by manipulating the draggable part.
       program { signal: "mouse,down,1*"; source: "sb_vbar_p1";
          action: DRAG_VAL_PAGE 0.0 -1.0;
          target: "elm.dragable.vbar";
       }
+      // Triggers a page-down scroll.
       program { signal: "mouse,down,1*"; source: "sb_vbar_p2";
          action: DRAG_VAL_PAGE  0.0 1.0;
          target: "elm.dragable.vbar";
@@ -391,6 +453,8 @@ group { name: "elm/scroller/base/default";
 //      }
 
 // horiz bar /////////////////////////////////////////////////////////////
+      // The horizontal scrollbar implementation is analogous to the vertical one,
+      // but operates on the X-axis.
       part { name: "sb_hbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -436,6 +500,7 @@ group { name: "elm/scroller/base/default";
             fixed: 1 1;
          }
       }
+      // The draggable thumb of the horizontal scrollbar.
       part { name: "elm.dragable.hbar"; type: RECT;
          scale: 1;
          clip_to: "sb_hbar";
@@ -549,6 +614,7 @@ group { name: "elm/scroller/base/default";
             max: 0 0;
          }
       }
+      // This program shows all parts of the horizontal scrollbar.
       program { signal: "elm,action,show,hbar"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "sb_hbar";
@@ -559,6 +625,7 @@ group { name: "elm/scroller/base/default";
          target: "x_hbar_right_mapper";
          target: "x_hbar_right";
       }
+      // This program hides all parts of the horizontal scrollbar.
       program { signal: "elm,action,hide,hbar"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "sb_hbar";
@@ -569,6 +636,7 @@ group { name: "elm/scroller/base/default";
          target: "x_hbar_right_mapper";
          target: "x_hbar_right";
       }
+      // These programs handle page-left and page-right scrolling on mouse clicks.
       program { signal: "mouse,down,1*"; source: "sb_hbar_p1";
          action: DRAG_VAL_PAGE -1.0 0.0;
          target: "elm.dragable.hbar";
@@ -593,6 +661,8 @@ group { name: "elm/scroller/base/default";
 //      }
 
       //////////////////////////////////////////////////////////////////////
+      // This part provides the themed color for the vertical scrollbar track.
+      // It changes color based on state (default, disabled, clicked).
       part { name: "color_vbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_vbar_show";
          description { state: "default" 0.0;
@@ -609,6 +679,8 @@ group { name: "elm/scroller/base/default";
          }
       }
 
+      // This is the visible thumb of the vertical scrollbar, layered on top of
+      // the colored track. It's related to the draggable part for its position.
       part { name: "base_vbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_vbar";
@@ -621,12 +693,14 @@ group { name: "elm/scroller/base/default";
          }
          description { state: "over" 0.0;
             inherit: "default" 0.0;
+            // The thumb widens on mouseover for better visual feedback.
             min: 15 15;
             max: 15 999999;
          }
       }
 
       //////////////////////////////////////////////////////////////////////
+      // This part provides the themed color for the horizontal scrollbar track.
       part { name: "color_hbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_hbar_show";
          description { state: "default" 0.0;
@@ -643,6 +717,7 @@ group { name: "elm/scroller/base/default";
          }
       }
 
+      // This is the visible thumb of the horizontal scrollbar.
       part { name: "base_hbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_hbar";
@@ -655,6 +730,7 @@ group { name: "elm/scroller/base/default";
          }
          description { state: "over" 0.0;
             inherit: "default" 0.0;
+            // The thumb becomes thicker on mouseover.
             min: 15 15;
             max: 999999 15;
          }
@@ -662,32 +738,42 @@ group { name: "elm/scroller/base/default";
 
       //////////////////////////////////////////////////////////////////////
 
+      // This part creates a dimming effect over the content, used for visual
+      // feedback during "looping" animations (e.g., bounce-back at scroll ends).
       part { name: "dim_effect"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Transparent dark gray (#20202000).
             color: 32 32 32 0; // no cc
             visible: 0;
          }
          description { state: "effect" 0.0;
+            // Opaque dark gray (#202020FF).
             color: 32 32 32 255; // no cc
          }
       }
    }
    programs {
+      // Handles the disabled state for both scrollbars, applying the "disabled"
+      // state which typically alters their appearance (e.g., grays them out).
       program { signal: "elm,state,disabled"; source: "elm";
          action: STATE_SET "disabled" 0.0;
          target: "color_hbar";
          target: "color_vbar";
       }
+      // Restores the default appearance of the scrollbars when enabled.
       program { signal: "elm,state,enabled"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "color_hbar";
          target: "color_vbar";
       }
+      // When the vertical scrollbar thumb is pressed, this program changes its
+      // state to "clicked" for visual feedback.
       program { signal: "mouse,down,1*"; source: "elm.dragable.vbar";
          action: STATE_SET "clicked" 0.0;
          target: "elm.dragable.vbar";
          target: "color_vbar";
       }
+      // Emits a signal to the C code that the vertical bar has been pressed.
       program { signal: "mouse,down,*"; source: "elm.dragable.vbar";
          action: SIGNAL_EMIT "elm,vbar,press" "elm";
       }
@@ -716,20 +802,28 @@ group { name: "elm/scroller/base/default";
       program { signal: "mouse,up,*"; source: "elm.dragable.hbar";
          action: SIGNAL_EMIT "elm,hbar,unpress" "elm";
       }
+      // This program and the following one create the looping (bounce) effect.
+      // When triggered, it animates the "dim_effect" part to become visible.
+      // The `after` keyword specifies a program to run after this one completes.
       program { signal: "elm,action,looping,left"; source: "elm";
          action: STATE_SET "effect" 0.0;
          transition: LINEAR 0.3;
          target: "dim_effect";
          after: "looping,left,done";
       }
+      // After the dim animation, this program signals back to the C code
+      // that the animation has finished.
       program { name: "looping,left,done";
          action: SIGNAL_EMIT "elm,looping,left,done" "elm";
       }
+      // This program fades out the dim effect when the looping action ends.
       program { signal: "elm,action,looping,left,end"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 0.3;
          target: "dim_effect";
       }
+      // The following programs implement the same looping/dimming effect for the
+      // right, up, and down directions.
       program { signal: "elm,action,looping,right"; source: "elm";
          action: STATE_SET "effect" 0.0;
          transition: LINEAR 0.3;
@@ -775,6 +869,9 @@ group { name: "elm/scroller/base/default";
    }
 }
 
+// This group inherits from the default scroller but disables content clipping.
+// It achieves this by making the "clipper" part extremely large, so it
+// never actually clips the content within the window.
 group { name: "elm/scroller/base/noclip";
    inherit: "elm/scroller/base/default";
    parts {
@@ -804,6 +901,10 @@ group { name: "elm/scroller/base/noclip";
    }
 }
 
+// This group defines the content swallows required for looping (infinite) scroll.
+// It provides four swallow parts: the main one, and three others for content
+// to the right, bottom, and bottom-right. The C code can populate these
+// swallows with copies of the content to create a seamless wrapping effect.
 group { name: "elm/scroller/contents/default";
    parts {
       part { name: "elm.swallow.content"; type: SWALLOW;
@@ -855,6 +956,9 @@ group { name: "elm/scroller/contents/default";
    }
 }
 
+// This variant of the scroller is used in contexts like popups where the
+// default inset shadow is not desired. It inherits from the base and
+// overrides the content swallow's offsets to remove the inset.
 group { name: "elm/scroller/base/popup/no_inset_shadow";
    inherit: "elm/scroller/base/default";
    alias: "elm/scroller/base/no_inset_shadow";

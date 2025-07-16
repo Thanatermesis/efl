@@ -1,4 +1,9 @@
 // regular icons
+// Defines a standard, full-color icon.
+// Each icon is a group containing a single part that displays an image.
+// The group name, like "e/icons/modules-files", is used by applications to look up the icon.
+// The part is not interactive (mouse_events: 0) to improve performance.
+// Its aspect ratio is fixed to 1:1, ensuring it scales correctly.
 #define ICON(_NAME, _ICON) \
    group { name: "e/icons/"_NAME; min: ICMIN ICMIN; \
       parts { \
@@ -151,6 +156,10 @@ ICON("unlock",  "i-padlock-unlock")
 #undef ICON
 
 // mono color default fg color icons
+// Defines a monochromatic icon that inherits its color from the current theme.
+// These icons are typically white or grayscale and are tinted by a 'color_class'.
+// 'color_class: "/fg/normal/icon"' applies the theme's standard foreground color to the icon.
+// This allows the icon's color to change dynamically with the theme, ensuring visual consistency.
 #define ICON(_NAME, _ICON) \
    group { name: "e/icons/"_NAME; min: ICMIN ICMIN; \
       parts { \
@@ -223,6 +232,9 @@ ICON("fprint", "i-fingerprint")
 #undef ICON
 
 // mono border action icons
+// Defines monochromatic icons specifically for window borders (decorations).
+// The group name prefix "e/widgets/border/default/" signals their use case.
+// Like the previous set, these icons use a color_class to match the theme's foreground color.
 #define ICON(_NAME, _ICON) \
    group { name: "e/widgets/border/default/"_NAME; min: ICMIN ICMIN; \
       parts { \
@@ -263,6 +275,10 @@ ICON("sendto", "i-sendto")
 #undef ICON
 
 // mime icons
+// Defines icons for different file mime types, used in file managers.
+// The group name, e.g., "e/icons/fileman/mime/inode/file", clearly indicates its purpose.
+// 'alias' provides an alternative name for the group, "e/icons/mimetypes/" + _NAME.
+// This is often used for compatibility or to provide a more generic lookup key.
 #define ICON(_NAME, _ICON) \
    group { name: "e/icons/fileman/mime/"_NAME; min: ICMIN ICMIN; \
       alias: "e/icons/mimetypes/"_NAME; \
@@ -534,7 +550,10 @@ ICON("application/x-partial-download", "i-download")
 #undef ICON
 
 // elm icons
-// mono color default fg color icons
+// This section defines icons used by the Elementary widget set. The naming
+// convention "elm/icon/NAME/default" allows widgets to look up standard icons
+// without being tied to a specific theme. These are monochromatic icons
+// that use a color_class to adapt to the current theme.
 #define ICON(_NAME, _ICON) \
    group { name: "elm/icon/"_NAME"/default"; min: ICMIN ICMIN; \
       parts { \
@@ -739,7 +758,9 @@ ICON("state-check", "i-check")
 
 #undef ICON
 
-// regular icons
+// These are standard, full-color icons for Elementary widgets. Unlike the
+// monochromatic icons, these do not use a color_class and will retain their
+// original colors regardless of the theme.
 #define ICON(_NAME, _ICON) \
    group { name: "elm/icon/"_NAME"/default"; min: ICMIN ICMIN; \
       parts { \
@@ -1068,6 +1089,11 @@ ICON("unlock",  "i-padlock-unlock")
 #undef ICON
 
 // flags
+// Defines flag icons. These are special as they are loaded directly from PNG
+// files and maintain their original aspect ratio.
+// 'images.image' block loads the image file. 'COMP' suggests compression is used.
+// 'aspect_preference: SOURCE' ensures that the icon's aspect ratio matches the
+// source image, which is important for non-square flags.
 #define FLAG(_NAME) \
    group { name: "elm/icon/"_NAME"/default"; min: ICMIN ICMIN; \
       images.image: "flags/"##_NAME##".png" COMP; \

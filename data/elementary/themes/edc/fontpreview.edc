@@ -1,17 +1,42 @@
+// This group defines the layout for a font preview widget, which is commonly
+// used in font selection dialogs to display a sample of the selected font.
 group { name: "e/widgets/fontpreview";
    parts {
+      // This part displays the actual preview text. It's of type TEXT and is configured
+      // to not receive any mouse events, making it a purely visual element.
+      // The `scale: 1;` property allows this part to be scaled.
       part { name: "e.fontpreview.text"; type: TEXT; mouse_events: 0;
          scale: 1;
+         // The 'description' block defines the appearance and properties of the part
+         // for a given state. Here, it's for the "default" state.
          description { state: "default" 0.0;
+            // A color_class is a themable color definition. Instead of hardcoding a
+            // color value (like "#FF0000 FF"), it references a color defined in the
+            // theme, allowing for consistent look and feel.
             color_class: "/fg/normal/text/fontpreview";
+            // `rel1` and `rel2` define the part's position and size relative to its
+            // container. The offsets create a 4px padding on the top/left and a 5px
+            // padding on the bottom/right.
             rel1.offset: 4 4;
             rel2.offset: -5 -5;
+            // The `text` block contains properties specific to this TEXT part.
+            // `font: FN;` uses a macro `FN` for the font name, which is defined
+            // elsewhere, making it easy to change the font globally.
             text { font: FN; size: 10;
                min: 1 1;
+               // ellipsis of -1.0 will show "..." at the end of the string if it
+               // does not fit. A value of 0.0 would be at the start, and 0.5 in
+               // the middle.
                ellipsis: -1;
                align: 0.5 0.5;
+               // text_class is similar to a color_class but for styling text. It
+               // allows themes to define text styles (like shadows or outlines) that
+               // can be applied consistently.
                text_class: "_e_font_preview";
             }
+            // `offscale` is a performance optimization. It indicates that this part's
+            // contents (the text) do not need to be recalculated when the UI is
+            // scaled, which is useful for static text.
             offscale;
          }
       }

@@ -1,20 +1,30 @@
+// This group defines the visual style of a path separator, which is typically used in breadcrumb-style path navigation.
 group { name: "elm/entry/path/separator/default";
    parts {
+      // The 'icon' part is an image that serves as the separator. 'nomouse' makes it non-interactive, preventing it from capturing mouse events.
       image { "icon"; nomouse;
          scale: 1;
          desc { "default";
+            // Uses the 'i-arrow-r' icon as the visual representation of the separator.
             image.normal: "i-arrow-r";
+            // This macro ensures the separator has a fixed size of 15x15 pixels.
             FIXED_SIZE(15, 15)
+            // Maintains a square aspect ratio to prevent the icon from being distorted.
             aspect: 1.0 1.0;
+            // Applies a theme-defined color for consistency. This is a best practice for creating themeable UIs.
             color_class: "/fg/normal/fileselector/pathsep";
          }
       }
    }
 }
 
+// This group defines the main layout of the fileselector widget. It organizes various components like buttons, lists, and input fields into a cohesive interface.
 group { name: "elm/fileselector/base/default";
+   // 'data.item' provides a template for a path separator. This allows embedding the separator defined in "elm/entry/path/separator/default"
+   // within other text-based widgets using a special tag, such as in a path breadcrumb. 'href' links to another part that defines the item's appearance.
    data.item: "path_separator" "<item relsize=15x15 vsize=full href=path/separator></item>";
    parts {
+      // A swallow part for the "Up" button, used for navigating to the parent directory.
       swallow { "elm.swallow.up";
          scale: 1;
          desc { "default";
@@ -23,9 +33,11 @@ group { name: "elm/fileselector/base/default";
             rel1.offset: 4 4;
             rel2.relative: 0.0 0.0;
             rel2.offset: 4 4;
+            // 'offscale' ensures that the part is initially rendered outside the visible area, effectively hiding it until it's needed.
             offscale;
          }
       }
+      // Swallow part for the "Home" button, providing a shortcut to the user's home directory, positioned to the right of the "Up" button.
       swallow { "elm.swallow.home";
          scale: 1;
          desc { "default";
@@ -44,10 +56,12 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the search input field.
       swallow { "elm.swallow.search";
          scale: 1;
          desc { "default";
             align: 0.0 0.5;
+            // 'fixed: 0 1' allows the part to expand horizontally while maintaining a fixed vertical size.
             fixed: 0 1;
             min: 65 21;
             rel1 {
@@ -63,6 +77,7 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the "Cancel" button, aligned to the bottom-right corner.
       swallow { "elm.swallow.cancel";
          scale;
          desc { "default";
@@ -76,6 +91,7 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the "OK" button, typically used to confirm the file selection, positioned to the left of the "Cancel" button.
       swallow { "elm.swallow.ok";
          scale;
          desc { "default";
@@ -83,6 +99,7 @@ group { name: "elm/fileselector/base/default";
             fixed: 1 0;
             min: 80 4;
             rel1 {
+               // Positioned relative to the "elm.swallow.cancel" part.
                to: "elm.swallow.cancel";
                relative: 0.0 0.0;
                offset: -5 0;
@@ -95,6 +112,7 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the file type filters (e.g., a dropdown menu).
       swallow { "elm.swallow.filters";
          scale: 1;
          desc { "default";
@@ -102,6 +120,8 @@ group { name: "elm/fileselector/base/default";
             fixed: 1 1;
             min: 80 4;
             rel1 {
+               // 'to_y' specifies that only the Y-axis of the target part should be used for relative positioning.
+               // This part is placed above the "OK" button.
                to_y: "elm.swallow.ok";
                relative: 1.0 0.0;
                offset: -5 -5;
@@ -114,6 +134,7 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for the filename input field.
       swallow { "elm.swallow.filename";
          scale: 1;
          desc { "default";
@@ -133,6 +154,7 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for displaying the current path, typically as a breadcrumb.
       swallow { "elm.swallow.path";
          scale: 1;
          desc { "default";
@@ -140,6 +162,7 @@ group { name: "elm/fileselector/base/default";
             fixed: 0 1;
             min: 160 20;
             rel1 {
+               // Positioned vertically above the 'filename' part.
                to_y: "elm.swallow.filename";
                relative: 0.0 0.0;
                offset: 4 -5;
@@ -152,16 +175,19 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // This is the main content area, for displaying the list of files and directories. It occupies the central space of the dialog.
       swallow { "elm.swallow.files";
          scale: 1;
          desc { "default";
             min: 160 80;
             rel1 {
+               // The top edge is placed below the 'home' button.
                to_y: "elm.swallow.home";
                relative: 0.0 1.0;
                offset: 4 4;
             }
             rel2 {
+               // The bottom edge is placed above the 'path' display area.
                to_y: "elm.swallow.path";
                relative: 1.0 0.0;
                offset: -5 -5;
@@ -169,7 +195,9 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // Swallow part for a spinner widget, used to indicate loading or busy states.
       swallow { "elm.swallow.spinner";
+         // The 'clip' property links this part to a clipper part ('elm.spinner.clip'), which controls its visibility.
          clip: "elm.spinner.clip";
          scale: 1;
          desc { "default";
@@ -182,25 +210,30 @@ group { name: "elm/fileselector/base/default";
             offscale;
          }
       }
+      // This rectangle part serves as a clipper for the spinner. Its alpha channel is animated to show or hide the spinner.
       rect { "elm.spinner.clip";
          desc { "default";
             fixed: 1 1;
             rel.to: "elm.swallow.spinner";
+            // In the default state, the clipper is fully transparent, hiding the spinner. Color is R:255 G:255 B:255 A:0 (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
          desc { "visible";
             inherit: "default" 0.0;
+            // In the 'visible' state, it's fully opaque. Color is R:255 G:255 B:255 A:255 (#FFFFFFFF).
             color: 255 255 255 255; // no cc
          }
       }
    }
    programs {
+      // This program is triggered by the "elm,action,spinner,show" signal. It animates the clipper to the 'visible' state over 0.2 seconds.
       program {
          signal: "elm,action,spinner,show"; source: "elm";
          action: STATE_SET "visible" 0.0;
          transition: LINEAR 0.2;
          target: "elm.spinner.clip";
       }
+      // This program is triggered by the "elm,action,spinner,hide" signal. It animates the clipper back to 'default' (transparent) state.
       program {
          signal: "elm,action,spinner,hide"; source: "elm";
          action: STATE_SET "default" 0.0;
@@ -216,8 +249,10 @@ group { name: "elm/fileselector/base/default";
    }
 }
 
+// This group defines a compact layout, typically for a file path entry combined with a browse button.
 group { name: "elm/fileselector_entry/base/default";
    parts {
+      // Swallow part for a button, likely to open the main fileselector dialog, positioned at the right edge.
       swallow { "elm.swallow.button"; scale;
          scale: 1;
          desc { "default";
@@ -230,12 +265,15 @@ group { name: "elm/fileselector_entry/base/default";
             }
          }
       }
+      // Swallow part for a text entry field, where the file path is displayed or can be typed.
       swallow { "elm.swallow.entry"; scale;
          scale: 1;
          desc { "default";
             align: 0.0 0.5;
             min: 80 4;
-            rel2 { to_x: "elm.swallow.button";
+            rel2 {
+               // The right edge of the entry is attached to the left edge of the button. 'to_x' limits relativity to the X-axis.
+               to_x: "elm.swallow.button";
                relative: 0.0 1.0;
                offset: -1 -1;
             }

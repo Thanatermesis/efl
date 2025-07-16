@@ -1,18 +1,25 @@
+// This is the main container for all design definitions.
 collections {
+   // Defines the main graphical element of the widget.
    group {
       name: "main";
       images {
 //         image: "1.png" COMP;
       }
+      // Contains all the visual components of the group.
       parts {
+         // A solid rectangle that serves as the background.
          part {
             name: "bg";
             type: RECT;
             description {
                state: "default" 0.0;
+               // Sets the background color to a light yellow (#F7EF84).
                color: 247 239 132 255;
             }
          }
+         // A container part that can hold external Evas objects.
+         // This is where the application will place its content, like an entry widget.
          part {
             name: "ent";
             type: SWALLOW;

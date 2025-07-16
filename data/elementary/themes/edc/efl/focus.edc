@@ -5,16 +5,28 @@ Group: efl/focus_highlight/top (@since 1.23)
 	 Signal: efl,state,animating,stopped
 Group: efl/focus_highlight/top:blank (@since 1.23)
 */
+// This group defines a dynamic focus highlight effect that can animate its
+// position and size. It also features a pulsing animation to draw attention.
 group { name: "efl/focus_highlight/top";
    data.item: "version" "123";
    data.item: "animate" "on";
+   // The script handles the smooth animation of the highlight from one position
+   // and size to another. It receives coordinates from the application code
+   // via a message and interpolates the geometry over a short duration.
    script {
+      // s_ is for source geometry, dif is for the difference to the target geometry.
       public s_x, s_y, s_w, s_h; /* source */
       public difx, dify, difw, difh;
+      // g_anim_id: Holds the ID of the currently running animation, to cancel it if needed.
       public g_anim_id;
 
+      // Custom animator function called at each frame of the transition.
+      // It calculates the intermediate state of the highlight's geometry.
+      // 'pos' is the animation position, from 0.0 (start) to 1.0 (end).
       public animator1(val, Float:pos) {
          new x, y, w, h, dx, dy, dw, dh, Float:p;
+         // 'p' is a smoothed position using a cubic ease-out curve, making the
+         // animation start fast and then slow down towards the end.
          p = 1.0 - ((1.0 - pos) * (1.0 - pos) * (1.0 - pos));
          dx = round(float_mul(float(get_int(difx)), p));
          x = get_int(s_x) + dx;
@@ -31,11 +43,17 @@ group { name: "efl/focus_highlight/top";
          }
       }
 
+      // This function applies the calculated geometry to the 'base' part.
+      // By changing the offsets of the 'base' part, all other parts that are
+      // relative to it will move and resize accordingly.
       public update_offset(x, y, w, h) {
          set_state_val(PART:"base", STATE_REL1_OFFSET, x, y);
          set_state_val(PART:"base", STATE_REL2_OFFSET, x + w - 1, y + h - 1);
       }
 
+      // Message handler to receive new coordinates from the application.
+      // Expects a message of type MSG_INT_SET with ID 1, followed by
+      // source geometry (x1, y1, w1, h1) and target geometry (x2, y2, w2, h2).
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_INT_SET) && (id == 1)) {
             new x1, y1, w1, h1, x2, y2, w2, h2;
@@ -70,17 +88,25 @@ group { name: "efl/focus_highlight/top";
             update_offset(x1, y1, w1, h1);
             set_state(PART:"base", "custom", 0.0);
 
+            // Start a 0.2-second animation using the 'animator1' function.
             anim_id = anim(0.2, "animator1", 1);
             set_int(g_anim_id, anim_id);
          }
       }
    }
    parts {
+      // The 'base' part is an invisible spacer that acts as an anchor for all
+      // other visible parts. The script animates its offset to move and resize
+      // the entire highlight effect as a single unit.
       part { name: "base"; type: SPACER;
          description { state: "default" 0.0;
             fixed: 1 1;
          }
       }
+      // The 'clip' part is a rectangle used to clip all visible highlight
+      // elements. Its visibility is animated to create a fade-in/fade-out
+      // effect for the entire highlight. It is much larger than the actual
+      // highlight to ensure it doesn't clip the highlight itself during animations.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
@@ -88,15 +114,22 @@ group { name: "efl/focus_highlight/top";
             rel1.offset: -999 -999;
             rel2.relative: 2.0 2.0;
             rel2.offset: 999 999;
+            // Transparent white (#FFFFFF00), making it invisible by default.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
+         // In the 'visible' state, the clip becomes opaque, revealing the highlight parts.
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The following parts ('top', 'topl', 'topr', 'bot', 'botl', 'botr')
+      // form the visible border of the highlight. They are clipped by the 'clip'
+      // part and use color classes for theming. The 'hi' state is used for the
+      // pulsing animation. `scale: 1` prevents them from being scaled with the object.
       part { name: "top"; type: RECT;
          clip_to: "clip";
          scale: 1;
@@ -191,12 +224,16 @@ group { name: "efl/focus_highlight/top";
       }
    }
    programs {
+      // Triggered when the highlight should become visible (e.g., widget gets focus).
+      // It stops any ongoing pulse animation and then starts the fade-in sequence.
       program { signal: "efl,focus,visible,on"; source: "efl";
          action: ACTION_STOP;
          target: "pulse";
          target: "pulse2";
          after: "go2";
       }
+      // Fades in the highlight by transitioning the 'clip' part to the 'visible' state.
+      // After fading in, it starts the 'pulse' animation and emits a "done" signal.
       program { name: "go2";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.2;
@@ -204,15 +241,21 @@ group { name: "efl/focus_highlight/top";
          after: "pulse";
          after: "go3";
       }
+      // Notifies the application that the fade-in animation has completed.
       program { name: "go3";
          action: SIGNAL_EMIT "efl,focus,visible,on,done" "efl";
       }
+      // Triggered when the highlight should be hidden (e.g., widget loses focus).
+      // It fades out the highlight by transitioning the 'clip' part to its default
+      // (invisible) state.
       program { signal: "efl,focus,visible,off"; source: "efl";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.4;
          target: "clip";
          after: "stop2";
       }
+      // Notifies the application that the fade-out animation is done and proceeds
+      // to stop the pulsing animation.
       program { name: "stop2";
          action: SIGNAL_EMIT "efl,focus,visible,off,done" "efl";
          after: "stop3";
@@ -222,6 +265,11 @@ group { name: "efl/focus_highlight/top";
          target: "pulse";
          target: "pulse2";
       }
+      // These two programs create a continuous pulsing effect. 'pulse' transitions
+      // the highlight border to the 'hi' state (e.g., brighter color), and then
+      // 'pulse2' transitions it back to the 'default' state. They call each other
+      // to create an infinite loop, which is started and stopped by other programs.
+      // The `in: 3.0 0.0;` parameter is likely a leftover and has no effect here.
       program { name: "pulse";
          action: STATE_SET "hi" 0.0;
          transition: SINUSOIDAL 0.2;
@@ -245,6 +293,10 @@ group { name: "efl/focus_highlight/top";
          target: "botr";
          after: "pulse";
       }
+      // This program is a safety net. If the widget being highlighted stops
+      // its own animations, this ensures the highlight's 'base' part is reset
+      // to its default state, preventing it from being stuck in a 'custom' state
+      // set by the script.
       program { signal: "efl,state,animating,stopped"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -252,6 +304,8 @@ group { name: "efl/focus_highlight/top";
    }
 }
 
+// This is a blank version of the focus highlight. It can be used when no
+// highlight effect is desired, providing an empty but valid theme part.
 group { name: "efl/focus_highlight/top:blank";
    data.item: "version" "123";
    parts {

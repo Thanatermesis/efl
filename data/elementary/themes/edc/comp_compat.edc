@@ -1,55 +1,73 @@
+// Default theme for window borders, providing a standard look and feel with shadow and focus effects.
 group { name: "e/comp/border/default";
    alias: "e/comp/border/default/fast"; // legacy
    images.image: "win_shad_flat.png" COMP;
    parts {
+      // A clipper part used as a mask for other elements. It's initially invisible and very large.
+      // When visibility is toggled, it animates to provide a smooth transition.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -1.0  -1.0;
             rel1.offset: -9999 -9999;
             rel2.relative: 2.0   2.0;
             rel2.offset: 9999  9999;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF), enabling clipping for parts attached to it.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The main shadow part, clipped by the "clipper". It doesn't receive mouse events.
       part { name: "shadow"; type: RECT; mouse_events: 0;
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "clipper";
          }
+         // A state to hide the shadow completely.
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
             visible: 0;
          }
       }
+      // This part overlays the shadow and changes its color based on the window's focus state.
+      // It uses color classes to allow for theme-wide color adjustments.
       part { name: "focus-shadow"; type: RECT;
          clip_to: "shadow";
          description { state: "default" 0.0;
             rel.to: "clipper";
+            // Color for when the window is not focused.
             color_class: "/shadow/normal/comp/win";
          }
          description { state: "focused" 0.0;
             inherit;
+            // Color for when the window is focused.
             color_class: "/shadow/selected/comp/win";
          }
       }
+      // This macro creates the shadow effect around the content area using the specified image.
+      // It ties the shadow's visibility and appearance to the "focus-shadow" part.
       WIN_SHAD("e.swallow.content", "focus-shadow", "win_shad_flat.png", 21, 21, 14, 28, 0.5)
+      // A spacer part that controls the content area's size. It animates from a smaller area
+      // to the full area, creating a zoom-in effect when the window becomes visible.
       part { name: "shower"; type: SPACER;
          description { state: "default" 0.0;
+            // The content area is initially shrunk to 90% of its size (5% margin on each side).
             rel1.relative: 0.05 0.05;
             rel2.relative: 0.95 0.95;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // The content area expands to its full size.
             rel1.relative: 0.0  0.0;
             rel2.relative: 1.0  1.0;
          }
       }
+      // Another clipper, perhaps for handling transparency effects.
       part { name: "trans-clipper"; type: RECT;
          clip_to: "clipper";
          mouse_events: 0;
@@ -57,6 +75,7 @@ group { name: "e/comp/border/default";
             rel.to: "clipper";
          }
       }
+      // A clipper for the main content area that changes color with focus, similar to "focus-shadow".
       part { name: "focus-clipper"; type: RECT;
          clip_to: "trans-clipper";
          mouse_events: 0;
@@ -69,6 +88,9 @@ group { name: "e/comp/border/default";
             color_class: "/bg/selected/comp/win";
          }
       }
+      // This is the container for the actual window content. 'SWALLOW' type means it will host
+      // content from the application. It's clipped by "focus-clipper" and its size is
+      // controlled by the "shower" part.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "focus-clipper";
          description { state: "default" 0.0;
@@ -77,24 +99,30 @@ group { name: "e/comp/border/default";
       }
    }
    programs {
+      // When "e,state,shadow,on" is received, set the "shadow" part to its default (visible) state.
       program { signal: "e,state,shadow,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "shadow";
       }
+      // When "e,state,shadow,off" is received, set the "shadow" part to its "hidden" state.
       program { signal: "e,state,shadow,off"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "shadow";
       }
+      // When the window is shown, animate the "clipper" and "shower" to the "visible" state.
       program { signal: "e,state,visible,on"; source: "e";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.15 USE_DURATION_FACTOR 1;
          target: "clipper";
          target: "shower";
+         // After this animation, run the "show2" program.
          after: "show2";
       }
+      // This program signals that the show animation is complete.
       program { name: "show2";
          action: SIGNAL_EMIT "e,action,show,done" "e";
       }
+      // When the window is hidden, animate "clipper" and "shower" back to their default states.
       program { signal: "e,state,visible,off"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.30 USE_DURATION_FACTOR 1;
@@ -102,14 +130,17 @@ group { name: "e/comp/border/default";
          target: "shower";
          after: "hide2";
       }
+      // This program signals that the hide animation is complete.
       program { name: "hide2";
          action: SIGNAL_EMIT "e,action,hide,done" "e";
       }
+      // On gaining focus, transition "focus-clipper" and "focus-shadow" to the "focused" state.
       program { signal: "e,state,focus,on"; source: "e";
          action: STATE_SET "focused" 0.0;
          transition: SINUSOIDAL 0.1 USE_DURATION_FACTOR 1;
          targets: "focus-clipper" "focus-shadow";
       }
+      // On losing focus, transition them back to the "default" state.
       program { signal: "e,state,focus,off"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.1 USE_DURATION_FACTOR 1;
@@ -139,24 +170,28 @@ group { name: "e/comp/border/default";
    }
 }
 
+// A border style that adds a rotation animation on focus change, inheriting from the default border.
 group { name: "e/comp/border/rotate";
    alias: "e/comp/border/rotate/fast"; // legacy
    inherit: "e/comp/border/default";
    parts {
+      // The content part is modified to support 3D transformations.
       part { name: "e.swallow.content";
          description { state: "default";
             map {
-               on: 1;
+               on: 1; // Enable mapping.
                rotation {
-                  z: 0;
+                  z: 0; // Default rotation.
                }
             }
          }
          description { state: "focus-out";
             inherit: "default";
+            // Rotated 180 degrees around the Z-axis when not focused.
             map.rotation.z: 180;
          }
       }
+      // The "shower" part is overridden to disable the zoom-in effect from the parent group.
       part {
          name: "shower";
          description { state: "default";
@@ -166,11 +201,13 @@ group { name: "e/comp/border/rotate";
       }
    }
    programs {
+      // When focus is gained, animate the content back to its default (0-degree) rotation.
       program { signal: "e,state,focus,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.swallow.content";
          transition: LINEAR 0.3 USE_DURATION_FACTOR 1;
       }
+      // When focus is lost, animate the content to the "focus-out" (180-degree) rotation.
       program { signal: "e,state,focus,off"; source: "e";
          action: STATE_SET "focus-out" 0.0;
          target: "e.swallow.content";
@@ -179,6 +216,7 @@ group { name: "e/comp/border/rotate";
    }
 }
 
+// A variation of the rotate theme that flips the window content on the Y-axis instead of rotating on Z.
 group { name: "e/comp/border/flip";
    alias: "e/comp/border/flip/fast"; // legacy
    inherit: "e/comp/border/rotate";
@@ -191,24 +229,27 @@ group { name: "e/comp/border/flip";
                   z: 0;
                   y: 0;
                }
-               backface_cull: 1;
+               backface_cull: 1; // Hides the back of the part when it's flipped away.
             }
          }
          description { state: "focus-out";
             inherit: "default";
             map.rotation {
                z: 0;
-               y: 180;
+               y: 180; // Flipped 180 degrees on the Y-axis.
             }
          }
       }
    }
 }
 
+// A base style for popup windows, inheriting from the default.
+// It doesn't add new features but can be used as a foundation for other styles.
 group { name: "e/comp/border/popup";
    alias: "e/comp/border/popup/fast"; // legacy
    inherit: "e/comp/border/default";
    parts {
+      // This empty part override is likely a placeholder for customization in derived themes.
       part { name: "focus-clipper";
          description { state: "default";
          }
@@ -216,14 +257,17 @@ group { name: "e/comp/border/popup";
    }
 }
 
+// A borderless style for windows that should have no decoration.
 group { name: "e/comp/border/none";
    parts {
+      // It only contains the content part, filling the entire area.
       part { name: "e.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
          }
       }
    }
    programs {
+      // Instantly signals completion for show/hide actions as there are no animations.
       program { signal: "e,state,visible,on"; source: "e";
          action: SIGNAL_EMIT "e,action,show,done" "e";
       }
@@ -233,10 +277,12 @@ group { name: "e/comp/border/none";
    }
 }
 
+// A style that inherits from the default but disables the initial zoom-in animation.
 group { name: "e/comp/border/still";
    alias: "e/comp/border/still/fast"; // legacy
    inherit: "e/comp/border/default";
    parts {
+      // Overrides the "shower" part to be full-sized from the start.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: 0.0 0.0;
@@ -246,10 +292,12 @@ group { name: "e/comp/border/still";
    }
 }
 
+// A style for menus, based on the popup style.
 group { name: "e/comp/border/menu";
    alias: "e/comp/border/menu/fast"; // legacy
    inherit: "e/comp/border/popup";
    parts {
+      // The content area is adjusted, likely to create a visual offset for the menu.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: 0.05 0.0;
@@ -259,10 +307,13 @@ group { name: "e/comp/border/menu";
    }
 }
 
+// An unconventional style where the content area is larger than the window itself.
 group { name: "e/comp/border/everything";
    alias: "e/comp/border/everything/fast"; // legacy
    inherit: "e/comp/border/popup";
    parts {
+      // The "shower" part extends beyond the window boundaries, making the content area
+      // larger than the window frame. This could be used for specific zoom or overflow effects.
       part { name: "shower";
          description { state: "default" 0.0;
             rel1.relative: -0.3 -0.3;
@@ -272,22 +323,26 @@ group { name: "e/comp/border/everything";
    }
 }
 
+// A dedicated style for fullscreen windows with a more elaborate animation sequence.
 group { name: "e/comp/border/fullscreen";
    alias: "e/comp/border/fullscreen/fast"; // legacy
    images.image: "screen_circular_shadow.png" COMP;
    data.item: "screen.bg" "fullscreen.bg";
    parts {
+      // Clipper for the content, with a two-stage visibility animation.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -1.0  -1.0;
             rel1.offset: -9999 -9999;
             rel2.relative: 2.0   2.0;
             rel2.offset: 9999  9999;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible1" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
             visible: 1;
          }
@@ -297,10 +352,12 @@ group { name: "e/comp/border/fullscreen";
             visible: 1;
          }
       }
+      // A clipper for the entire screen area.
       part { name: "clipper_all"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // A shadow effect for the entire screen, which animates in.
       part { name: "scr_shadow"; mouse_events: 0;
          clip_to: "clipper_all";
          description { state: "default" 0.0;
@@ -308,6 +365,7 @@ group { name: "e/comp/border/fullscreen";
             rel2.relative: 2.0 2.0;
             image.normal: "screen_circular_shadow.png";
             fill.smooth: 0;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
@@ -315,28 +373,36 @@ group { name: "e/comp/border/fullscreen";
             inherit: "default" 0.0;
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 1.0;
+            // Opaque white (#FFFFFFFF).
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // A shade overlay for the screen that fades in to black.
       part { name: "scr_shade"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Transparent black (#00000000).
             color: 0 0 0 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque black (#000000FF).
             color: 0 0 0 255; // no cc
             visible: 1;
          }
       }
+      // A spacer that controls the content's size, animating from a small point, to a horizontal
+      // bar, and finally to fullscreen.
       part { name: "shower"; type: SPACER;
          description { state: "default" 0.0;
+            // Starts as a single point in the center.
             rel1.relative: 0.5 0.5;
             rel2.relative: 0.5 0.5;
          }
          description { state: "visible1" 0.0;
             inherit: "default" 0.0;
+            // Expands to a thin horizontal bar.
             rel1.relative: 0.1 0.49;
             rel1.offset: 0 0;
             rel2.relative: 0.9 0.51;
@@ -344,10 +410,12 @@ group { name: "e/comp/border/fullscreen";
          }
          description { state: "visible2" 0.0;
             inherit: "default" 0.0;
+            // Expands to fill the entire screen.
             rel1.relative: 0.0  0.0;
             rel2.relative: 1.0  1.0;
          }
       }
+      // The main content container.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -355,25 +423,30 @@ group { name: "e/comp/border/fullscreen";
             rel2.to: "shower";
          }
       }
+      // A fader part that sits on top of the content, used for a fade-in/fade-out effect.
       part { name: "fader"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible1" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF), hiding the content initially.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
          description { state: "visible2" 0.0;
             inherit: "default" 0.0;
+            // Fades to transparent, revealing the content.
             color: 255 255 255 0; // no cc
             visible: 0;
          }
       }
    }
    programs {
+      // When the fullscreen window is shown, first animate the screen shadow and shade.
       program {
          name: "visible_on";
          signal: "e,state,visible,on"; source: "e";
@@ -382,6 +455,7 @@ group { name: "e/comp/border/fullscreen";
          target: "scr_shadow";
          target: "scr_shade";
       }
+      // Simultaneously, start the first stage of the content animation.
       program {
          name: "visible_on2";
          signal: "e,state,visible,on"; source: "e";
@@ -390,8 +464,9 @@ group { name: "e/comp/border/fullscreen";
          target: "clipper";
          target: "shower";
          target: "fader";
-         after: "show2";
+         after: "show2"; // Chain to the next stage.
       }
+      // Second stage of the show animation: expand content to full screen and fade it in.
       program { name: "show2";
          action: STATE_SET "visible2" 0.0;
          transition: DECELERATE 0.20 USE_DURATION_FACTOR 1;
@@ -400,9 +475,11 @@ group { name: "e/comp/border/fullscreen";
          target: "fader";
          after: "show3";
       }
+      // Signal that the show animation is complete.
       program { name: "show3";
          action: SIGNAL_EMIT "e,action,show,done" "e";
       }
+      // When hiding, fade out the screen shadow and shade.
       program {
          name: "visible_off";
          signal: "e,state,visible,off"; source: "e";
@@ -411,6 +488,7 @@ group { name: "e/comp/border/fullscreen";
          target: "scr_shadow";
          target: "scr_shade";
       }
+      // First stage of hide animation for the content.
       program {
          name: "visible_off2";
          signal: "e,state,visible,off"; source: "e";
@@ -421,6 +499,7 @@ group { name: "e/comp/border/fullscreen";
          target: "fader";
          after: "hide2";
       }
+      // Second stage of hide animation: shrink content back to a point.
       program { name: "hide2";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.05 USE_DURATION_FACTOR 1;
@@ -429,6 +508,7 @@ group { name: "e/comp/border/fullscreen";
          target: "fader";
          after: "hide3";
       }
+      // Signal that the hide animation is complete.
       program { name: "hide3";
          action: SIGNAL_EMIT "e,action,hide,done" "e";
       }

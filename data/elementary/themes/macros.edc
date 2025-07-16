@@ -1,12 +1,22 @@
+// General-purpose macros for layout management in Edje.
+// ASPECT_FILL: Forces a part to maintain a specific aspect ratio.
+// TILED_PATTERN: Sets the fill size for a tiled pattern with a given width and height.
 #define ASPECT_FILL(_ASPECT) \
    aspect: _ASPECT _ASPECT; aspect_preference: NONE;
 #define TILED_PATTERN(_WIDTH, _HEIGHT) \
    fill { size { relative: 0.0 0.0; offset: _WIDTH _HEIGHT; } }
+// TILED_HORIZ: Sets the fill size for a horizontally tiled pattern.
+// FIXED_SIZE: Constrains a part to a fixed width and height.
 #define TILED_HORIZ(_WIDTH) \
    fill { size { relative: 0.0 1.0; offset: _WIDTH 0; } }
 #define FIXED_SIZE(_WIDTH, _HEIGHT) \
    min: _WIDTH _HEIGHT; max: _WIDTH _HEIGHT; fixed: 1 1;
 
+// Defines various constants used throughout the theme.
+// SHELFPAD: Padding for shelf containers.
+// ICMIN: Minimum size for icons.
+// RSZCOL, RSZCOL2: Color definitions for resizer components (currently transparent).
+// RSZMINW, RSZMINH: Minimum width and height for resizable objects.
 #define SHELFPAD 3
 #define ICMIN 15
 #define RSZCOL  0 0 0 0
@@ -16,9 +26,17 @@
 
 #define SPACER_TEXT "NN";
 
+// BACKGROUND_COMP defines the compression method for background images.
+// LOSSY 91 specifies JPEG-style compression with 91% quality.
+// The commented-out lines show alternative compression options like ETC1/ETC2.
 #define BACKGROUND_COMP LOSSY 91
 //#define BACKGROUND_COMP LOSSY_ETC1
 //#define BACKGROUND_COMP LOSSY_ETC2
+// BACKGROUND_IMG defines a set of responsive background images.
+// Edje automatically selects the best image based on the object's size.
+// The 'size' property specifies the resolution range for each image:
+// min_width min_height max_width max_height.
+// This is an optimization to avoid loading large images on smaller screens.
 #define BACKGROUND_IMG \
    set { name: "background"; \
      image { image: "p-5120.png" BACKGROUND_COMP; size: 3841 2161 51200 28800; } \
@@ -30,6 +48,11 @@
      image { image: "p-1280.png" BACKGROUND_COMP; size:    0    0  1280   720; } \
    }
 
+// Creates a fill pattern that scales proportionally with its container.
+// This is achieved using a helper SPACER part '_pat_sizer' and an Embryo script.
+// The script runs on resize, gets the dimensions of the scaled sizer,
+// and applies a calculated fill size to the target part named "pat".
+// The arguments _w and _h are percentages of the container's size.
 #define PAT_FILL_SCALE(_w, _h) \
    part { name: "_pat_sizer"; type: SPACER; \
       scale: 1; \
@@ -49,9 +72,19 @@
       } \
    }
 
+// Color definition for a dark grey background (48, 48, 48, 255 -> #303030FF).
 #define DARK_GREY_BG_COLOR 48 48 48 255
+// Color for disabled elements, a slightly lighter grey (64, 64, 64, 255 -> #404040FF).
 #define DARK_GREY_BG_DISABLED_COLOR 64 64 64 255
 
+// This macro defines a single shadow part.
+// It uses a scalable border image to create the shadow effect.
+// '_to': The part that casts the shadow.
+// '_clip': The part used for clipping the shadow.
+// '_img': The shadow image.
+// '_l, _r, _t, _b': Left, right, top, bottom offsets for positioning.
+// '_scale': Border scale factor.
+// 'offscale' ensures the shadow's border thickness doesn't change when the UI is scaled.
 #define SHAD(_to, _clip, _img, _l, _r, _t, _b, _scale) \
       scale: 1; clip_to: _clip; \
       description { state: "default" 0.0; \
@@ -65,6 +98,10 @@
          fill.smooth: 1; \
          offscale; \
       }
+// Creates a set of four rectangular clipping parts (_shcl1 to _shcl4).
+// These parts are used to create a complex clipping mask around a target part '_to'.
+// This is typically used to prevent a window's shadow from being drawn over the window itself.
+// The clipping parts define the areas where the shadow will be visible.
 #define SHAD_CLIP(_to, _clip, _l, _r, _t, _b, _scale) \
    part { type: RECT; name: "_shcl1"; \
       scale: 1; clip_to: _clip; \
@@ -107,6 +144,10 @@
       } \
    }
 
+// Combines SHAD_CLIP and SHAD to create a complete window shadow effect.
+// It first defines the clipping areas and then creates four shadow segments,
+// each clipped by one of the clipping rects. This modular approach
+// allows for clean and well-defined shadow rendering around a window.
 #define WIN_SHAD(_to, _clip, _img, _l, _r, _t, _b, _scale) \
    SHAD_CLIP(_to, _clip, _l, _r, _t, _b, _scale) \
    part { name: "_sh1"; mouse_events: 0; \
@@ -122,6 +163,8 @@
       SHAD(_to, "_shcl4", _img, _l, _r, _t, _b, _scale) \
    }
 
+// Defines a standard window shadow using 'win_shadow.png'.
+// It sets specific border scaling and offsets for a default shadow look.
 #define WIN_SHADOW \
    image.normal: "win_shadow.png"; \
    image.border: 32 32 32 32; \
@@ -132,6 +175,7 @@
    rel2.offset: 20 27; \
    fill.smooth: 0; \
    offscale
+// A smaller version of the window shadow, with reduced offsets and border scaling.
 #define WIN_SHADOW_SMALL \
    image.normal: "win_shadow.png"; \
    image.border: 32 32 32 32; \
@@ -142,10 +186,14 @@
    rel2.offset: 9 10; \
    fill.smooth: 0; \
    offscale
+// This macro doesn't draw anything. Instead, it defines offsets that create
+// empty space around a widget, effectively reserving room for a shadow
+// to be drawn without being overlapped by other UI elements.
 #define WIN_SHADOW_SPACER \
    rel1.offset: 21 14; \
    rel2.offset: -22 -29; \
    offscale
+// A specific shadow style for menus, using 'win_menu_shadow.png'.
 #define WIN_MENU_SHADOW \
    image.normal: "win_menu_shadow.png"; \
    image.border: 32 32 32 32; \
@@ -156,6 +204,8 @@
    rel2.offset: 20 27; \
    fill.smooth: 0; \
    offscale
+// A small, angled shadow, likely for tooltips or popups.
+// The image is passed as a parameter, allowing for different angled shadow graphics.
 #define WIN_SHADOW_ANGLE_SMALL(_img) \
    image.normal: _img; \
    image.border: 32 32 32 32; \
@@ -167,6 +217,10 @@
    fill.smooth: 0; \
    offscale
 
+// Defines a responsive image set, similar to BACKGROUND_IMG, but for general purpose images.
+// It creates a set of images named based on the parameter 'x' (e.g., "ring1.png", "ring2.png").
+// Edje selects the appropriate image based on the part's size, using 'sz' to calculate thresholds.
+// This is useful for icons or other graphics that need to look crisp at various sizes.
 #define IMAGE_RING(x, sz) \
    set { name: x; \
       image { image: x"1.png" COMP; size:  (sz/2)   (sz/2)  99999   99999;   } \
@@ -175,6 +229,23 @@
       image { image: x"4.png" COMP; size:  (sz/16)  (sz/16) (sz/8)  (sz/8);  } \
       image { image: x"5.png" COMP; size:       0        0  (sz/16) (sz/16); } \
    }
+// Defines a complete busy indicator animation (spinner).
+// This macro creates several parts and programs to achieve a multi-layered, rotating effect.
+// Arguments:
+//   x:      The name of the part that this busy indicator is visually associated with.
+//   start1, start2: Signal and source to trigger the start of the animation.
+//   stop1, stop2:  Signal and source to trigger the end of the animation.
+//
+// High-level explanation of its components:
+// - A main container part "busy" (RECT) is used to fade the whole animation in and out.
+// - Three image parts ("busy1", "busy2", "busy3") are used for the rotating rings.
+//   They use images defined by IMAGE_RING ("ringa", "ringb", "ringc") and are colorized
+//   via color classes. They use `map` to enable rotation.
+// - A set of looping programs ("busy-p11/p12", "busy-p21/p22", etc.) create continuous
+//   rotation for each ring at different speeds (1.0s, 0.7s, 1.4s), resulting in a
+//   complex and visually appealing animation.
+// - Trigger programs react to start/stop signals to control the visibility of the "busy"
+//   container and to start/stop the animation loops.
 #define BUSY(x, start1, start2, stop1, stop2) \
    program { signal: start1; source: start2; \
       action: STATE_SET "visible" 0.0; \
@@ -278,12 +349,25 @@
       target: "busy3"; \
       after: "busy-p31"; }
 
-#define ICON         1
-#define LABEL        2
-#define MASK         3
-#define DISABLE      4
-#define PRESSED      8
-#define BACKGROUND  16
+// Bitmask flags used to define the state of a button-like widget.
+// These flags can be combined to represent complex states.
+#define ICON         1 // The button displays an icon.
+#define LABEL        2 // The button displays a text label.
+#define MASK         3 // A mask combining ICON and LABEL for easy checking.
+#define DISABLE      4 // The button is in a disabled state.
+#define PRESSED      8 // The button is currently being pressed.
+#define BACKGROUND  16 // The button has a custom background.
+// An Embryo script to manage the visual states of a button.
+// This script is the logic core for a button widget. It defines a public integer 'btmode'
+// to hold the button's state as a bitmask of the flags above.
+//
+// The 'eval_mode' function is the main entry point. It's called whenever the state changes.
+// It decodes the 'btmode' integer and applies the corresponding visual states to various
+// parts of the widget (e.g., "base", "shadow", "elm.swallow.content", "elm.text").
+//
+// 'flag_set' and 'flag_unset' are public functions that can be called from the C application
+// via signals. They allow for dynamically changing the button's state by adding or removing
+// flags from 'btmode' and then triggering 'eval_mode' to update the UI.
 #define BUTTONMODE_SCRIPT \
       public btmode; \
       public eval_mode(m) { \
@@ -376,6 +460,11 @@
          new m = get_int(btmode) & ~flag; \
          set_int(btmode, m); eval_mode(m); \
       }
+// This is a variation of BUTTONMODE_SCRIPT.
+// The logic is identical, but it targets parts with the 'efl.' prefix
+// (e.g., "efl.background", "efl.content", "efl.text") instead of 'elm.'.
+// This is for compatibility with newer widgets in EFL that follow the 'efl.' naming convention
+// for their swallow parts.
 #define BUTTONMODE_SCRIPT2 \
       public btmode; \
       public eval_mode(m) { \

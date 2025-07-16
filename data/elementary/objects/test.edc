@@ -1,5 +1,11 @@
 collections {
+   // A group defining a complex animated layout.
+   // It includes several image parts, text, and swallow parts for external content.
+   // The layout features continuous background animations.
    group { name: "layout";
+      // Defines images used in this group, specifying compression methods.
+      // COMP (or COMPRESS) is lossless (PNG), while LOSSY is for formats like JPEG.
+      // The number after LOSSY (e.g., 80) is the quality level.
       images {
          image: "over.png" COMP;
          image: "under.png" COMP;
@@ -7,11 +13,15 @@ collections {
          image: "clo.png" LOSSY 60;
       }
       parts {
+         // A RECT part used as a clipper. Other parts assigned to 'clip_to: "clip"'
+         // will be masked by this rectangle's geometry.
          part { name: "clip";
             type: RECT;
             description { state: "default" 0.0;
             }
          }
+         // The "sky" image part, which is clipped by the "clip" part.
+         // 'mouse_events: 1' allows this part to receive mouse interactions.
          part { name: "sky";
             mouse_events: 1;
             clip_to: "clip";
@@ -20,6 +30,9 @@ collections {
                aspect_preference: NONE;
                image.normal: "sky.jpg";
             }
+            // The "drift" state is used for animation. It inherits properties from
+            // the "default" state and overrides the fill origin. This change in
+            // origin creates a horizontal scrolling effect.
             description { state: "drift" 0.0;
                inherit: "default" 0.0;
                fill {
@@ -30,6 +43,9 @@ collections {
                }
             }
          }
+         // The "under" image part. 'mouse_events: 0' makes it ignore mouse input.
+         // 'aspect_preference: HORIZONTAL' maintains the image's aspect ratio,
+         // fitting it to the part's horizontal space.
          part { name: "under";
             mouse_events: 0;
             clip_to: "clip";
@@ -40,10 +56,12 @@ collections {
                image.normal: "under.png";
             }
          }
+         // A TEXT part to display static text.
          part { name: "text";
             type: TEXT;
             clip_to: "clip";
             description { state: "default" 0.0;
+               // Color is yellow with full alpha (#FFFF00FF).
                color: 255 255 0 255;
                rel1.relative: 0.3 0.02;
                rel2.relative: 0.6 0.12;
@@ -57,6 +75,9 @@ collections {
                }
             }
          }
+         // A SWALLOW part, which acts as a container for an external Evas object.
+         // This is a powerful feature for embedding custom widgets or other complex
+         // UI components into an Edje layout.
          part { name: "element1";
             type: SWALLOW;
             clip_to: "clip";
@@ -124,7 +145,11 @@ collections {
             }
          }
       }
+      // Programs define the dynamic behavior of the group.
       programs {
+         // This program triggers on the "load" signal (when the object is created).
+         // It animates the "clo" part to its "drift" state over 10 seconds.
+         // 'after: "anim2"' chains the next program to run after this one completes.
          program { name: "anim1";
             signal: "load";
             source: "";
@@ -133,11 +158,15 @@ collections {
             target: "clo";
             after: "anim2";
          }
+         // This program animates "clo" back to the "default" state and then
+         // triggers "anim1" again, creating an infinite animation loop.
          program { name: "anim2";
             action: STATE_SET "default" 0.0;
             target: "clo";
             after: "anim1";
          }
+         // A similar animation loop for the "sky" part, but with a much
+         // longer transition time (40 seconds), creating a slow drift effect.
          program { name: "anim3";
             signal: "load";
             source: "";
@@ -153,6 +182,9 @@ collections {
          }
       }
    }
+   // This group is a variation of the "layout" group, but without the
+   // animation programs and with mouse events disabled for the "sky" part.
+   // It reuses the same image resources.
    group { name: "layout2";
       images {
          image: "over.png" COMP;
@@ -279,8 +311,13 @@ collections {
          }
       }
    }
+   // Defines a 4x4 grid layout, likely for a launcher or home screen.
+   // Each cell in the grid is a SWALLOW part, intended to hold an application icon or widget.
+   // The naming convention "slot.X.Y" corresponds to grid coordinates.
    group { name: "launcher_page";
       parts {
+         // This is the top-left cell (0,0) of the grid, occupying the
+         // top-left quarter of the layout's space.
          part { name: "slot.0.0"; type: SWALLOW;
             description { state: "default" 0.0;
               rel2.relative: 0.25 0.25;
@@ -373,14 +410,23 @@ collections {
          part { name: "slot.3.3"; type: SWALLOW;
             description { state: "default" 0.0;
               rel1.relative: 0.75 0.75;
+              // rel2 is not specified, so it defaults to 1.0 1.0, making the part
+              // fill the bottom-right quadrant of the layout.
             }
          }
       }
    }
+   // This group defines the appearance and behavior of a single launcher icon.
+   // It consists of a SWALLOW part for the icon image and a TEXT part for its label.
+   // It includes multiple states and programs to handle user interactions like
+   // clicks and drags, providing visual feedback.
    group { name: "launcher_icon";
       parts {
+         // The SWALLOW part for the icon itself.
          part { name: "slot"; type: SWALLOW;
             description { state: "default" 0.0;
+              // The bottom of the slot is aligned with the top of the "label" part.
+              // This positions the icon directly above its text label.
               rel2 {
                 relative: 1.00 0.00;
                 to_y: "label";
@@ -391,6 +437,8 @@ collections {
               rel1.offset: -5 -3;
               rel2.offset: -5 -3;
             }
+            // These states are used in a looping animation to give a "wiggling"
+            // effect when the icon is being dragged.
             description { state: "drag2" 0.0;
               inherit: "default" 0.0;
               rel1.offset: 10 3;
@@ -402,6 +450,7 @@ collections {
               rel2.offset: -1  6;
             }
          }
+         // The text label for the icon.
          part { name: "label"; type: TEXT;
             effect: SOFT_SHADOW;
             scale: 1;
@@ -448,12 +497,18 @@ collections {
          }
       }
       programs {
+         // When a "click" signal is received from the "app" source,
+         // the "label" part transitions to the "hi" state (red text) over 0.5s.
          program { name: "click";
             signal: "click"; source: "app";
             action: STATE_SET "hi" 0.0;
             transition: LINEAR 0.5;
             target: "label";
          }
+         // When a "drag" signal is received, this program starts a looping
+         // animation sequence (drag1 -> drag2 -> drag3 -> drag1...).
+         // This creates a visual effect while the icon is being dragged.
+         // Both the "label" and "slot" parts are targeted.
          program { name: "drag1";
             signal: "drag"; source: "app";
             action: STATE_SET "drag1" 0.0;
@@ -476,12 +531,14 @@ collections {
             target: "slot";
             after: "drag1";
          }
+         // When the drag is finished ("drop" signal), everything returns to the "default" state.
          program { name: "drop";
             signal: "drop"; source: "app";
             action: STATE_SET "default" 0.0;
             target: "label";
             target: "slot";
          }
+         // When the click is released ("unclick" signal), the label animates back to default.
          program { name: "unclick";
             signal: "unclick"; source: "app";
             action: STATE_SET "default" 0.0;
@@ -489,6 +546,7 @@ collections {
             target: "label";
             target: "slot";
          }
+         // If the drag is cancelled, everything returns to the default state.
          program { name: "cancel";
             signal: "cancel"; source: "app";
             action: STATE_SET "default" 0.0;
@@ -498,13 +556,16 @@ collections {
          }
       }
    }
+   // A simple layout for displaying two lines of content.
    group { name: "twolines";
       parts {
+         // A clipper to contain the parts.
          part { name: "clip";
             type: RECT;
             description { state: "default" 0.0;
             }
          }
+         // A semi-transparent background rectangle (color #0080C81E).
          part { name: "under";
             mouse_events: 0;
             clip_to: "clip";
@@ -513,6 +574,7 @@ collections {
                color: 0 128 200 30;
             }
          }
+         // A SWALLOW part for the top line of content.
          part { name: "element1";
             type: SWALLOW;
             clip_to: "clip";
@@ -544,6 +606,9 @@ collections {
       }
    }
 
+   // This group defines a background overlay with a horizontally scrolling image.
+   // The animation logic is identical to the "clo" animation in the "layout" group,
+   // creating a continuous loop.
    group { name: "bg_overlay";
       images {
           image: "clo.png" LOSSY 60;
@@ -602,20 +667,24 @@ collections {
          }
       }
    }
+   // A test layout with a background image and a content area.
    group {
       name: "test/layout";
       images {
          image: "sky.jpg" LOSSY 80;
       }
       parts {
+            // The background part uses "sky.jpg".
             part {
                  name: "bg";
                  description {
                      state: "default" 0.0;
+                     // The image is tinted with a semi-transparent white (#FFFFFF64).
                      color: 255 255 255 100;
                      image.normal: "sky.jpg";
                  }
             }
+            // A swallow part for content, with an 8-pixel margin.
             part {
                  name: "swallow";
                  type: SWALLOW;
@@ -627,6 +696,8 @@ collections {
             }
       }
    }
+   // A group used for window configuration, containing a single SWALLOW part.
+   // The minimum size constraint is likely used to enforce a minimum window content size.
    group {
       name: "win_config";
       parts {
@@ -640,8 +711,10 @@ collections {
             }
       }
    }
+   // Defines a 3x3 grid layout for an accessibility interface.
    group { name: "access_page";
       parts {
+         // Top-left cell of the 3x3 grid.
          part { name: "slot.0.0"; type: SWALLOW;
             description { state: "default" 0.0;
               rel2.relative: 0.33 0.33;
@@ -696,23 +769,29 @@ collections {
          }
       }
    }
+   // Defines an accessibility icon.
    group { name: "access_icon";
       parts {
          part { name: "slot"; type: SWALLOW;
             description { state: "default" 0.0;
             }
          }
+         // This is a transparent rectangle placed exactly over the "slot" part.
+         // It can be used as a hit area for mouse events without being visible.
          part { name: "access"; type: RECT;
             description { state: "default" 0.0;
               rel1.to: "slot";
               rel2.to: "slot";
-              color: 0 0 0 0;
+              color: 0 0 0 0; // Transparent color (#00000000)
             }
          }
       }
    }
+   // A layout for a color selection page, possibly for accessibility settings.
+   // It features four colored rectangles and a central SWALLOW area.
    group { name: "access_color_page";
       parts {
+         // A red rectangle (#FF0000FF).
          part { name: "red"; type: RECT;
             description { state: "default" 0.0;
               rel1.relative: 0.1  0.1;
@@ -749,8 +828,13 @@ collections {
          }
       }
    }
+   // A complex page layout with multiple SWALLOW parts.
+   // 'scale: 1' enables scaling for all parts in this group.
    group { name: "page_layout";
       parts {
+         // The main background part. 'min' and 'max' are set to the same values,
+         // effectively fixing the size of this part at 400x500 pixels.
+         // It serves as an anchor for other parts in the layout.
          part { name: "bg";
             type: RECT;
             scale: 1;
@@ -760,6 +844,7 @@ collections {
               color: 0 0 0 0;
            }
          }
+         // The main content area, positioned relative to the "bg" part with a 10% margin.
          part { name: "page";
             type: SWALLOW;
             scale: 1;
@@ -816,10 +901,16 @@ collections {
          }
       }
    }
+   // This group demonstrates shorthand syntax and advanced features.
+   // 'group "name"' is equivalent to 'group { name: "name"; ... }'.
    group { "layout_edje";
       parts {
+         // 'rect' is a shorthand for 'part { type: RECT; ... }'.
+         // 'desc' is a shorthand for 'description { ... }'.
          rect { "red";
             desc {
+               // 'color_class' allows styling parts from a central theme definition,
+               // promoting consistency and making theming easier.
                color_class: "red";
             }
          }
@@ -827,13 +918,19 @@ collections {
             desc { "default";
             }
             desc { "changed";
-               color: 0 0 255 255;
+               color: 0 0 255 255; // Blue color (#0000FFFF)
+               // 'link.base' is an advanced feature for parameterization. It allows properties
+               // of this description to be modified externally at runtime, which is useful
+               // for creating dynamic and reusable components.
                link.base: "change" "test";
             }
          }
       }
    }
+   // This group demonstrates the use of styles for text formatting.
    group { name: "font_overlay_layout";
+      // Styles allow defining reusable sets of properties. This is highly
+      // recommended for maintaining a consistent look and feel.
       styles {
          style { name: "test_class_style";
             base: "font=Sans font_size=20 color=#fff text_class=font_overlay_test wrap=mixed";
@@ -848,6 +945,8 @@ collections {
                color: 0 0 0 0;
             }
          }
+         // This TEXTBLOCK part uses the defined style. TEXTBLOCK is a powerful part
+         // that supports rich text features like markup, wrapping, and styles.
          part { name: "elm.text";
             type: TEXTBLOCK;
             scale: 1;
@@ -860,6 +959,8 @@ collections {
          }
       }
    }
+   // A test layout featuring a very large background part and a small SWALLOW part.
+   // This could be used for testing performance with large surfaces or scaling behavior.
    group { name: "layout3";
       parts {
          part { name: "bg";
@@ -867,7 +968,7 @@ collections {
             scale: 1;
             description { state: "default" 0.0;
                min: 4000 4000;
-               color: 0 255 0 100;
+               color: 0 255 0 100; // Semi-transparent green (#00FF0064)
             }
          }
          part { name: "swallow";
@@ -881,14 +982,17 @@ collections {
          }
       }
    }
+   // This group demonstrates how to overlay one part on top of another.
    group { name: "image_align";
       parts {
+         // This red rectangle is positioned to exactly cover the "swallow" part.
+         // This is a common technique for creating visual overlays, highlights, or debug rectangles.
          part { name: "color";
             type: RECT;
             description { state: "default" 0.0;
                rel1.to: "swallow";
                rel2.to: "swallow";
-               color: 255 0 0 50;
+               color: 255 0 0 50; // Semi-transparent red (#FF000032)
             }
          }
          part { name: "swallow";
@@ -901,19 +1005,23 @@ collections {
 
       }
    }
+   // This group defines the content layout for a scrollable popup.
+   // It uses shorthand syntax ('rect' for 'part { type: RECT; ... }').
    group { "efl_ui_popup_scroll_content";
       parts {
          rect { "base";
             desc { "default";
                min: 200 200;
-               color: 255 0 0 255;
+               color: 255 0 0 255; // Red (#FF0000FF)
             }
          }
+         // A rectangle at the top of the "base" part, possibly a header.
+         // 'fixed: 0 1' means its height is fixed, but its width is scalable.
          rect { "top";
             desc { "default";
                fixed: 0 1;
                min: 100 20;
-               color: 255 255 0 255;
+               color: 255 255 0 255; // Yellow (#FFFF00FF)
                rel1.to: "base";
                rel2.to: "base";
                rel2.relative: 1.0 0.0;
@@ -933,12 +1041,18 @@ collections {
          }
       }
    }
+   // A layout for a popup with multiple anchor points, which are SWALLOW parts.
+   // This could be used for tooltips or popups that need to be positioned
+   // relative to specific points in the UI.
    group { "efl_ui_popup_anchor_layout";
       parts {
+         // A 'spacer' is an invisible part that takes up no space but can be used
+         // as a reference for positioning other parts. Here it acts as a base anchor.
          spacer { "base";
             desc { "default";
             }
          }
+         // 'swallow' is a shorthand for 'part { type: SWALLOW; ... }'.
          swallow { "anchor1";
             scale;
             desc { "default";
@@ -1011,11 +1125,13 @@ collections {
          }
       }
    }
+   // A layout designed for testing focus management between different UI components.
    group { "focus_test_6";
       parts {
+         // Background for the list area for visual debugging.
          rect { "list_bg";
             description { state: "default";
-               color: 200 0 0 100;
+               color: 200 0 0 100; // Semi-transparent red (#C8000064)
                rel1.to: "list_swallow";
                rel2.to: "list_swallow";
             }
@@ -1027,6 +1143,8 @@ collections {
                rel2.to: "box";
             }
          }
+         // A 'box' part is a container that arranges its children according to a
+         // specified layout (e.g., horizontal, vertical).
          box { "box";
             description { state: "default";
                rel1.relative: 0.0 0.0;
@@ -1039,13 +1157,14 @@ collections {
                }
             }
          }
-         swallow { "list_swallow"; 
+         // SWALLOW part for a list widget.
+         swallow { "list_swallow";
             description { state: "default";
                rel1.relative: 0.0 0.2;
                rel2.relative: 0.5 1.0;
             }
          }
-         swallow { "label_swallow"; 
+         swallow { "label_swallow";
             description { state: "default";
                rel1.relative: 0.0 0.1;
                rel2.relative: 1.0 0.2;

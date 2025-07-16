@@ -5,6 +5,8 @@
       elm,state,unfocused: Emitted when an item is unfocused only when an item's "focus_highlight" is "on".
 */
 
+// Macro to create an odd-row variant of a genlist item style.
+// It inherits from a source style and overrides the background color.
 #define ODD(_NAME, _SRC) \
    group { _NAME; \
       inherit: _SRC; \
@@ -16,6 +18,8 @@
          } \
       } \
    }
+// Macro for a 'compress' style variant, where text properties are adjusted
+// to minimize vertical space. text.min is set to 0 1, and ellipsis is disabled.
 #define COMPRESS(_NAME, _SRC) \
    group { _NAME; \
       inherit: _SRC; \
@@ -40,6 +44,7 @@
          } \
       } \
    }
+// Macro that combines the 'compress' and 'odd' styles.
 #define COMPRESS_ODD(_NAME, _SRC) \
    group { name: _NAME; \
       inherit: _SRC; \
@@ -72,17 +77,25 @@
 
 #define TREEPAD (ICMIN+4)
 
+// This group defines the style for a group index item in a genlist.
+// It's typically used as a header for a section of items.
 group { "elm/genlist/item/group_index/default"; nomouse; program_source: "elm";
+   // data.item properties provide metadata to the Elementary widget.
+   // "texts" maps the "elm.text" part to the main text of the item.
    data.item: "texts" "elm.text";
+   // "contents" maps swallow parts that can hold custom content.
    data.item: "contents" "elm.swallow.icon elm.swallow.end";
+   // "treesize" defines the indentation width for tree styles.
    data.item: "treesize" TREEPAD;
 
    parts {
+      // "base" is a rectangle that serves as the background for the group index.
       rect { "base";
          desc { "default";
             color_class: "/bg/normal/list/group";
          }
       }
+      // "elm.text" is the text part for the group index's title.
       text { "elm.text";
          scale;
          desc { "default";
@@ -111,6 +124,8 @@ group { "elm/genlist/item/group_index/default"; nomouse; program_source: "elm";
             link.base: "elm,state,disabled";
          }
       }
+      // "elm.swallow.pad" is a swallow part used for padding on the left side,
+      // creating space for tree indentation if needed.
       swallow { "elm.swallow.pad"; mouse;
          scale;
          desc { "default";
@@ -122,6 +137,7 @@ group { "elm/genlist/item/group_index/default"; nomouse; program_source: "elm";
             rel2.offset: 4 -5;
          }
       }
+      // "elm.swallow.icon" is a swallow part for an icon, positioned to the right of the padding.
       swallow { "elm.swallow.icon"; mouse;
          scale;
          desc { "default";
@@ -137,6 +153,7 @@ group { "elm/genlist/item/group_index/default"; nomouse; program_source: "elm";
             rel2.offset: 0 -3;
          }
       }
+      // "elm.swallow.end" is a swallow part for content at the end (right side) of the item.
       swallow { "elm.swallow.end"; mouse;
          scale;
          desc { "default";
@@ -151,6 +168,8 @@ group { "elm/genlist/item/group_index/default"; nomouse; program_source: "elm";
       }
    }
 }
+// This is a compressed version of the group index, inheriting from the default
+// and modifying the text part to use less space.
 group { "elm/genlist/item_compress/group_index/default"; nomouse;
    inherit: "elm/genlist/item/group_index/default";
    parts {
@@ -171,11 +190,18 @@ group { "elm/genlist/item_compress/group_index/default"; nomouse;
    }
 }
 
+// "genlist_base" is a fundamental group that provides common parts for most genlist items.
+// 'inherit_only: 1' means this group cannot be instantiated directly but must be inherited.
 group { "genlist_base"; inherit_only: 1; nomouse; program_source: "elm";
    target_group: "default" "elm.text";
    parts {
+       // "event" is a transparent rectangle that captures all mouse events over the item area.
+       // This allows the entire item to be interactive.
        rect { "event"; mouse;
           desc { "default";
+             // color 0 0 0 0 (#00000000) is fully transparent black.
+             // The "no cc" comment indicates that this color is not tied to a color class,
+             // so it will not change with the theme.
              color: 0 0 0 0; // no cc
              link.base: "elm,state,enabled";
           }
@@ -185,6 +211,8 @@ group { "genlist_base"; inherit_only: 1; nomouse; program_source: "elm";
              link.base: "elm,state,disabled";
           }
        }
+       // "base" is the background rectangle for the item. It has different color classes
+       // for "even" and "odd" states, enabling alternating row colors.
        rect { "base";
           desc { "default";
              color_class: "/bg/normal/list/item";
@@ -195,6 +223,8 @@ group { "genlist_base"; inherit_only: 1; nomouse; program_source: "elm";
              link.base: "elm,state,odd";
           }
        }
+       // "sel_base" is an image part (used as a colored rectangle here) to show the
+       // selection highlight. It's hidden by default and becomes visible when selected.
        image { "sel_base"; type: RECT; mouse_events: 0;
           desc { "default";
              color_class: "/bg/selected/list/item";
@@ -210,8 +240,12 @@ group { "genlist_base"; inherit_only: 1; nomouse; program_source: "elm";
    }
 }
 
+// Another inheritable group, providing a layer to block events.
 group { "genlist_top"; inherit_only: 1; nomouse; program_source: "elm";
     parts {
+       // "event_block" is a transparent rectangle that is visible only in the "disabled"
+       // state. When visible, it sits on top and blocks mouse events from reaching
+       // parts underneath, effectively disabling interaction with the item.
        rect { "event_block"; mouse;
           desc { "default";
              color: 0 0 0 0; // no cc
@@ -227,8 +261,13 @@ group { "genlist_top"; inherit_only: 1; nomouse; program_source: "elm";
     }
 }
 
+// This inheritable group provides a placeholder for an arrow, used for alignment
+// in non-tree items that should align with tree items (which have an arrow).
 group { "genlist_noarrow"; inherit_only: 1; program_source: "elm";
    parts {
+      // The "arrow" rectangle is a transparent spacer. It ensures that items inheriting
+      // this group have the same indentation as items with a visible arrow,
+      // maintaining a consistent layout in mixed lists.
       rect { "arrow"; mouse;
          scale;
          desc { "default";
@@ -243,12 +282,14 @@ group { "genlist_noarrow"; inherit_only: 1; program_source: "elm";
             rel2.to_x: "elm.swallow.pad";
             rel2.relative: 1.0 1.0;
             rel2.offset: 0 -5;
+            // Transparent color, making it invisible.
             color: 0 0 0 0; // no cc
          }
       }
    }
 }
 
+// This is the default style for a standard genlist item.
 group { "elm/genlist/item/default/default"; nomouse;
 //   data.item: "selectraise" "on";
 //   data.item: "focusraise" "on";
@@ -259,6 +300,7 @@ group { "elm/genlist/item/default/default"; nomouse;
    inherit: "genlist_base";
    parts {
       //##//
+      // "elm.text" is the main text part of the item.
       text { "elm.text";
          scale;
          desc { "default";
@@ -292,6 +334,8 @@ group { "elm/genlist/item/default/default"; nomouse;
             hid;
          }
       }
+      // "elm.text.flip" is a swallow part used for the "flip" mode, where the default
+      // content of the item can be replaced by custom content. It's hidden by default.
       swallow { "elm.text.flip"; mouse;
          scale;
          desc { "default";
@@ -307,32 +351,40 @@ group { "elm/genlist/item/default/default"; nomouse;
             vis;
          }
       }
+      // This program is triggered by the "elm,state,selected" signal from the C code.
+      // It sets the state of parts in the "default" target_group (elm.text) to "selected".
       program {
          signal: "elm,state,selected";
          action: STATE_SET "selected";
          groups: "default";
       }
+      // When "elm,state,unselected" is signaled, it reverts the state to "default".
       program {
          signal: "elm,state,unselected";
          action: STATE_SET "default";
          target_groups: "default";
       }
+      // Handles the disabled state.
       program {
          signal: "elm,state,disabled";
          action: STATE_SET "disabled";
          groups: "default";
       }
+      // Handles the enabled state.
       program {
          signal: "elm,state,enabled";
          action: STATE_SET "default";
          groups: "default";
       }
+      // When flip mode is enabled, it sets the "flip_enabled" state on "elm.text"
+      // (making it hidden) and the swallow part "elm.text.flip" (making it visible).
       program {
          signal: "elm,state,flip,enabled";
          action: STATE_SET "flip_enabled";
          groups: "default";
          target: "elm.text.flip";
       }
+      // Disables flip mode, reverting to the default state.
       program {
          signal: "elm,state,flip,disabled";
          action: STATE_SET "default";
@@ -364,10 +416,13 @@ group { "elm/genlist/item/default/default"; nomouse;
             rel2.to_x: "elm.swallow.pad";
             rel2.relative: 1.0 1.0;
             rel2.offset: 0 -5;
+            // This part is linked to the "elm,state,flip,disabled" state, so it is
+            // visible only when flip mode is off.
             link.base: "elm,state,flip,disabled";
          }
          desc { "flip_enabled";
             inherit: "default";
+            // It is hidden when flip mode is on.
             hid;
             link.base: "elm,state,flip,enabled";
          }
@@ -398,6 +453,8 @@ ODD("elm/genlist/item_odd/default/default", "elm/genlist/item/default/default")
 COMPRESS("elm/genlist/item_compress/default/default", "elm/genlist/item/default/default")
 COMPRESS_ODD("elm/genlist/item_compress_odd/default/default", "elm/genlist/item/default/default")
 
+// This style is similar to the default, but uses a TEXTBLOCK part instead of TEXT.
+// This allows for rich text formatting using tags like "<b>" or "<hilight>".
 group { "elm/genlist/item/default_style/default"; nomouse;
 //   data.item: "selectraise" "on";
 //   data.item: "focusraise" "on";
@@ -405,6 +462,8 @@ group { "elm/genlist/item/default_style/default"; nomouse;
    data.item: "contents" "elm.swallow.icon elm.swallow.end";
    data.item: "treesize" TREEPAD;
    data.item: "flips" "elm.text.flip";
+   // The 'styles' block defines text styles that can be applied to the textblock.
+   // Each style has a base definition and can define formatting for various tags.
    styles.style { "genlist_style";
       base: "font="FN" font_size=10 align=left valign=0.5 color=cc:/fg/normal/list/item text_class=list_item";
       tag: "br" "\n";
@@ -413,6 +472,7 @@ group { "elm/genlist/item/default_style/default"; nomouse;
       tag: "b" "+ font_weight=Bold";
       tag: "tab" "\t";
    }
+   // A separate style for the selected state, typically changing the text color.
    styles.style { "genlist_style_selected";
       base: "font="FN" font_size=10 align=left valign=0.5 color=cc:/fg/selected/list/item text_class=list_item_selected";
       tag: "br" "\n";
@@ -421,6 +481,7 @@ group { "elm/genlist/item/default_style/default"; nomouse;
       tag: "b" "+ font_weight=Bold";
       tag: "tab" "\t";
    }
+   // A style for the disabled state.
    styles.style { "genlist_style_disabled";
       base: "font="FN" font_size=10 align=left valign=0.5 color=cc:/fg/disabled/list/item text_class=list_item";
       tag: "br" "\n";
@@ -429,11 +490,12 @@ group { "elm/genlist/item/default_style/default"; nomouse;
       tag: "b" "+ font_weight=Bold";
       tag: "tab" "\t";
    }
-   
+
    inherit: "genlist_base";
    parts {
-        
+
       //##//
+      // "elm.text" is a textblock part that can render styled text.
       textblock { "elm.text";
          scale;
          desc { "default";
@@ -454,10 +516,12 @@ group { "elm/genlist/item/default_style/default"; nomouse;
             }
             min: 0 ICMIN;
          }
+         // In the "selected" state, it applies the "genlist_style_selected" style.
          desc { "selected";
             inherit: "default";
             text.style: "genlist_style_selected";
          }
+         // In the "disabled" state, it applies the "genlist_style_disabled" style.
          desc { "disabled";
             inherit: "default";
             text.style: "genlist_style_disabled";
@@ -566,7 +630,7 @@ group { "elm/genlist/item/default_style/default"; nomouse;
          }
       }
       //##//
-      
+
    }
    inherit: "genlist_top";
 }
@@ -1038,12 +1102,16 @@ group { "elm/genlist/item_compress_odd/full/default";
    inherit: "elm/genlist/item_odd/full/default";
 }
 
+// This group defines the expandable arrow for tree items. It's designed to be
+// inherited by tree item styles.
 group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
 //   images.image: "big_arrow_left.png" COMP;
 //   images.image: "big_arrow_right.png" COMP;
 //   images.image: "big_arrow_down.png" COMP;
 
    parts {
+      // "arrow_img_l" is the arrow image for LTR (Left-To-Right) locales.
+      // It's clipped by "arrow_clip_l" to be shown only in LTR mode.
       image { "arrow_img_l";
          clip_to: "arrow_clip_l";
          scale;
@@ -1080,6 +1148,8 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             color_class: "/fg/disabled/list/item";
          }
       }
+      // "arrow_img_r" is the arrow image for RTL (Right-To-Left) locales.
+      // It's clipped by "arrow_clip_r" to be shown only in RTL mode.
       image { "arrow_img_r";
          clip_to: "arrow_clip_r";
          scale;
@@ -1116,6 +1186,7 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             color_class: "/fg/disabled/list/item";
          }
       }
+      // "arrow" is a transparent rectangle that acts as the clickable area for the arrow.
       rect { "arrow"; mouse;
          scale;
          desc { "default";
@@ -1129,6 +1200,8 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             color: 0 0 0 0; // no cc
          }
       }
+      // "arrow_clip_l" is a clipper for the LTR arrow image. It's visible only when
+      // the global Edje state is "ltr".
       rect { "arrow_clip_l";
          desc { "default";
             rel1.to: "arrow_img_l";
@@ -1141,6 +1214,7 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             link.base: "edje,state,rtl" "edje";
          }
       }
+      // "arrow_clip_r" is a clipper for the RTL arrow image, visible in "rtl" state.
       rect { "arrow_clip_r";
          desc { "default";
             rel1.to: "arrow_img_r";
@@ -1153,12 +1227,19 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             link.base: "edje,state,rtl" "edje";
          }
       }
+      // When the arrow area is clicked, it emits a signal to the C code
+      // to toggle the expanded/contracted state of the item.
       program {
          signal: "mouse,up,1"; source: "arrow";
          action: SIGNAL_EMIT "elm,action,expand,toggle" "elm";
       }
+      // This program runs when the item is expanded.
       program { "arr1";
          signal: "elm,state,expanded";
+         // The script rotates the arrow image to point down.
+         // It reads the current state description (e.g. "default", "selected")
+         // and reapplies it with a new state value (1.0 for expanded).
+         // This preserves the color state while changing the rotation state.
          script {
             new st[31], Float:vl;
             get_state(PART:"arrow_img_l", st, 30, vl);
@@ -1166,8 +1247,11 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             set_state(PART:"arrow_img_r", st, 1.0);
          }
       }
+      // This program runs when the item is contracted.
       program { "arr2";
          signal: "elm,state,contracted";
+         // The script rotates the arrow image back to its default (right-pointing) position.
+         // It uses the same technique as "arr1" to preserve the color state.
          script {
             new st[31], Float:vl;
             get_state(PART:"arrow_img_l", st, 30, vl);
@@ -1175,6 +1259,10 @@ group { "genlist_arrow"; inherit_only: 1; program_source: "elm";
             set_state(PART:"arrow_img_r", st, 0.0);
          }
       }
+      // The following programs handle state changes (selected, unselected, enabled, disabled)
+      // for the arrow images, ensuring their color matches the item's state.
+      // They use scripts to change only the state description string (e.g., "default" to "selected")
+      // while keeping the state value (rotation) unchanged.
       program { "arr3";
          signal: "elm,state,selected";
          script {
@@ -3272,12 +3360,16 @@ COMPRESS_MODE_ODD("elm/genlist/tree_compress_odd/mode/default", "elm/genlist/tre
          } \
       } \
    }
+// This group defines the style for the "edit mode" decorator of a genlist item.
+// It typically shows handles for reordering or deleting items.
 group { "elm/genlist/item/edit/default"; nomouse;
+   // "contents" maps the swallow parts for the edit icons.
    data.item: "contents" "elm.edit.icon.1 elm.edit.icon.2";
 //   data.item: "selectraise" "on";
 //   data.item: "focusraise" "on";
    program_source: "elm";
    parts {
+      // The background, with states for odd/even rows.
       rect { "base";
          desc { "default";
             color_class: "/bg/normal/list";
@@ -3318,6 +3410,8 @@ group { "elm/genlist/item/edit/default"; nomouse;
          groups: "edit";
       }
 
+      // "elm.edit.icon.1" is a swallow part for an edit icon.
+      // In the default state, it is positioned on the right side.
       swallow { "elm.edit.icon.1"; mouse;
          scale;
          desc { "default";
@@ -3329,6 +3423,7 @@ group { "elm/genlist/item/edit/default"; nomouse;
             rel1.offset: -1 4;
             rel2.offset: -1 -5;
          }
+         // In the "on" state (when edit mode is active), it moves to the left side.
          desc { "on";
             inherit: "default";
             align: 0.0 0.5;
@@ -3340,6 +3435,8 @@ group { "elm/genlist/item/edit/default"; nomouse;
             hid;
          }
       }
+      // "elm.edit.icon.2" is another swallow part for an edit icon.
+      // In the default state, it is positioned on the far left, mostly off-screen or hidden.
       swallow { "elm.edit.icon.2"; mouse;
          scale;
          desc { "default";
@@ -3351,6 +3448,7 @@ group { "elm/genlist/item/edit/default"; nomouse;
             rel1.offset: 1 4;
             rel2.offset: 1 -5;
          }
+         // In the "on" state, it moves to the right side.
          desc { "on";
             inherit: "default";
             align: 1.0 0.5;
@@ -3363,11 +3461,13 @@ group { "elm/genlist/item/edit/default"; nomouse;
          }
       }
 
+      // This swallow part holds the original item content.
       swallow { "elm.swallow.decorate.content"; mouse;
          scale;
          desc { "default";
             offscale;
          }
+         // In the "on" state, it is positioned between the two edit icons.
          desc { "on";
             inherit: "default";
             rel1.to_x: "elm.edit.icon.1";
@@ -3378,7 +3478,10 @@ group { "elm/genlist/item/edit/default"; nomouse;
             rel2.offset: -1 -1;
          }
       }
+      // The "decorate" target group includes the content and both icons, so they
+      // can be controlled together.
       target_group: "decorate" "elm.swallow.decorate.content" "elm.edit.icon.1" "elm.edit.icon.2";
+      // This program enables the edit mode with a transition.
       program {
          signal: "elm,state,decorate,enabled,effect";
          action: STATE_SET "on";

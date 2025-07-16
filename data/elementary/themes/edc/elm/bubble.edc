@@ -1,25 +1,35 @@
+// This group defines the visual style for a bubble with its arrow pointing to the
+// top-left. It serves as a container for text, an optional icon, and other
+// content, adapting its layout for both LTR and RTL languages.
 group { name: "elm/bubble/top_left/default";
    alias: "elm/bubble/base/default";
    images.image: "bub_base_tl.png" COMP;
    images.image: "bub_base_tr.png" COMP;
    parts {
+      // An invisible rectangle covering the entire area to capture mouse events.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            // The color is set to fully transparent (RGBA: 0, 0, 0, 0 or #00000000).
+            color: 0 0 0 0;
          }
       }
+      // This part is a container for an icon, which is initially hidden.
+      // It's a SWALLOW part, allowing external Evas objects to be placed inside.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
+         // The icon has a fixed size and does not stretch.
          fixed: 1 1;
             visible: 0;
             align: 0.0 0.0;
             rel1.offset: 4 4;
+            // The bottom of the icon is positioned relative to the top of the 'elm.text' part.
             rel2 {
                to_y: "elm.text";
                relative: 0.0 1.0;
                offset: 4 -5;
             }
+            // offscale prevents visual artifacts when the part is scaled to zero size (hidden).
             offscale;
          }
          description { state: "visible" 0.0;
@@ -28,11 +38,13 @@ group { name: "elm/bubble/top_left/default";
             min: ICMIN ICMIN;
          }
       }
+      // The main text part of the bubble. It does not react to mouse events.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 0 1;
             align: 0.0 0.0;
+            // Positioned to the right of the icon and to the left of the info text.
             rel1 {
                to_x: "elm.swallow.icon";
                relative: 1.0 0.0;
@@ -53,6 +65,7 @@ group { name: "elm/bubble/top_left/default";
             }
          }
       }
+      // An optional text part for displaying secondary information, aligned to the right.
       part { name: "elm.info"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -73,6 +86,7 @@ group { name: "elm/bubble/top_left/default";
             }
          }
       }
+      // The main background of the bubble, using a scalable border image.
       part { name: "base"; mouse_events:  0;
          scale: 1;
          description { state: "default" 0.0;
@@ -84,17 +98,24 @@ group { name: "elm/bubble/top_left/default";
             }
             rel2.offset: -5 -5;
             image.normal: "bub_base_tl.png";
+            // The border property defines how the image is sliced for scaling (left, right, top, bottom).
+            // This ensures corners are not distorted.
             image.border: 24 0 12 0;
+            // SOLID indicates that the central part of the image is not rendered, which is an optimization for solid-color backgrounds.
             image.middle: SOLID;
             fill.smooth: 0;
             offscale;
          }
+         // The 'rtl' state is used for right-to-left languages.
+         // It flips the background image and adjusts the border accordingly.
          description { state: "rtl" 0.0;
             inherit: "default" 0.0;
             image.normal: "bub_base_tr.png";
             image.border: 0 24 12 0;
          }
       }
+      // This is the main content area of the bubble.
+      // As a SWALLOW part, it can host any other Evas object.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -105,19 +126,26 @@ group { name: "elm/bubble/top_left/default";
          }
       }
    }
+   // Programs define the dynamic behavior of the group, reacting to signals.
    programs {
+      // When the "elm,state,icon,visible" signal is received, it transitions
+      // the "elm.swallow.icon" part to its "visible" state, making the icon appear.
       program { signal: "elm,state,icon,visible"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.swallow.icon";
       }
+      // Hides the icon by returning it to the "default" state.
       program { signal: "elm,state,icon,hidden"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.icon";
       }
+      // Standard signals for handling LTR/RTL layout changes.
+      // When "edje,state,rtl" is received, the "base" part switches to the "rtl" state.
       program { signal: "edje,state,rtl"; source: "edje";
          action: STATE_SET "rtl" 0.0;
          target: "base";
       }
+      // When "edje,state,ltr" is received, it reverts to the "default" (LTR) state.
       program { signal: "edje,state,ltr"; source: "edje";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -125,6 +153,8 @@ group { name: "elm/bubble/top_left/default";
    }
 }
 
+// This group defines the style for a bubble with its arrow pointing to the
+// top-right. It mirrors the 'top_left' layout, with adjustments for alignment.
 group { name: "elm/bubble/top_right/default";
    images.image: "bub_base_tr.png" COMP;
    images.image: "bub_base_tl.png" COMP;
@@ -139,6 +169,7 @@ group { name: "elm/bubble/top_right/default";
          description { state: "default" 0.0;
             fixed: 1 1;
             visible: 0;
+            // Aligned to the top-right to match the bubble's orientation.
             align: 1.0 0.0;
             aspect: 1.0 1.0; aspect_preference: VERTICAL;
             rel1.offset: -5 4;
@@ -208,6 +239,7 @@ group { name: "elm/bubble/top_right/default";
                offset: 4 4;
             }
             rel2.offset: -5 -5;
+            // Uses the top-right arrow image by default.
             image.normal: "bub_base_tr.png";
             image.border: 0 24 12 0;
             image.middle: SOLID;
@@ -216,6 +248,7 @@ group { name: "elm/bubble/top_right/default";
          }
          description { state: "rtl" 0.0;
             inherit: "default" 0.0;
+            // For RTL, it switches to the top-left arrow image.
             image.normal: "bub_base_tl.png";
             image.border: 24 0 12 0;
          }
@@ -250,6 +283,8 @@ group { name: "elm/bubble/top_right/default";
    }
 }
 
+// This group defines the style for a bubble with its arrow pointing to the
+// bottom-left, suitable for content appearing below an anchor.
 group { name: "elm/bubble/bottom_left/default";
    images.image: "bub_base_bl.png" COMP;
    images.image: "bub_base_br.png" COMP;
@@ -263,6 +298,7 @@ group { name: "elm/bubble/bottom_left/default";
          description { state: "default" 0.0;
             fixed: 1 1;
             visible: 0;
+            // Aligned to the bottom-left.
             align: 0.0 1.0;
             aspect: 1.0 1.0; aspect_preference: VERTICAL;
             rel1 {
@@ -330,11 +366,13 @@ group { name: "elm/bubble/bottom_left/default";
          description { state: "default" 0.0;
             color_class: "/bg/normal/bubble";
             rel1.offset: 4 4;
+            // The bottom of the base is aligned with the top of the icon to contain all elements.
             rel2 {
                to_y: "elm.swallow.icon";
                relative: 1.0 0.0;
                offset: -5 -5;
             }
+            // Uses the bottom-left arrow image.
             image.normal: "bub_base_bl.png";
             image.border: 24 0 0 13;
             image.middle: SOLID;
@@ -343,6 +381,7 @@ group { name: "elm/bubble/bottom_left/default";
          }
          description { state: "rtl" 0.0;
             inherit: "default" 0.0;
+            // Switches to the bottom-right arrow for RTL.
             image.normal: "bub_base_br.png";
             image.border: 0 24 0 13;
          }
@@ -376,6 +415,8 @@ group { name: "elm/bubble/bottom_left/default";
    }
 }
 
+// This group defines the style for a bubble with its arrow pointing to the
+// bottom-right, mirroring the 'bottom_left' layout.
 group { name: "elm/bubble/bottom_right/default";
    images.image: "bub_base_br.png" COMP;
    images.image: "bub_base_bl.png" COMP;
@@ -390,6 +431,7 @@ group { name: "elm/bubble/bottom_right/default";
          description { state: "default" 0.0;
             fixed: 1 1;
             visible: 0;
+            // Aligned to the bottom-right.
             align: 1.0 1.0;
             aspect: 1.0 1.0; aspect_preference: VERTICAL;
             rel1 {
@@ -463,6 +505,7 @@ group { name: "elm/bubble/bottom_right/default";
                relative: 1.0 0.0;
                offset: -5 -5;
             }
+            // Uses the bottom-right arrow image by default.
             image.normal: "bub_base_br.png";
             image.border: 0 24 0 13;
             image.middle: SOLID;
@@ -471,6 +514,7 @@ group { name: "elm/bubble/bottom_right/default";
          }
          description { state: "rtl" 0.0;
             inherit: "default" 0.0;
+            // Switches to the bottom-left arrow for RTL.
             image.normal: "bub_base_bl.png";
             image.border: 24 0 0 13;
          }

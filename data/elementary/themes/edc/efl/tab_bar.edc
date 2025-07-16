@@ -1,6 +1,10 @@
+// The main group for the tab bar widget. It serves as a container
+// for the tab bar content.
 group { "efl/tab_bar";
    data.item: "version" "123";
    parts {
+      // This swallow part holds the actual content of the tab bar,
+      // such as a box that contains all the individual tabs.
       swallow { "efl.content";
          desc { "default";
          }
@@ -8,18 +12,33 @@ group { "efl/tab_bar";
    }
 }
 
+// This group defines the appearance and behavior of a single tab item.
+// It includes states for selection, disabling, and different content
+// visibility modes (icon only, label only, or both).
 group { "efl/tab_bar/tab";
    data.item: "version" "123";
+   // This enables transition animations for state changes within this group.
    data.item: "transition_animation_on" "1";
 
+   // Preload the shadow image and compress it for better performance.
    images.image: "win_shad_flat.png" COMP;
 
+// These definitions are used as bitmasks to control the tab's appearance.
+// This allows for combining different states (e.g., icon and label visible)
+// efficiently within the script.
 #define ICON    1
 #define LABEL   2
 #define MASK    3
 #define DISABLE 4
+   // The Embryo script block handles the logic for updating the tab's visual
+   // state based on its current mode.
    script {
+      // A public variable to hold the current button mode as a bitmask.
       public btmode;
+      // This function is called to apply the visual state corresponding to the given mode 'm'.
+      // It decodes the mode to determine if the icon, label, or both should be shown,
+      // and whether the tab is disabled. Based on this, it sets the appropriate states
+      // on the "efl.icon", "icon_clip", and "efl.text" parts to reflect the desired appearance.
       public eval_mode(m) {
          new m1 = m & MASK;
          new d = m & DISABLE;
@@ -67,29 +86,38 @@ group { "efl/tab_bar/tab";
       }
    }
    parts {
+      // A rectangle part for the shadow effect behind the tab.
       part { name: "shadow"; type: RECT;
          description { state: "default" 0.0;
             rel1.to_x: "_sh1";
             rel1.to_y: "_sh1";
             rel2.to_x: "_sh1";
             rel2.to_y: "";
+            // Semi-transparent white (#FFFFFF80). This color is hardcoded
+            // and does not use a color class.
             color: 255 255 255 128; // no cc
             color_class: "/shadow/normal/tab";
          }
+         // When selected, the shadow becomes fully opaque white (#FFFFFFFF).
          desc { "selected";
             inherit: "default" 0.0;
             color: 255 255 255 255; // no cc
          }
       }
+      // This macro creates a window shadow effect using the specified image.
       WIN_SHAD("base", "shadow", "win_shad_flat.png", 10, 10, 7, 14, 0.25)
+      // The main background rectangle of the tab.
       rect { "base";
          desc { "default";
             color_class: "/bg/normal/tab";
          }
+         // A state for when the tab bar is in vertical mode.
          desc { "vert";
             inherit: "default" 0.0;
          }
       }
+      // A clipper for the inset shadow effect, which is hidden when the tab is selected.
+      // The color is likely for debugging the clipper's area.
       rect { "inset_clip";
          desc { "default";
             rel.to: "base";
@@ -100,6 +128,9 @@ group { "efl/tab_bar/tab";
             hid;
          }
       }
+      // An image part that creates an inset shadow effect at the bottom of the tab,
+      // giving it a sense of depth. It uses border scaling on the shadow image
+      // to make it resizable and is clipped by "inset_clip".
       image { "inset";
          clip_to: "inset_clip";
          scale;
@@ -114,9 +145,12 @@ group { "efl/tab_bar/tab";
             rel1.offset: -22 -11;
             rel2.offset: 21 20;
             color_class: "/shadow/normal/tab";
+            // Prevents this part from being scaled by the global UI scaling factor,
+            // which is useful for maintaining pixel-perfect details.
             offscale;
          }
       }
+      // A rectangle for the highlight effect, visible only when the tab is selected.
       rect { "highlight";
          desc { "default";
             rel.to: "base";
@@ -128,6 +162,8 @@ group { "efl/tab_bar/tab";
             vis;
          }
       }
+      // This is the master clipper for the icon. It's used to apply a disabled
+      // effect by making it semi-transparent white (#FFFFFF40).
       rect { "icon_clip";
          desc { "default";
          }
@@ -136,6 +172,8 @@ group { "efl/tab_bar/tab";
             color: 255 255 255 64; // no cc
          }
       }
+      // The icon animation is handled by cross-fading two icon swallows.
+      // "icon_clip1" holds the current icon ("efl.icon") and fades out during animation.
       rect { "icon_clip1";
          clip_to: "icon_clip";
          desc { "default";
@@ -148,6 +186,7 @@ group { "efl/tab_bar/tab";
             hid;
          }
       }
+      // Swallow part for the current icon.
       swallow { "efl.icon";
          clip_to: "icon_clip1";
          scale;
@@ -174,6 +213,7 @@ group { "efl/tab_bar/tab";
             rel2.to_y: "";
          }
       }
+      // "icon_clip2" holds the new icon ("efl.icon_new") and fades in during animation.
       rect { "icon_clip2";
          clip_to: "icon_clip";
          desc { "default";
@@ -186,6 +226,7 @@ group { "efl/tab_bar/tab";
             vis;
          }
       }
+      // Swallow part for the new icon, used during icon change animations.
       swallow { "efl.icon_new";
          clip_to: "icon_clip2";
          scale;
@@ -213,6 +254,8 @@ group { "efl/tab_bar/tab";
             rel2.to_y: "";
          }
       }
+      // Similar to the icon, the text label is animated by cross-fading.
+      // "text_clip1" holds the current label and fades out.
       rect { "text_clip1";
          desc { "default";
             color: 255 255 255 255; // no cc
@@ -224,6 +267,8 @@ group { "efl/tab_bar/tab";
             hid;
          }
       }
+      // The main text part for the tab's label. It has several states to handle
+      // different visibility modes and disabled appearance.
       text { "efl.text";
          nomouse;
          scale;
@@ -268,6 +313,8 @@ group { "efl/tab_bar/tab";
             fixed: 1 1;
          }
       }
+      // "text_clip2" holds the new label and fades in. The actual text content
+      // of "efl.text" is swapped by the C code during the animation process.
       rect { "text_clip2";
          desc { "default";
             color: 255 255 255 0; // no cc
@@ -279,6 +326,7 @@ group { "efl/tab_bar/tab";
             vis;
          }
       }
+      // The selection indicator bar, usually shown at the bottom of the selected tab.
       rect { "bar";
          nomouse;
          scale;
@@ -298,11 +346,15 @@ group { "efl/tab_bar/tab";
             vis;
          }
       }
+      // An invisible rectangle covering the entire tab to capture mouse events.
+      // This provides a reliable click area.
       rect { "event";
          desc { "default";
             color: 0 0 0 0; // no cc
          }
       }
+      // A swallow part for optional extra content, like a close button or a notification badge.
+      // It's aligned to the top-right of the tab.
       swallow { "efl.extra";
          scale;
          desc { "default";
@@ -317,7 +369,10 @@ group { "efl/tab_bar/tab";
       }
    }
    programs {
+      // This macro binds standard clickable events (mouse down, up, click) to the "event"
+      // part and emits corresponding signals (e.g., "efl,action,click").
       EFL_UI_CLICKABLE_PART_BIND(event)
+      // Respond to orientation changes from the C side.
       program { signal: "efl,state,horizontal"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -326,11 +381,13 @@ group { "efl/tab_bar/tab";
          action: STATE_SET "vert" 0.0;
          target: "base";
       }
+      // On load, initialize the tab mode to show both icon and label.
       program { signal: "load"; source: "";
          script {
             set_int(btmode, LABEL | ICON);
          }
       }
+      // Handle selection state changes.
       program { signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected" 0.0;
          target: "efl.text";
@@ -345,6 +402,7 @@ group { "efl/tab_bar/tab";
          target: "bar";
          target: "inset_clip";
       }
+      // Handle mouse-over highlight state.
       program { signal: "efl,highlight,on"; source: "efl";
          action: STATE_SET "selected" 0.0;
          target: "highlight";
@@ -353,6 +411,8 @@ group { "efl/tab_bar/tab";
          action: STATE_SET "default" 0.0;
          target: "highlight";
       }
+      // The following programs update the 'btmode' script variable and call 'eval_mode'
+      // to visually update the tab when its content or state changes.
       program { signal: "efl,text,unset"; source: "efl";
          script {
             new m = get_int(btmode);
@@ -395,10 +455,12 @@ group { "efl/tab_bar/tab";
             eval_mode(m);
          }
       }
+      // When the tab is being moved (e.g., via drag and drop), reset its shadow.
       program { signal: "efl,state,moving"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "shadow";
       }
+      // This program triggers the icon cross-fade animation. It runs for 0.2s.
       program { signal: "efl,state,icon_new,set"; source: "efl";
          action: STATE_SET "animation" 0.0;
          target: "icon_clip1";
@@ -406,20 +468,25 @@ group { "efl/tab_bar/tab";
          transition: LINEAR 0.2;
          after: "icon_set,animation,done";
       }
+      // After the animation, this program notifies the C code by emitting a signal.
       program { name: "icon_set,animation,done";
          action: SIGNAL_EMIT "efl,state,icon_set,done" "efl";
       }
+      // Resets the icon clips to their default state, for example to cancel an animation.
       program { signal: "efl,state,icon,reset"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "icon_clip1";
          target: "icon_clip2";
       }
+      // The label change animation is more complex, supporting different directions.
+      // These programs trigger the core animation program.
       program { signal: "efl,state,label_set,forward"; source: "efl";
          after: "label_set,animation";
       }
       program { signal: "efl,state,label_set,backward"; source: "efl";
          after: "label_set,animation";
       }
+      // This is the core label animation program, which cross-fades the text clippers.
       program { name: "label_set,animation";
          signal: "efl,state,label_set"; source: "efl";
          action: STATE_SET "animation" 0.0;
@@ -428,15 +495,18 @@ group { "efl/tab_bar/tab";
          transition: LINEAR 0.2;
          after: "label_set,animation,done";
       }
+      // After animation, notify the C code.
       program { name: "label_set,animation,done";
          action: SIGNAL_EMIT "efl,state,label_set,done" "efl";
       }
+      // Resets the text clippers to their default state.
       program { signal: "efl,state,label,reset"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "text_clip1";
          target: "text_clip2";
       }
    }
+// Undefine the macros to avoid conflicts in other files including this one.
 #undef ICON
 #undef LABEL
 #undef MASK

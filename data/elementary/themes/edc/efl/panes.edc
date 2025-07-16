@@ -9,24 +9,34 @@
       efl,action,unpress: Used for "unpress" smart callback.
 */
 
+// Minimum size for the pane's smaller dimension (width for vertical, height for horizontal).
 #define PANEMIN  8
+// Minimum size for the pane's larger dimension (height for vertical, width for horizontal).
 #define PANEMIN2 24
+// Width of the pane handle.
 #define PANEWID  24
 
+// This group defines the style for a vertical panes widget.
+// It creates a layout with two content areas (left and right) separated by a draggable vertical bar.
 group { name: "efl/panes/vertical";
    data.item: "version" "123";
    images.image: "pane_handle_v.png" COMP;
    parts {
+      // Aliases for the content parts. "first" and "second" are the modern names,
+      // while "left" and "right" are kept for backward compatibility.
       //TODO: remove left/right
       alias: "first" "efl.left";
       alias: "second" "efl.right";
       alias: "left" "efl.left";
       alias: "right" "efl.right";
 
+      // The main container part that fills the entire widget area.
       part { name: "whole"; type: SPACER;
          description { state: "default" 0.0;
          }
       }
+      // These spacer parts are used to constrain the movement of the draggable bar.
+      // They don't have a visual representation but define the boundaries for dragging.
       part { name: "right_constraint"; type: SPACER;
          dragable { confine: "whole";
             x: 1 1 1;
@@ -45,6 +55,8 @@ group { name: "efl/panes/vertical";
             max: 0 0;
          }
       }
+      // A container that holds the draggable bar. Its size is determined by the
+      // 'left_constraint' and 'right_constraint' parts, effectively defining the draggable area.
       part { name: "sub_whole"; type: SPACER;
          description { state: "default" 0.0;
             rel1.relative: 1.0 0.0;
@@ -53,6 +65,7 @@ group { name: "efl/panes/vertical";
             rel2.to_x: "right_constraint";
          }
       }
+      // These RECT parts serve as backgrounds for the left and right panes.
       part { name: "whole_left"; type: RECT;
          description { state: "default" 0.0;
             rel2.to_x: "efl.bar";
@@ -65,6 +78,9 @@ group { name: "efl/panes/vertical";
             rel1.relative: 1.0 0.0;
          }
       }
+      // These are the SWALLOW parts where the actual content from the application is placed.
+      // 'efl.left' is for the left content, and 'efl.right' is for the right content.
+      // They are clipped to their respective background parts.
       part { name: "efl.left"; type: SWALLOW;
          clip_to: "whole_left";
          description { state: "default" 0.0;
@@ -79,6 +95,8 @@ group { name: "efl/panes/vertical";
             rel1.relative: 1.0 0.0;
          }
       }
+      // The draggable bar itself. It's a SPACER, allowing it to be dragged within 'sub_whole'.
+      // Its movement resizes the left and right panes.
       part { name: "efl.bar"; type: SPACER;
          dragable { confine: "sub_whole";
             x: 1 1 1;
@@ -92,6 +110,8 @@ group { name: "efl/panes/vertical";
             rel2.relative: 1.0 0.5;
          }
       }
+      // The visual representation of the handle on the bar (e.g., dots or lines).
+      // It does not receive mouse events itself to avoid interfering with dragging.
       part { name: "dots"; mouse_events: 0;
          description { state: "default" 0.0;
             FIXED_SIZE(8, 24)
@@ -105,6 +125,8 @@ group { name: "efl/panes/vertical";
             color_class: "/fg/pressed/panes/handle";
          }
       }
+      // An invisible swallow part used to define the clickable area of the handle.
+      // This allows for a larger, more user-friendly click/drag target.
       part { name: "efl.event"; type: SWALLOW;
          description { state: "default" 0.0;
             visible: 0;
@@ -113,6 +135,9 @@ group { name: "efl/panes/vertical";
             rel.to: "efl.bar";
          }
       }
+      // The actual interactive area for dragging. It's an invisible RECT that captures
+      // mouse events and forwards them to 'efl.bar'. This technique increases the hit
+      // area of the bar without changing its visual appearance.
       part { name: "bar"; type: RECT;
          dragable.events: "efl.bar";
          description { state: "default" 0.0;
@@ -121,7 +146,7 @@ group { name: "efl/panes/vertical";
             fixed: 1 1;
             rel1.to_x: "efl.event";
             rel2.to_x: "efl.event";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
@@ -130,22 +155,31 @@ group { name: "efl/panes/vertical";
       }
    }
    programs {
+      // This macro binds mouse click events on the "bar" part to emit "efl,action,press"
+      // and "efl,action,unpress" signals, which are used for the "press" and "unpress"
+      // smart callbacks.
       EFL_UI_CLICKABLE_PART_BIND("bar")
+      // When the mouse button is pressed down on the bar, this program changes
+      // the state of the "dots" part to "pressed", providing visual feedback.
       program { name: "bar_down";
          signal: "mouse,down,1"; source: "bar";
          action: STATE_SET "pressed" 0.0;
          target: "dots";
       }
+      // When the mouse button is released, the "dots" part returns to its "default" state.
       program { name: "bar_up";
          signal: "mouse,up,1"; source: "bar";
          action: STATE_SET "default" 0.0;
          target: "dots";
       }
+      // These programs handle the 'fixed' state of the panes. When the "efl,panes,fixed"
+      // signal is received, the bar is set to "disabled", preventing it from being dragged.
       program { // for efl_panes_fixed_set()
          signal: "efl,panes,fixed"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "bar";
       }
+      // When "efl,panes,unfixed" is received, the bar is re-enabled.
       program { // for efl_panes_fixed_set()
          signal: "efl,panes,unfixed"; source: "efl";
          action: STATE_SET "default" 0.0;
@@ -154,6 +188,10 @@ group { name: "efl/panes/vertical";
    }
 }
 
+// This group defines the style for a horizontal panes widget. It is structurally
+// similar to the vertical version, but splits the content into top and bottom
+// areas with a horizontal draggable bar. Most parts and programs function
+// analogously to their vertical counterparts.
 group { name: "efl/panes/horizontal";
    data.item: "version" "123";
    images.image: "pane_handle_h.png" COMP;
@@ -282,11 +320,13 @@ group { name: "efl/panes/horizontal";
          action: STATE_SET "default" 0.0;
          target: "dots";
       }
+      // Disables bar dragging when the panes are fixed.
       program { // for efl_panes_fixed_set()
          signal: "efl,panes,fixed"; source: "efl";
          action: STATE_SET "disabled" 0.0;
          target: "bar";
       }
+      // Re-enables bar dragging when unfixed.
       program { // for efl_panes_fixed_set()
          signal: "efl,panes,unfixed"; source: "efl";
          action: STATE_SET "default" 0.0;
@@ -297,6 +337,9 @@ group { name: "efl/panes/horizontal";
 
 ////////////////////////////////////////////////////////////////////////////
 
+// This group defines a "flush" style for the vertical panes. In this style, the
+// separator bar is invisible by default and a glow effect appears on hover, making
+// for a cleaner, more minimalist interface.
 group { name: "efl/panes/vertical:flush";
    data.item: "version" "123";
    images.image: "shadow_circle_vert.png" COMP;
@@ -390,13 +433,16 @@ group { name: "efl/panes/vertical:flush";
             rel1.relative: 0.0 0.25;
             rel2.to_x: "efl.event";
             rel2.relative: 1.0 0.75;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
             visible: 0;
          }
       }
+      // These 'glow' parts create the hover effect. They are invisible by default
+      // and become visible when the mouse enters the corresponding side of the bar.
+      // 'glow1a' and 'glow2a' are for the circular shadow effect at the ends of the bar.
       part { name: "glow1a"; mouse_events: 0;
          clip_to: "whole_right";
          scale: 1;
@@ -405,13 +451,13 @@ group { name: "efl/panes/vertical:flush";
             rel1.to_x: "efl.bar";
             rel2.to_x: "efl.bar";
             color_class: "/shadow/normal/panes/flush";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc - Transparent white (#FFFFFF00)
             offscale;
             visible: 0;
          }
          description { state: "active" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc - Opaque white (#FFFFFFFF)
             rel1.offset: -16 0;
             rel2.offset: 15 -1;
             visible: 1;
@@ -437,6 +483,7 @@ group { name: "efl/panes/vertical:flush";
             visible: 1;
          }
       }
+      // 'glowbar1a' and 'glowbar2a' are for the glowing line effect along the bar.
       part { name: "glowbar1a"; type: RECT; mouse_events: 0;
          clip_to: "whole_left";
          scale: 1;
@@ -471,12 +518,15 @@ group { name: "efl/panes/vertical:flush";
             visible: 1;
          }
       }
+      // The interactive bar is split into two halves, 'bar1' and 'bar2', to trigger
+      // separate hover effects for each adjacent pane. `repeat_events: 1` ensures
+      // that mouse events are propagated to other parts below.
       part { name: "bar1"; type: RECT; repeat_events: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
             rel.to: "bar";
             rel2.relative: 0.5 1.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
       part { name: "bar2"; type: RECT; repeat_events: 1;
@@ -484,11 +534,13 @@ group { name: "efl/panes/vertical:flush";
             fixed: 1 1;
             rel.to: "bar";
             rel1.relative: 0.5 0.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }
    programs {
+      // These programs emit signals for "press" and "unpress" smart callbacks when
+      // the bar is clicked, similar to the EFL_UI_CLICKABLE_PART_BIND macro.
       program {signal: "mouse,down,1"; source: "bar"; // for "press" smart callback
          action: SIGNAL_EMIT "efl,action,press" "efl";
       }
@@ -505,6 +557,9 @@ group { name: "efl/panes/vertical:flush";
          action: STATE_SET "default" 0.0;
          target: "bar";
       }
+      // These programs manage the glow effect on mouse hover.
+      // When the mouse enters 'bar1' (left side of the handle), the corresponding
+      // glow parts are set to the "active" state with a quick transition.
       program {
          signal: "mouse,in"; source: "bar1";
          action: STATE_SET "active" 0.0;
@@ -512,6 +567,7 @@ group { name: "efl/panes/vertical:flush";
          target: "glow1a";
          target: "glowbar1a";
       }
+      // When the mouse leaves, the glow parts fade out by returning to the "default" state.
       program {
          signal: "mouse,out"; source: "bar1";
          action: STATE_SET "default" 0.0;
@@ -536,6 +592,8 @@ group { name: "efl/panes/vertical:flush";
    }
 }
 
+// This group provides the "flush" style for horizontal panes, analogous to the
+// vertical flush version. It features a hover-to-reveal separator bar.
 group { name: "efl/panes/horizontal:flush";
    data.item: "version" "123";
    images.image: "shadow_circle_horiz.png" COMP;
@@ -629,7 +687,7 @@ group { name: "efl/panes/horizontal:flush";
             rel1.relative: 0.25 0.0;
             rel2.to_y: "efl.event";
             rel2.relative: 0.75 1.0;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
@@ -644,13 +702,13 @@ group { name: "efl/panes/horizontal:flush";
             rel1.to_y: "efl.bar";
             rel2.to_y: "efl.bar";
             color_class: "/shadow/normal/panes/flush";
-            color: 255 255 255 0; // no cc
+            color: 255 255 255 0; // no cc - Transparent white (#FFFFFF00)
             offscale;
             visible: 0;
          }
          description { state: "active" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc - Opaque white (#FFFFFFFF)
             rel1.offset: 0 -16;
             rel2.offset: -1 15;
             visible: 1;
@@ -715,7 +773,7 @@ group { name: "efl/panes/horizontal:flush";
             fixed: 1 1;
             rel.to: "bar";
             rel2.relative: 1.0 0.5;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
       part { name: "bar2"; type: RECT; repeat_events: 1;
@@ -723,7 +781,7 @@ group { name: "efl/panes/horizontal:flush";
             fixed: 1 1;
             rel.to: "bar";
             rel1.relative: 0.0 0.5;
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }
@@ -775,15 +833,24 @@ group { name: "efl/panes/horizontal:flush";
    }
 }
 
+// This group defines a "left-fold" style for vertical panes. It inherits from the
+// base "efl/panes/vertical" style and adds the functionality to collapse and expand
+// the left pane by clicking a button on the separator bar.
 group { name: "efl/panes/vertical:left-fold";
    data.item: "version" "123";
    inherit: "efl/panes/vertical";
+   // An Embryo script is used to manage the state of the foldable pane.
+   // 'open': A flag to track whether the pane is open (1) or closed (0).
+   // 'drag_x', 'drag_y': Variables to store the bar's position before collapsing,
+   // so it can be restored when expanded.
    script {
       public open;
       public drag_x;
       public drag_y;
    }
    parts {
+      // The "dots" part from the base style is replaced with an arrow icon
+      // to indicate the foldable nature of the pane.
       image { "dots";
          scale;
          desc { "default";
@@ -796,20 +863,24 @@ group { name: "efl/panes/vertical:left-fold";
             image.normal: "i-arrow-r";
          }
       }
+      // An invisible rectangle over the arrow icon to capture click events for folding.
       rect { "event";
          repeat;
          desc { "default";
             rel.to: "dots";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }
    programs {
+      // On load, initialize the pane to be in the "open" state.
       program { signal: "load"; source: "";
          script {
             set_int(open, 1);
          }
       }
+      // Overrides the base "bar_down" program to handle different "pressed"
+      // states for the arrow icon depending on whether it's open or closed.
       program { name: "bar_down";
          script {
             if (get_int(open) == 1) {
@@ -819,6 +890,7 @@ group { name: "efl/panes/vertical:left-fold";
             }
          }
       }
+      // Overrides the base "bar_up" program.
       program { name: "bar_up";
          script {
             if (get_int(open) == 1) {
@@ -828,18 +900,25 @@ group { name: "efl/panes/vertical:left-fold";
             }
          }
       }
+      // This is the core logic for folding/unfolding the pane.
+      // It is triggered by a click on the "event" rectangle (the arrow).
       program { signal: "mouse,clicked,1"; source: "event";
          script {
+            // If the pane is open, collapse it.
             if (get_int(open) == 1) {
                new Float: dx;
                new Float: dy;
                set_int(open, 0);
+               // Store the current position of the bar.
                get_drag(PART:"efl.bar", dx, dy);
                set_float(drag_x, dx);
+               // Move the bar to the far left to collapse the left pane.
                set_drag(PART:"efl.bar", 0.0, 0.5);
                set_state(PART:"dots", "closed", 0.0);
+            // If the pane is closed, expand it.
             } else if (get_int(open) == 0) {
                set_int(open, 1);
+               // Restore the bar to its previous position.
                set_drag(PART:"efl.bar", get_float(drag_x), 0.5);
                set_state(PART:"dots", "default", 0.0);
             }
@@ -848,6 +927,9 @@ group { name: "efl/panes/vertical:left-fold";
    }
 }
 
+// Defines a "right-fold" style, which is analogous to "left-fold" but allows
+// the right pane to be collapsed and expanded. The logic is similar, but the
+// bar is moved to the far right when collapsed.
 group { name: "efl/panes/vertical:right-fold";
    data.item: "version" "123";
    inherit: "efl/panes/vertical";
@@ -872,7 +954,7 @@ group { name: "efl/panes/vertical:right-fold";
          repeat;
          desc { "default";
             rel.to: "dots";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }
@@ -920,6 +1002,8 @@ group { name: "efl/panes/vertical:right-fold";
    }
 }
 
+// Defines an "up-fold" style for horizontal panes, allowing the top pane to be
+// collapsed. This is the horizontal equivalent of the "left-fold" style.
 group { name: "efl/panes/horizontal:up-fold";
    data.item: "version" "123";
    inherit: "efl/panes/horizontal";
@@ -944,7 +1028,7 @@ group { name: "efl/panes/horizontal:up-fold";
          repeat;
          desc { "default";
             rel.to: "dots";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }
@@ -992,6 +1076,8 @@ group { name: "efl/panes/horizontal:up-fold";
    }
 }
 
+// Defines a "down-fold" style for horizontal panes, allowing the bottom pane
+// to be collapsed. This is the horizontal equivalent of the "right-fold" style.
 group { name: "efl/panes/horizontal:down-fold";
    data.item: "version" "123";
    inherit: "efl/panes/horizontal";
@@ -1016,7 +1102,7 @@ group { name: "efl/panes/horizontal:down-fold";
          repeat;
          desc { "default";
             rel.to: "dots";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc - Transparent color (#00000000)
          }
       }
    }

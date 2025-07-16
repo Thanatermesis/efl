@@ -1,33 +1,57 @@
+// An EDC file is a collection of resources and definitions.
 collections {
+   // Images used in this theme.
+   // 'COMP' means the image will be stored compressed in the final .edj file,
+   // saving space. It's decompressed at load time.
    images {
       image: "border-0.jpg" COMP;
    }
 
+   // Defines a UI component, in this case a frame.
+   // Groups are the building blocks of an Edje interface.
    group {
       name: "frame/default";
 
+      // A group is composed of parts, which are the visual elements.
       parts {
+         // This part renders the visual frame border.
          part {
             name: "border";
             type: IMAGE;
+            // 'mouse_events: 0' makes this part transparent to mouse events,
+            // allowing events to pass through to objects behind it.
             mouse_events: 0;
             description {
                state: "default" 0.0;
                image {
                   normal: "border-0.jpg";
+                  // 'border' defines a resizable border. The four values are for the
+                  // left, right, top, and bottom borders in pixels. This allows the
+                  // image to be stretched without distorting the corners.
                   border: 2 2 2 2;
                }
+               // These offsets make the border part larger than the group's area.
+               // rel1.offset positions the top-left corner at (-2, -2).
+               // rel2.offset positions the bottom-right at (width+1, height+1).
+               // This creates a frame that extends 2 pixels outside the container
+               // on all sides.
                rel1.offset: -2 -2;
                rel2.offset: 1 1;
             }
          }
 
+         // This part is a container for external content.
          part {
             name: "img";
+            // 'SWALLOW' type creates a placeholder where an application can
+            // add (swallow) another Evas object at runtime.
             type: SWALLOW;
             mouse_events: 0;
             description {
                state: "default" 0.0;
+               // The offsets position this swallow part inside the border frame.
+               // It's inset by 2 pixels on all sides, creating a content area
+               // that aligns with the inner edge of the 'border' part.
                rel1.offset: 2 2;
                rel2.offset: -3 -3;
             }

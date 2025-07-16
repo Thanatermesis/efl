@@ -1,5 +1,13 @@
+// Define a base size for UI elements, used for consistency.
 #define BSZ 24
+// This group defines the default appearance and behavior of the media player.
+// It includes all the visual components, their layout, and interaction logic.
 group { name: "elm/player/base/default";
+   // This Embryo script manages the visibility of the control bar.
+   // It uses three state variables:
+   // - in_control: Mouse is over the main control area.
+   // - in_volume: Mouse is over the volume control area.
+   // - inside: The control bar is currently visible.
    script {
       public in_control;
       public in_volume;
@@ -10,11 +18,15 @@ group { name: "elm/player/base/default";
          new v2 = get_int(in_volume);
          new isin = get_int(inside);
 
+         // If the control bar is visible (isin is true), check if the mouse
+         // has left all sensitive areas. If so, hide the controls.
          if (isin) {
             if ((!v1) && (!v2)) {
                emit("conhide", "");
                set_int(inside, 0);
             }
+         // If the control bar is hidden, check if the mouse has entered
+         // a sensitive area. If so, show the controls.
          } else {
             if ((v1) || (v2)) {
                emit("conshow", "");
@@ -24,23 +36,31 @@ group { name: "elm/player/base/default";
       }
    }
    parts {
+      // A solid black background for the entire player.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
+            // Opaque black (#000000FF).
             color: 0 0 0 255; // no cc
          }
       }
+      // An invisible rectangle that serves as a clipping area for other parts.
+      // This ensures that child elements do not render outside of these bounds.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
       // video (elm_video) content here
+      // This is a SWALLOW part, a placeholder where the actual video content
+      // (an Evas object) will be displayed.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
          }
       }
 
+      // Background bar for the media controls. Its height is dynamically
+      // sized to fit the controls from the 'prev' button to the 'positionslider'.
       part { name: "bar";  type: RECT;
          clip_to: "clipper";
          scale: 1;
@@ -54,18 +74,23 @@ group { name: "elm/player/base/default";
          }
       }
 
+      // A clipper for the volume slider pop-up. It's normally invisible
+      // and becomes visible to reveal the volume slider.
       part { name: "volclip"; type: RECT;
          description { state: "default" 0.0;
             rel1.to: "bg";
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
          description { state: "visible" 0.0;
             inherit: "default" 0.0;
+            // Opaque white (#FFFFFFFF) to enable clipping.
             color: 255 255 255 255; // no cc
             visible: 1;
          }
       }
+      // The background for the volume slider popup, clipped by "volclip".
       part { name: "volpop"; type: RECT;
          clip_to: "volclip";
          description { state: "default" 0.0;
@@ -77,7 +102,13 @@ group { name: "elm/player/base/default";
          }
       }
 
-      part { name: "elm.swallow.media_player.prev"; type: SWALLOW; 
+      // SWALLOW part for the 'previous' button. Like other controls, it has
+      // two states: 'default' (hidden) and 'visible'. The 'offscale' property
+      // is an optimization that can improve performance by not rendering
+      // elements that are scaled down or outside the viewport.
+      // It is positioned at the bottom of the player and moves into view
+      // when the controls are shown.
+      part { name: "elm.swallow.media_player.prev"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -97,7 +128,8 @@ group { name: "elm/player/base/default";
             align: 0.0 1.0;
          }
       }
-      part { name: "elm.swallow.media_player.rewind"; type: SWALLOW; 
+      // SWALLOW part for the 'rewind' button, positioned next to 'prev'.
+      part { name: "elm.swallow.media_player.rewind"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -113,7 +145,9 @@ group { name: "elm/player/base/default";
             offscale;
          }
       }
-      part { name: "elm.swallow.media_player.play"; type: SWALLOW; 
+      // SWALLOW part for the 'play' button. It can be hidden, for example
+      // when the media is playing and the 'pause' button is shown instead.
+      part { name: "elm.swallow.media_player.play"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -133,7 +167,8 @@ group { name: "elm/player/base/default";
             visible: 0;
          }
       }
-      part { name: "elm.swallow.media_player.pause"; type: SWALLOW; 
+      // SWALLOW part for the 'pause' button, which shares the same space as 'play'.
+      part { name: "elm.swallow.media_player.pause"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -147,7 +182,7 @@ group { name: "elm/player/base/default";
             visible: 0;
          }
       }
-      part { name: "elm.swallow.media_player.forward"; type: SWALLOW; 
+      part { name: "elm.swallow.media_player.forward"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -163,7 +198,7 @@ group { name: "elm/player/base/default";
             offscale;
          }
       }
-      part { name: "elm.swallow.media_player.next"; type: SWALLOW; 
+      part { name: "elm.swallow.media_player.next"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -231,7 +266,7 @@ group { name: "elm/player/base/default";
             visible: 0;
          }
       }
-      part { name: "elm.swallow.media_player.mute"; type: SWALLOW; 
+      part { name: "elm.swallow.media_player.mute"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -245,7 +280,7 @@ group { name: "elm/player/base/default";
             visible: 0;
          }
       }
-      part { name: "elm.swallow.media_player.info"; type: SWALLOW; 
+      part { name: "elm.swallow.media_player.info"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -261,7 +296,8 @@ group { name: "elm/player/base/default";
             offscale;
          }
       }
-      part { name: "elm.swallow.media_player.positionslider"; type: SWALLOW; 
+      // SWALLOW part for the media position slider.
+      part { name: "elm.swallow.media_player.positionslider"; type: SWALLOW;
          clip_to: "clipper";
          scale: 1;
          description { state: "default" 0.0;
@@ -274,6 +310,8 @@ group { name: "elm/player/base/default";
             offscale;
          }
       }
+     // SWALLOW part for the volume control slider. It appears above the
+     // volume button and is clipped by "volclip".
      part { name: "elm.swallow.media_player.volumeslider"; type: SWALLOW;
          clip_to: "volclip";
          scale: 1;
@@ -289,6 +327,9 @@ group { name: "elm/player/base/default";
          }
       }
 
+      // An invisible rectangle covering the control bar area, used to
+      // detect mouse-in and mouse-out events to show/hide the controls.
+      // 'repeat_events: 1' allows events to pass through to objects below it.
       part { name: "controls"; type: RECT; repeat_events: 1;
          clip_to: "clipper";
          scale: 1;
@@ -296,10 +337,13 @@ group { name: "elm/player/base/default";
             min: BSZ BSZ;
             align: 0.5 1.0;
             rel1.relative: 0.0 0.8;
+            // Transparent (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
 
+      // An invisible SPACER part used for layout purposes. It helps define the
+      // top boundary of the volume control's mouse-sensitive area.
       part { name: "volumetop"; type: SPACER;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -310,6 +354,8 @@ group { name: "elm/player/base/default";
             align: 0.5 0.0;
          }
       }
+      // An invisible, mouse-sensitive area for the volume control.
+      // Hovering over this area triggers the volume slider pop-up.
       part { name: "volume"; type: RECT; repeat_events: 1;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -321,6 +367,7 @@ group { name: "elm/player/base/default";
             rel2.to: "elm.swallow.media_player.volume";
             rel2.relative: 2.0 1.0;
             align: 0.5 1.0;
+            // Transparent (#00000000).
             color: 0 0 0 0; // no cc
             visible: 0;
          }
@@ -331,6 +378,8 @@ group { name: "elm/player/base/default";
       }
    }
    programs {
+      // When the mouse enters the 'controls' area, set 'in_control' to 1
+      // and evaluate the script to show the control bar if it's hidden.
       program { name: "ci";
          signal: "mouse,in"; source: "controls";
          script {
@@ -338,6 +387,9 @@ group { name: "elm/player/base/default";
             eval_in();
          }
       }
+      // When the mouse leaves 'controls', set 'in_control' to 0 and evaluate
+      // the script, which may hide the bar if the cursor is not over another
+      // sensitive area (like volume).
       program { name: "co";
          signal: "mouse,out"; source: "controls";
          script {
@@ -345,6 +397,8 @@ group { name: "elm/player/base/default";
             eval_in();
          }
       }
+      // Mouse enter/leave events for the 'volume' area, work similarly to
+      // the 'controls' area for showing and hiding the main control bar.
       program { name: "vi";
          signal: "mouse,in"; source: "volume";
          script {
@@ -359,6 +413,8 @@ group { name: "elm/player/base/default";
             eval_in();
          }
       }
+      // Triggered by the script's "conshow" signal.
+      // It animates the 'prev' button and 'volume' area to the "visible" state.
       program {
          signal: "conshow"; source: "";
          action: STATE_SET "visible" 0.0;
@@ -366,6 +422,8 @@ group { name: "elm/player/base/default";
          target: "elm.swallow.media_player.prev";
          target: "volume";
       }
+      // Triggered by "conhide" to animate back to the "default" (hidden) state.
+      // The ACCELERATE transition gives a different feel to the animation.
       program {
          signal: "conhide"; source: "";
          action: STATE_SET "default" 0.0;
@@ -373,12 +431,14 @@ group { name: "elm/player/base/default";
          target: "elm.swallow.media_player.prev";
          target: "volume";
       }
+      // Shows the volume slider by making its clipper visible.
       program {
          signal: "mouse,in"; source: "volume";
          action: STATE_SET "visible" 0.0;
          transition: DECELERATE 0.5;
          target: "volclip";
       }
+      // Hides the volume slider.
       program {
          signal: "mouse,out"; source: "volume";
          action: STATE_SET "default" 0.0;
@@ -386,6 +446,9 @@ group { name: "elm/player/base/default";
          target: "volclip";
       }
 
+      // Programs to handle the play/pause button state.
+      // On "load", default to the paused state.
+      // These react to signals sent from the application logic.
       program {
          signal: "load"; source: "";
          after: "pause/0";
@@ -398,6 +461,8 @@ group { name: "elm/player/base/default";
          signal: "elm,player,pause"; source: "elm";
          after: "pause/0";
       }
+      // The 'play' state is a sequence of two programs. First, it hides the
+      // 'play' button, then in the next step, it shows the 'pause' button.
       program { name: "play/0";
          action: STATE_SET "hidden" 0.0;
          target: "elm.swallow.media_player.play";
@@ -407,6 +472,7 @@ group { name: "elm/player/base/default";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.media_player.pause";
       }
+      // The 'pause' state sequence, hiding 'pause' and showing 'play'.
       program { name: "pause/0";
          action: STATE_SET "hidden" 0.0;
          target: "elm.swallow.media_player.pause";
@@ -417,6 +483,8 @@ group { name: "elm/player/base/default";
          target: "elm.swallow.media_player.play";
       }
 
+      // Programs to handle the mute/unmute button state, similar to play/pause.
+      // Defaults to "unmuted" on load.
       program {
          signal: "load"; source: "";
          after: "unmute/0";
@@ -447,13 +515,17 @@ group { name: "elm/player/base/default";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.media_player.volume";
       }
-      
+
    }
 }
 
+// This group defines a "flush" style for the player, where the UI elements
+// are aligned to the edges of the container without any padding. It inherits
+// all properties from the "default" group and overrides specific part descriptions.
 group { name: "elm/player/base/flush";
    inherit: "elm/player/base/default";
    parts {
+      // The background is modified to fill the entire area.
       part { name: "bg";
          description { state: "default" 0.0;
             rel1.offset: 0 0;
@@ -466,12 +538,15 @@ group { name: "elm/player/base/flush";
             rel2.offset: -1 -1;
          }
       }
+      // The control bar is also flushed to the edges.
       part { name: "bar";
          description { state: "default" 0.0;
             rel1.offset: 0 0;
             rel2.offset: -1 -1;
          }
       }
+      // The 'prev' button's position is adjusted for the flush layout.
+      // In the 'default' state, it's positioned differently than in 'visible'.
       part { name: "elm.swallow.media_player.prev";
          description { state: "default" 0.0;
             rel1.offset: 0 7;

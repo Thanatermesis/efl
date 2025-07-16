@@ -1,27 +1,43 @@
+// This group is a simple preview that displays a static image. It is used
+// to show what a particular theme or content item looks like without any
+// complex logic or animations.
 group { name: "e/transpreview/0";
+   // Defines an image resource for this group with a lossy compression of 92.
    images.image: "img_example_1.png" LOSSY 92;
    parts {
+      // A RECT part used as a clipping mask. It defines the visible area for
+      // other parts that are clipped to it (e.g., "bg").
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // The background part that displays the image.
       part { name: "bg";
+         // This part is clipped by the "clip" part, ensuring it does not
+         // render outside the defined rectangular area.
          clip_to: "clip";
          description {state: "default" 0.0;
+            // Sets the image to be displayed in the default state.
             image.normal: "img_example_1.png";
+            // A macro that ensures the image fills the part while maintaining its
+            // aspect ratio (400:300), preventing distortion.
             ASPECT_FILL((400/300))
          }
       }
    }
 }
 
+// This group is another preview, similar in structure to "e/transpreview/0",
+// but displays a different image.
 group { name: "e/transpreview/1";
    images.image: "img_example_2.png" LOSSY 92;
    parts {
+      // Serves as a clipping mask, same as in the previous group.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // Displays the second example image, clipped by "clip".
       part { name: "bg";
          clip_to: "clip";
          description {state: "default" 0.0;
@@ -32,21 +48,34 @@ group { name: "e/transpreview/1";
    }
 }
 
+// Defines a crossfade transition between two content elements.
+// This is achieved by animating the alpha channel of a clipping rectangle
+// over the new content, making it gradually visible. The old content is
+// simply replaced without animation.
 group { name: "e/transitions/crossfade";
    parts {
+      // A SWALLOW part that holds the old content to be transitioned from.
       part { name: "e.swallow.bg.old"; type: SWALLOW;
          description { state: "default" 0.0;
          }
       }
+      // A SWALLOW part that holds the new content to be transitioned to.
+      // It is clipped by "bg_new_clip", which controls its visibility.
       part { name: "e.swallow.bg.new"; type: SWALLOW;
          clip_to: "bg_new_clip";
          description { state: "default" 0.0;
          }
       }
+      // This RECT acts as a clipping mask for the new content. The transition
+      // works by animating this part's color from transparent to opaque.
       part { name: "bg_new_clip"; type: RECT;
+         // In the initial state, the clipper is fully transparent (#FFFFFF00),
+         // making the new content invisible.
          description { state: "default" 0.0;
             color: 255 255 255 0; // no cc
          }
+         // In the "done" state, the clipper becomes fully opaque (#FFFFFFFF),
+         // revealing the new content.
          description { state: "done" 0.0;
             inherit: "default" 0.0;
             color: 255 255 255 255; // no cc
@@ -54,49 +83,73 @@ group { name: "e/transitions/crossfade";
       }
    }
    programs {
+      // This program starts the crossfade animation when it receives the
+      // "e,action,start" signal.
       program { signal: "e,action,start"; source: "e";
+         // It triggers a state change to "done" for the target part.
          action: STATE_SET "done" 0.0;
+         // The transition will last 1.0 second with a smooth sinusoidal curve.
          transition: SINUSOIDAL 1.0;
+         // The state change is applied to "bg_new_clip", animating its color
+         // from transparent to opaque.
          target: "bg_new_clip";
+         // After the animation is complete, it runs the "go2" program.
          after: "go2";
       }
+      // This program signals the application that the transition has finished.
       program { name: "go2";
          action: SIGNAL_EMIT "e,state,done" "";
       }
    }
 }
 
+// Implements a vertical swipe transition. The old content slides down and out
+// while the new content slides in from the top. This is achieved by animating
+// two clipping rectangles that control the visible areas of the old and new
+// content. A shadow effect is added at the content edges.
 group { name: "e/transitions/vswipe";
+   // Shadow image used for the dividing lines. COMP is for lossless compression.
    images.image: "vgrad_shadow_bi.png" COMP;
    parts {
+      // SWALLOW part for the old content, clipped by "bg_prev_clip".
       part { name: "e.swallow.bg.old"; type: SWALLOW;
          clip_to: "bg_prev_clip";
          description { state: "default" 0.0;
          }
       }
+      // SWALLOW part for the new content, clipped by "bg_new_clip".
       part { name: "e.swallow.bg.new"; type: SWALLOW;
          clip_to: "bg_new_clip";
          description { state: "default" 0.0;
          }
       }
+      // A part that draws a shadow at the top edge of the old content area
+      // as it moves out.
       part { name: "divideold";
          clip_to: "bg_prev_clip";
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "vgrad_shadow_bi.png";
+            // Positioned relative to the top of the old content's clipper.
             rel.to: "bg_prev_clip";
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 0.0;
+            // The shadow has a fixed height of 80px.
             min: 0 80;
             max: 99999 80;
+            // This macro tiles the image horizontally if it's narrower than
+            // the part, with a tile size of 80px.
             TILED_HORIZ(80)
          }
       }
+      // A part that draws a shadow at the bottom edge of the new content area
+      // as it moves in.
       part { name: "dividenew";
          clip_to: "bg_new_clip";
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "vgrad_shadow_bi.png";
+            // Positioned relative to the bottom of the new content's clipper.
             rel.to: "bg_new_clip";
             rel1.relative: 0.0 1.0;
             rel2.relative: 1.0 1.0;
@@ -105,27 +158,41 @@ group { name: "e/transitions/vswipe";
             TILED_HORIZ(80)
          }
       }
+      // The clipping rectangle for the old content. Its movement out of the
+      // view creates the first half of the swipe effect.
       part { name: "bg_prev_clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // Offsets are used to correctly position the shadow part within
+            // the visible area.
             rel1.offset: 0 -40;
             rel2.offset: -1 39;
+            // 'offscale' allows this part to be positioned outside its parent
+            // container, which is crucial for the sliding animation.
             offscale;
          }
+         // In the "done" state, this clipper moves down, positioning its top
+         // edge at the bottom of the container, effectively hiding the old content.
          description { state: "done" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 39;
          }
       }
+      // The clipping rectangle for the new content. It animates into view
+      // from the top.
       part { name: "bg_new_clip"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // In the initial state, the clipper is positioned completely
+            // above the container, making the new content invisible.
             rel2.relative: 1.0 0.0;
             rel1.offset: 0 -40;
             rel2.offset: -1 -40;
             offscale;
          }
+         // In the "done" state, the clipper moves down to fill the entire
+         // container, revealing the new content.
          description { state: "done" 0.0;
             inherit: "default" 0.0;
             rel2.relative: 1.0 1.0;
@@ -133,13 +200,18 @@ group { name: "e/transitions/vswipe";
          }
       }
       programs {
+         // This program initiates the swipe animation upon receiving the
+         // "e,action,start" signal.
          program { signal: "e,action,start"; source: "e";
             action: STATE_SET "done" 0.0;
             transition: SINUSOIDAL 1.0;
+            // It applies the state change to both clipping parts simultaneously,
+            // creating the coordinated swipe effect.
             target: "bg_new_clip";
             target: "bg_prev_clip";
             after: "go2";
          }
+         // Emits a signal to notify the application that the transition is complete.
          program { name: "go2";
             action: SIGNAL_EMIT "e,state,done" "";
          }

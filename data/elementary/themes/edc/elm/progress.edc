@@ -1,13 +1,22 @@
+// The default horizontal progressbar.
+// This is the main style for a horizontal progress bar, which can include an icon and a label,
+// and supports disabled and pulse states. It's designed to be flexible and themeable.
 group { name: "elm/progressbar/horizontal/default";
-#define ICON    1
-#define LABEL   2
-#define DISABLE 4
+// Bitmasks for managing different states of the progressbar.
+#define ICON    1 // Indicates that an icon is present.
+#define LABEL   2 // Indicates that a label is present.
+#define DISABLE 4 // Indicates that the widget is disabled.
+   // This script handles the dynamic changes of the progressbar's appearance based on its state.
    script {
+      // A public integer used as a bitmask to store the current state (icon, label, disabled).
       public slmode;
+      // This function evaluates the state mode and applies the corresponding visual states to the parts.
+      // 'm' is the bitmask containing the current state.
       public eval_mode(m) {
-         new ic = m & ICON;
-         new l = m & LABEL;
-         new d = m & DISABLE;
+         new ic = m & ICON; // Check if icon is visible.
+         new l = m & LABEL; // Check if label is visible.
+         new d = m & DISABLE; // Check if disabled.
+         // Show or hide the label, with a different state for disabled.
          if (l) {
             if (!d) {
                set_state(PART:"elm.text", "visible", 0.0);
@@ -17,6 +26,8 @@ group { name: "elm/progressbar/horizontal/default";
          } else {
             set_state(PART:"elm.text", "default", 0.0);
          }
+         // Show or hide the icon. The background part 'bg' is also adjusted
+         // to make space for the icon and label.
          if (ic) {
             set_state(PART:"elm.swallow.content", "visible", 0.0);
             set_state(PART:"bg", "iclabel", 0.0);
@@ -29,6 +40,7 @@ group { name: "elm/progressbar/horizontal/default";
               set_state(PART:"bg", "default", 0.0);
             }
          }
+         // Apply a disabled effect over the icon.
          if (!d) {
             set_state(PART:"dis_clip", "default", 0.0);
          } else {
@@ -37,15 +49,22 @@ group { name: "elm/progressbar/horizontal/default";
       }
    }
    parts {
+      // A clipping rectangle that is used to apply a disabled effect on the icon.
       part { name: "dis_clip"; type: RECT;
          description { state: "default" 0.0;
+            // It is positioned relative to the icon container.
             rel.to: "elm.swallow.content";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // A semi-transparent white color (#FFFFFF40) to indicate the disabled state.
             color: 255 255 255 64; // no cc
          }
       }
+      // A clipping rectangle for the pulse animation. It is normally hidden and becomes
+      // visible only when the progressbar is in pulse mode. The negative relative
+      // positioning makes it larger than its parent, which is necessary for the pulse
+      // effect to render correctly without being clipped by the main part boundaries.
       part { name: "pulse_clip"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -2.0 -2.0;
@@ -57,6 +76,8 @@ group { name: "elm/progressbar/horizontal/default";
             visible: 1;
          }
       }
+      // A clipping rectangle for the main progress bar. It is hidden during pulse mode
+      // to avoid interfering with the pulse animation.
       part { name: "fract_clip"; type: RECT;
          description { state: "default" 0.0;
             rel1.relative: -2.0 -2.0;
@@ -67,8 +88,10 @@ group { name: "elm/progressbar/horizontal/default";
             visible: 0;
          }
       }
+      // This is a SWALLOW part, which acts as a container for an external Evas object, typically an icon.
       part { name: "elm.swallow.content"; type: SWALLOW;
          scale: 1;
+         // The content is clipped by 'dis_clip' to apply the disabled effect.
          clip_to: "dis_clip";
          description { state: "default" 0.0;
             visible: 0;
@@ -77,6 +100,7 @@ group { name: "elm/progressbar/horizontal/default";
             rel1.offset: -1 4;
             rel2.offset: -1 -5;
             rel2.relative: 0.0 1.0;
+            // 'offscale' is a performance optimization that hides parts that are scaled to zero or outside the viewport.
             offscale;
          }
          description { state: "visible" 0.0;
@@ -88,17 +112,20 @@ group { name: "elm/progressbar/horizontal/default";
             min: ICMIN ICMIN;
          }
       }
+      // The TEXT part used to display a label next to the progress bar.
       part { name: "elm.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
             align: 0.0 0.5;
+            // It is positioned to the right of the icon.
             rel1.to_x: "elm.swallow.content";
             rel1.relative: 1.0 0.0;
             rel1.offset: -1 4;
             rel2.to_x: "elm.swallow.content";
             rel2.relative: 1.0 1.0;
             rel2.offset: -1 -5;
+            // The 'color_class' is used for theming, allowing the color to be changed from a central theme file.
             color_class: "/fg/normal/progress/text";
             text { font: FN; size: 10;
                text_class: "progressbar";
@@ -123,6 +150,7 @@ group { name: "elm/progressbar/horizontal/default";
             color_class: "/fg/disabled/progress/text";
          }
       }
+      // The background of the progress bar.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -133,17 +161,21 @@ group { name: "elm/progressbar/horizontal/default";
             color_class: "/bg/normal/progress/base";
             offscale;
          }
+         // This state is used when there's an icon or a label, making space for them.
          description { state: "iclabel" 0.0;
             inherit: "default" 0.0;
             rel1.to_x: "elm.text";
             rel1.relative: 1.0 0.0;
          }
       }
+      // A SWALLOW part that holds the draggable spacer controlling the progress.
       part { name: "elm.swallow.bar"; type: SWALLOW; mouse_events: 0;
          description { state: "default" 0.0;
             rel.to: "bg";
          }
       }
+      // A SPACER part that is programmatically moved to represent the current progress value.
+      // It's not visible itself but is used as a reference for the 'bar' part's size.
       part { name: "elm.cur.progressbar"; mouse_events: 0; type: SPACER;
          dragable.confine: "elm.swallow.bar";
          dragable.x: 1 1 1;
@@ -155,35 +187,42 @@ group { name: "elm/progressbar/horizontal/default";
             rel.to: "elm.swallow.bar";
          }
       }
+      // A SPACER that marks the end of the progress bar fill.
       part { name: "barend"; type: SPACER;
          description { state: "default" 0.0;
             fixed: 1 0;
             max: 1 9999;
+            // It is positioned at the same x-coordinate as the progress indicator.
             rel1.to_x: "elm.cur.progressbar";
             rel2.to_x: "elm.cur.progressbar";
             align: 1.0 0.5;
          }
+         // In inverted mode, the alignment is flipped.
          description { state: "inv" 0.0;
             inherit: "default" 0.0;
             align: 0.0 0.5;
          }
       }
+      // The visual representation of the progress, as a colored rectangle.
       part { name: "bar"; type: RECT;
          scale: 1;
          clip_to: "fract_clip";
          description { state: "default" 0.0;
+            // Its width is determined by the 'barend' spacer.
             rel1.to: "bg";
             rel2.to_x: "barend";
             rel2.to_y: "bg";
             color_class: "/fg/normal/progress/bar";
             offscale;
          }
+         // In inverted mode, the bar fills from right to left.
          description { state: "inv" 0.0;
             inherit: "default" 0.0;
             rel1.to_x: "barend";
             rel2.to_x: "bg";
          }
       }
+      // The rectangle used for the pulse animation. It moves back and forth.
       part { name: "pulse"; type: RECT;
          clip_to: "pulse_clip";
          scale: 1;
@@ -200,6 +239,7 @@ group { name: "elm/progressbar/horizontal/default";
             align: 1.0 0.5;
          }
       }
+      // A text part to display the status, for example the percentage of completion.
       part { name: "elm.text.status"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -223,29 +263,35 @@ group { name: "elm/progressbar/horizontal/default";
       }
    }
    programs {
+      // Triggered by the "elm,state,inverted,on" signal, it sets the bar and barend parts to the "inv" state
+      // for a right-to-left progress indication.
       program { name: "inverted-on";
          signal: "elm,state,inverted,on"; source: "elm";
          action:  STATE_SET "inv" 0.0;
          target: "bar";
          target: "barend";
       }
+      // Reverts to the default left-to-right progress indication.
       program { name: "inverted-off";
          signal: "elm,state,inverted,off"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "bar";
          target: "barend";
       }
+      // When pulsing is enabled, this program hides the status text.
       program { name: "pulse-mode0";
          signal: "elm,state,pulse"; source: "elm";
          action:  STATE_SET "hidden" 0.0;
          target: "elm.text.status";
          after: "pulse-mode1";
       }
+      // This program hides the main progress bar ('fract_clip') to show the pulse animation instead.
       program { name: "pulse-mode1";
          signal: "elm,state,pulse,start"; source: "elm";
          action:  STATE_SET "pulse" 0.0;
          target: "fract_clip";
       }
+      // This program starts the pulse animation. It makes the pulse clipper visible and hides the fraction clipper.
       program { name: "pulse-start";
          signal: "elm,state,pulse,start"; source: "elm";
          action:  STATE_SET "pulse" 0.0;
@@ -253,24 +299,30 @@ group { name: "elm/progressbar/horizontal/default";
          target: "fract_clip";
          after: "pulse0";
       }
+      // Defines the back-and-forth movement of the pulse animation.
+      // 'pulse0' moves the pulse to the end.
       program { name: "pulse0";
          action:  STATE_SET "end" 0.0;
          transition: SINUSOIDAL 0.8;
          target: "pulse";
          after: "pulse1";
       }
+      // 'pulse1' moves it back to the start, creating a loop with 'pulse0'.
       program { name: "pulse1";
          action:  STATE_SET "default" 0.0;
          transition: SINUSOIDAL 0.8;
          target: "pulse";
          after: "pulse0";
       }
+      // Triggered when switching from pulse to fraction mode. It shows the status text
+      // and then chains to 'pulse-stop' to clean up the pulse animation.
       program { name: "fraction";
          signal: "elm,state,fraction"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "elm.text.status";
          after: "pulse-stop";
       }
+      // Stops the pulse animation programs.
       program { name: "elmpulse-stop";
          signal: "elm,state,pulse,stop"; source: "elm";
          action: ACTION_STOP;
@@ -278,20 +330,29 @@ group { name: "elm/progressbar/horizontal/default";
          target: "pulse1";
          after: "pulse-stop";
       }
+      // Hides the pulse clipper, effectively ending the pulse animation visibility.
       program { name: "pulse-stop";
          action:  STATE_SET "default" 0.0;
          target: "pulse_clip";
       }
+      // Makes the unit/status text visible.
       program { name: "units-visible";
          signal: "elm,state,units,visible"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "elm.text.status";
       }
+      // Hides the unit/status text.
       program { name: "units-hidden";
          signal: "elm,state,units,hidden"; source: "elm";
          action:  STATE_SET "hidden" 0.0;
          target: "elm.text.status";
       }
+      // The following programs ('text-visible', 'text-hidden', 'icon-visible', 'icon-hidden',
+      // 'state-disabled', 'state-enabled') are the main interface for controlling the
+      // progressbar's appearance from the C code. They update the 'slmode' bitmask and
+      // call 'eval_mode' to apply the changes.
+
+      // Shows the label.
       program { name: "text-visible";
          signal: "elm,state,text,visible"; source: "elm";
          script {
@@ -300,6 +361,7 @@ group { name: "elm/progressbar/horizontal/default";
             eval_mode(m);
          }
       }
+      // Hides the label.
       program { name: "text-hidden";
          signal: "elm,state,text,hidden"; source: "elm";
          script {
@@ -308,6 +370,7 @@ group { name: "elm/progressbar/horizontal/default";
             eval_mode(m);
          }
       }
+      // Shows the icon.
       program { name: "icon-visible";
          signal: "elm,state,icon,visible"; source: "elm";
          script {
@@ -316,6 +379,7 @@ group { name: "elm/progressbar/horizontal/default";
             eval_mode(m);
          }
       }
+      // Hides the icon.
       program { name: "icon-hidden";
          signal: "elm,state,icon,hidden"; source: "elm";
          script {
@@ -324,6 +388,7 @@ group { name: "elm/progressbar/horizontal/default";
             eval_mode(m);
          }
       }
+      // Sets the progressbar to its disabled state.
       program { name: "state-disabled";
          signal: "elm,state,disabled"; source: "elm";
          script {
@@ -332,6 +397,7 @@ group { name: "elm/progressbar/horizontal/default";
             eval_mode(m);
          }
       }
+      // Sets the progressbar to its enabled state.
       program { name: "state-enabled";
          signal: "elm,state,enabled"; source: "elm";
          script {
@@ -341,11 +407,15 @@ group { name: "elm/progressbar/horizontal/default";
          }
       }
    }
+// Undefine the macros to keep them local to this group.
 #undef ICON
 #undef LABEL
 #undef DISABLE
 }
 
+// The default vertical progressbar.
+// This is the vertical counterpart of the default horizontal progressbar.
+// Most of its logic and parts are similar, but adapted for a vertical orientation.
 group { name: "elm/progressbar/vertical/default";
 #define ICON    1
 #define LABEL   2
@@ -547,6 +617,7 @@ group { name: "elm/progressbar/vertical/default";
             align: 0.5 1.0;
          }
       }
+      // A spacer to help with the positioning of the rotated status text.
       part { name: "statbox"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -568,8 +639,10 @@ group { name: "elm/progressbar/vertical/default";
                text_class: "progress_status";
                align: 1.0 0.5;
             }
+            // Maps are used for transformations like rotation.
             map.on: 1;
             map.smooth: 0;
+            // The text is rotated 90 degrees to be displayed vertically.
             map.rotation.center: "elm.swallow.bar";
             map.rotation.z: 90;
             color_class: "/fg/normal/progress/text/status";
@@ -705,8 +778,11 @@ group { name: "elm/progressbar/vertical/default";
 #undef DISABLE
 }
 
+// A 'bare' style for the horizontal progressbar. It's a simpler version without an icon or label.
 group { name: "elm/progressbar/horizontal/bare";
    parts {
+      // The icon container is included but made invisible and zero-sized.
+      // This is often done for consistency in the API, so the part still exists.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -736,9 +812,11 @@ group { name: "elm/progressbar/horizontal/bare";
             visible: 0;
          }
       }
+      // The background of the progress bar.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
+            // It has a fixed height of 5 pixels.
             min: 10 5;
             max: -1 5;
             color_class: "/bg/normal/progress/base";
@@ -855,19 +933,23 @@ group { name: "elm/progressbar/horizontal/bare";
    }
 }
 
+// A 'hidden_bare' style, which is a 'bare' progressbar with a transparent background.
 group { name: "elm/progressbar/horizontal/hidden_bare";
    inherit: "elm/progressbar/horizontal/bare";
    parts {
       part { name: "bg";
          description { state: "default" 0.0;
+            // The background is made fully transparent (#00000000).
             color: 0 0 0 0; // no cc
          }
       }
    }
 }
 
+// A 'bare' style for the vertical progressbar.
 group { name: "elm/progressbar/vertical/bare";
    parts {
+      // The icon container is included but made invisible and zero-sized for API consistency.
       part { name: "elm.swallow.content"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -1029,8 +1111,12 @@ group { name: "elm/progressbar/vertical/hidden_bare";
    }
 }
 
+// A wheel-style progress indicator with a transparent background.
+// It is often used for indeterminate progress display.
 group { name: "elm/progressbar/horizontal/hidden_wheel";
    alias: "elm/progressbar/vertical/hidden_wheel";
+   // These macros create image parts for the animated rings of the wheel.
+   // The actual definition of IMAGE_RING is likely in an included file.
    IMAGE_RING("ringa", 160)
    IMAGE_RING("ringb", 160)
    IMAGE_RING("ringc", 160)
@@ -1051,7 +1137,9 @@ group { name: "elm/progressbar/horizontal/hidden_wheel";
             visible: 0;
          }
       }
+      // This macro sets up the programs that control the start and stop of the animation.
       BUSY("base", "elm,state,pulse,start", "elm", "elm,state,pulse,stop", "elm")
+      // A base rectangle that defines the area of the wheel.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -1066,11 +1154,13 @@ group { name: "elm/progressbar/horizontal/hidden_wheel";
    }
 }
 
+// A wheel-style progress indicator with a background image.
 group { name: "elm/progressbar/horizontal/wheel";
    inherit: "elm/progressbar/horizontal/hidden_wheel";
    alias: "elm/progressbar/vertical/wheel";
    images.image: "speaker_vol.png" COMP;
    parts {
+      // A background part is added, which is not present in the inherited 'hidden_wheel' group.
       part { name: "bg"; nomouse;
          insert_before: "base";
          description { state: "default" 0.0;
@@ -1080,15 +1170,18 @@ group { name: "elm/progressbar/horizontal/wheel";
          }
          description { state: "hidden" 0.0;
             inherit;
+            // Fully transparent white color (#FFFFFF00).
             color: 255 255 255 0; // no cc
             visible: 0;
          }
       }
+      // When pulsing starts, the background fades out.
       program { signal: "elm,state,pulse,start"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          transition: SINUSOIDAL 1.0;
          target: "bg";
       }
+      // When pulsing stops, the background fades back in.
       program { signal: "elm,state,pulse,stop"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: SINUSOIDAL 1.0;
@@ -1097,8 +1190,11 @@ group { name: "elm/progressbar/horizontal/wheel";
    }
 }
 
+// A bar-style progress indicator with spinning elements.
 group { name: "elm/progressbar/horizontal/bar";
    alias: "elm/progressbar/horizontal/fileselector/default";
+   // The 'set' block defines a collection of images that are chosen based on the part's size.
+   // This allows for providing different resolution images for different display sizes (LOD).
    set { name: "spinner";
       image { image: "spinner-32.png" COMP; size: 17 45 9999 9999; }
       image { image: "spinner-16.png" COMP; size:  9 23   16   44; }
@@ -1121,23 +1217,27 @@ group { name: "elm/progressbar/horizontal/bar";
             visible: 0;
          }
       }
+      // There are five 'spin' parts, each a segment of the progress bar.
       part { name: "spin1"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             image.normal: "spinner";
             color_class: "/fg/normal/progress/spin";
+            // Each spin part takes up 20% of the width of the 'base' part.
             rel1.relative: 0.0 0.0;
             rel2.relative: 0.2 1.0;
             rel1.to: "base";
             rel2.to: "base";
             min: 8 22;
             max: 8 22;
+            // 'map.on' enables transformations like rotation.
             map.on: 1;
             map.smooth: 1;
             map.rotation.center: "spin1";
          }
          description { state: "end" 0.0;
             inherit;
+            // In the 'end' state, the part is rotated 360 degrees.
             map.rotation.z: 360;
          }
       }
@@ -1234,6 +1334,9 @@ group { name: "elm/progressbar/horizontal/bar";
       }
    }
    programs {
+      // These programs create a sequential animation effect. When 'elm,state,pulse,start'
+      // is received, 'spin-1' starts immediately. The 'after' keyword chains the programs
+      // with a delay ('in' parameter), creating a wave-like effect.
       program { name: "spin-1";
          in: 0.0 0.0;
          signal: "elm,state,pulse,start"; source: "elm";
@@ -1259,6 +1362,9 @@ group { name: "elm/progressbar/horizontal/bar";
          in: 0.2 0.0;
          action: SIGNAL_EMIT "spin5" "";
       }
+      // Each spin part has a pair of programs that create a continuous rotation.
+      // 'spin1.1' is triggered by the "spin1" signal (emitted by 'spin-1' program).
+      // It rotates the part to 360 degrees.
       program { name: "spin1.1";
          signal: "spin1"; source: "";
          action: STATE_SET "end" 0.0;
@@ -1266,6 +1372,7 @@ group { name: "elm/progressbar/horizontal/bar";
          target: "spin1";
          after: "spin1.2";
       }
+      // 'spin1.2' resets the rotation to 0, and then calls 'spin1.1' again, creating a loop.
       program { name: "spin1.2";
          action: STATE_SET "default" 0.0;
          target: "spin1";
@@ -1340,13 +1447,17 @@ group { name: "elm/progressbar/horizontal/bar";
    }
 }
 
+// A vertical version of the bar-style progress indicator.
 group { name: "elm/progressbar/vertical/bar";
    inherit: "elm/progressbar/horizontal/bar";
    parts {
+      // The spin parts are reconfigured for vertical layout.
       part { name: "spin1";
          description { state: "default" 0.0;
+            // It now takes up 20% of the height.
             rel1.relative: 0.0 0.0;
             rel2.relative: 1.0 0.2;
+            // The rotation is adjusted for the vertical orientation.
             map.rotation.z: 90;
          }
          description { state: "end" 0.0;
@@ -1407,9 +1518,12 @@ group { name: "elm/progressbar/vertical/bar";
    }
 }
 
+// A horizontal progressbar with two bars. This can be used to show two
+// different progress values, for example, download progress and file writing progress.
 group { name: "elm/progressbar/horizontal/double";
    inherit: "elm/progressbar/horizontal/default";
    parts {
+      // A second progress indicator, similar to 'elm.cur.progressbar'.
       part { name: "elm.cur.progressbar1"; mouse_events: 0; type: SPACER;
          insert_after: "bg";
          scale: 1;
@@ -1423,6 +1537,7 @@ group { name: "elm/progressbar/horizontal/double";
             rel.to: "elm.swallow.bar";
          }
       }
+      // The end marker for the second bar.
       part { name: "barend1"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -1437,6 +1552,7 @@ group { name: "elm/progressbar/horizontal/double";
             align: 0.0 0.5;
          }
       }
+      // The visual representation of the second progress bar.
       part { name: "bar1"; type: RECT;
          scale: 1;
          insert_before: "bar";
@@ -1456,6 +1572,7 @@ group { name: "elm/progressbar/horizontal/double";
       }
    }
    programs {
+      // The inverted mode programs are updated to control both bars.
       program { name: "inverted-on";
          signal: "elm,state,inverted,on"; source: "elm";
          action:  STATE_SET "inv" 0.0;
@@ -1476,9 +1593,11 @@ group { name: "elm/progressbar/horizontal/double";
    }
 }
 
+// A vertical progressbar with two bars.
 group { name: "elm/progressbar/vertical/double";
    inherit: "elm/progressbar/vertical/default";
    parts {
+      // A second progress indicator for the vertical layout.
       part { name: "elm.cur.progressbar1"; mouse_events: 0; type: SPACER;
          insert_after: "bg";
          scale: 1;
@@ -1505,6 +1624,7 @@ group { name: "elm/progressbar/vertical/double";
             align: 0.5 0.0;
          }
       }
+      // The visual representation of the second progress bar for vertical layout.
       part { name: "bar1"; type: RECT;
          scale: 1;
          insert_after: "barend";
@@ -1524,6 +1644,7 @@ group { name: "elm/progressbar/vertical/double";
       }
    }
    programs {
+      // The inverted mode programs are updated to control both bars in the vertical layout.
       program { name: "inverted-on";
          signal: "elm,state,inverted,on"; source: "elm";
          action:  STATE_SET "inv" 0.0;

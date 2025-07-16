@@ -1,9 +1,32 @@
+// This group defines the standard appearance and behavior of a naviframe item.
+// It includes a title bar area with title, subtitle, icon, and navigation buttons,
+// as well as a content area. The design supports animated transitions for
+// pushing and popping views.
 group { name: "elm/naviframe/item/basic/default";
    parts {
-      // this set of limits and bottoms is evil - but it's a nasty construct
-      // allowing EITHER the title and subtitle texts OR the prev/next button
-      // swallows to control the lower bounds of the naviframe title, depending
-      // on which is taller
+      // The BOTTOMMAX macro implements a complex layout mechanism to dynamically
+      // adjust the height of the naviframe's title bar. The title bar must be
+      // tall enough to accommodate both the title/subtitle text block and the
+      // prev/next buttons. This is a workaround for the lack of a "max-of"
+      // constraint in Edje.
+      //
+      // It works by creating several SPACER parts and using a script-driven
+      // state-flipping trick to find the maximum height required.
+      //
+      // The process is as follows:
+      // 1. 'limit0' and 'limit1' are opposing spacers that measure the vertical
+      //    distance between the title block ('title3') and the 'next_btn'. One
+      //    will have height, the other will be zero.
+      // 2. 'bottom0' and 'pbot0' (program) work together to select the non-zero
+      //    height from 'limit0' and 'limit1'. The 'pbot0' program flips the
+      //    state of 'bottom0' if its height is zero, forcing a re-layout that
+      //    gives it the correct (larger) height.
+      // 3. 'limit2', 'limit3', 'bottom1', 'pbot1' do the exact same thing, but
+      //    for the title block versus the 'prev_btn'.
+      // 4. Finally, 'bottom' and 'pbot' do a final comparison between the height
+      //    of 'bottom0' and 'bottom1'. The resulting height of the 'bottom'
+      //    part is the maximum needed to contain all title bar elements, and is
+      //    used to set the height of the title bar itself.
 #define BOTTOMMAX() \
       part { name: "limit0"; type: SPACER; \
          description { state: "default" 0.0; \
@@ -126,6 +149,12 @@ group { name: "elm/naviframe/item/basic/default";
       }
       BOTTOMMAX()
 
+      // 'title1', 'title2', and 'title3' are invisible TEXT parts used solely
+      // for layout calculations. They form a three-part block to represent
+      // the vertical space that could be occupied by a title and two subtitles.
+      // 'title2' is for the main title, 'title1' and 'title3' for subtitles
+      // above and below it. Their heights are used in the BOTTOMMAX macro.
+      // `visible: 0;` ensures they are never rendered.
       part { name: "title1"; type: TEXT;
          scale: 1;
          description { state: "default" 0.0;
@@ -184,29 +213,41 @@ group { name: "elm/naviframe/item/basic/default";
          }
       }
 
+      // A clipping rectangle that covers the entire naviframe item area.
+      // All other content is clipped to this, preventing drawing outside the bounds.
       part { name: "clip"; type: RECT;
          description { state: "default" 0.0;
          }
       }
+      // A clipping rectangle for the top title bar area.
       part { name: "top_clip"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
          }
       }
+      // The 'base' spacer is a fundamental layout part. Most other elements are
+      // positioned relative to it. Its 'prev' and 'next' states are used to
+      // animate the entire item on and off screen during page transitions by
+      // changing its relative position.
       part { name: "base"; type: SPACER;
          description { state: "default" 0.0;
          }
+         // State for when item is off-screen to the left.
          description { state: "prev" 0.0;
             inherit: "default" 0.0;
             rel1.relative: -1.0 0.0;
             rel2.relative: 0.0 1.0;
          }
+         // State for when item is off-screen to the right.
          description { state: "next" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 1.0 0.0;
             rel2.relative: 2.0 1.0;
          }
       }
+      // The main content area of the naviframe item. Application content will be
+      // placed here. It is positioned below the 'top' bar by default, but fills
+      // the entire area if the title is hidden.
       part { name: "elm.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -220,6 +261,9 @@ group { name: "elm/naviframe/item/basic/default";
             rel1.relative: 0.0 0.0;
          }
       }
+      // 'tophide0' and 'tophide1' are helper spacers used for animating the title
+      // bar out of view. 'tophide0' occupies the space of the title bar, while
+      // 'tophide1' is positioned directly above it (off-screen).
       part { name: "tophide0"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "base";
@@ -234,6 +278,9 @@ group { name: "elm/naviframe/item/basic/default";
             rel2.to: "tophide0";
          }
       }
+      // The visible background of the title bar. Its height is determined by the
+      // 'bottom' spacer from the BOTTOMMAX macro. In the 'title-hidden' state,
+      // it moves up to 'tophide1's position, animating it off-screen.
       part { name: "top"; type: RECT;
          scale: 1;
          clip_to: "top_clip";
@@ -250,6 +297,10 @@ group { name: "elm/naviframe/item/basic/default";
             rel2.relative: 1.0 0.0;
          }
       }
+      // An invisible rectangle covering the title bar area, used to provide an
+      // accessible object for screen readers. `repeat_events: 1` allows mouse
+      // events to pass through to parts below it. `color: 0 0 0 0;` (#00000000)
+      // makes it fully transparent.
       part { name: "access.title"; type: RECT; repeat_events: 1;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -258,6 +309,9 @@ group { name: "elm/naviframe/item/basic/default";
             rel.to: "top";
          }
       }
+      // The main title text part. `mouse_events: 0` means it doesn't interact
+      // with the mouse. `offscale` is used to hide the part outside of the
+      // visible area by default, allowing it to be animated into view.
       part { name: "elm.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "elements_clip";
@@ -283,6 +337,7 @@ group { name: "elm/naviframe/item/basic/default";
             visible: 0;
          }
       }
+      // The subtitle text part, positioned below the main title.
       part { name: "elm.text.subtitle"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip_to: "elements_clip";
@@ -309,6 +364,8 @@ group { name: "elm/naviframe/item/basic/default";
             visible: 0;
          }
       }
+      // A clipping rectangle for the next/prev buttons. It's hidden when the
+      // title bar is hidden.
       part { name: "buttons_clip"; type: RECT;
          clip_to: "elements_clip";
          description { state: "default" 0.0;
@@ -319,6 +376,8 @@ group { name: "elm/naviframe/item/basic/default";
             visible: 0;
          }
       }
+      // Swallow part for the 'next' button, typically on the right side of the
+      // title bar. Its height contributes to the title bar height calculation.
       part { name: "elm.swallow.next_btn"; type: SWALLOW;
          scale: 1;
          clip_to: "buttons_clip";
@@ -340,6 +399,7 @@ group { name: "elm/naviframe/item/basic/default";
             visible: 0;
          }
       }
+      // Swallow part for the 'previous' button, typically on the left.
       part { name: "elm.swallow.prev_btn"; type: SWALLOW;
          scale: 1;
          clip_to: "buttons_clip";
@@ -361,6 +421,7 @@ group { name: "elm/naviframe/item/basic/default";
             visible: 0;
          }
       }
+      // Swallow part for an icon, positioned to the right of the 'prev_btn'.
       part { name: "elm.swallow.icon"; type: SWALLOW;
          clip_to: "elements_clip";
          description { state: "default" 0.0;
@@ -384,6 +445,10 @@ group { name: "elm/naviframe/item/basic/default";
             align: 0.5 0.5;
          }
       }
+      // A clipping rectangle for the title bar elements (icon, title, subtitle).
+      // It is used to hide all these elements at once during transitions by
+      // becoming invisible and transparent (`color: 255 255 255 0;` which is
+      // #FFFFFF00, fully transparent white).
       part { name: "elements_clip"; type: RECT;
          clip_to: "clip";
          description { state: "default" 0.0;
@@ -403,6 +468,7 @@ group { name: "elm/naviframe/item/basic/default";
       }
    }
    programs {
+      // Makes the title bar and its components visible immediately.
       program { signal: "elm,state,title,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "top";
@@ -411,6 +477,9 @@ group { name: "elm/naviframe/item/basic/default";
          target: "elm.swallow.prev_btn";
          target: "elm.swallow.next_btn";
       }
+      // Animates the title bar into view. This is a two-step animation.
+      // First, the 'top' bar and content area animate to their default positions.
+      // Then, 'titleshow2' makes the buttons visible.
       program { signal: "elm,action,title,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
@@ -425,6 +494,7 @@ group { name: "elm/naviframe/item/basic/default";
          target: "elm.swallow.prev_btn";
          target: "elm.swallow.next_btn";
       }
+      // Hides the title bar and its components immediately.
       program { signal: "elm,state,title,hide"; source: "elm";
          action: STATE_SET "title-hidden" 0.0;
          target: "buttons_clip";
@@ -433,6 +503,9 @@ group { name: "elm/naviframe/item/basic/default";
          target: "elm.swallow.prev_btn";
          target: "elm.swallow.next_btn";
       }
+      // Animates the title bar out of view. First, buttons are hidden instantly.
+      // Then 'titlehide2' animates the 'top' bar sliding up and the content
+      // area expanding to fill the space.
       program { signal: "elm,action,title,hide"; source: "elm";
          action: STATE_SET "title-hidden" 0.0;
          target: "buttons_clip";
@@ -447,14 +520,19 @@ group { name: "elm/naviframe/item/basic/default";
          target: "elm.swallow.content";
          after: "title_transition_finished";
       }
+      // Emits a signal to notify the C code that the title show/hide animation
+      // has completed.
       program { name: "title_transition_finished";
          action: SIGNAL_EMIT "elm,action,title,transition,finished" "elm";
       }
+      // Shows the 'prev' button, but only if the content area is in the
+      // 'default' state (i.e., title is not hidden).
       program { signal: "elm,state,prev_btn,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          filter: "elm.swallow.content" "default";
          target: "elm.swallow.prev_btn";
       }
+      // Programs to individually hide or show the prev and next buttons.
       program { signal: "elm,state,prev_btn,hide"; source: "elm";
          action: STATE_SET "title-hidden" 0.0;
          target: "elm.swallow.prev_btn";
@@ -468,37 +546,49 @@ group { name: "elm/naviframe/item/basic/default";
          action: STATE_SET "title-hidden" 0.0;
          target: "elm.swallow.next_btn";
       }
+      // When the title bar ('top' part) is clicked, emit a signal to the C code.
       program { signal: "mouse,clicked,1"; source: "top";
          action: SIGNAL_EMIT "elm,action,title,clicked" "elm";
       }
+      // Shows the icon, title, and subtitle text.
       program { signal: "elm,state,title_label,show"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.swallow.icon";
          target: "elm.text.title";
          target: "elm.text.subtitle";
       }
+      // Hides the icon, title, and subtitle text.
       program { signal: "elm,state,title_label,hide"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "elm.swallow.icon";
          target: "elm.text.title";
          target: "elm.text.subtitle";
       }
+      // Sets the item to its default visible state.
       program { signal: "elm,state,visible"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elements_clip";
          target: "base";
       }
+      // Hides the item's elements by setting the clipper to its hidden state.
       program { signal: "elm,state,invisible"; source: "elm";
          action: STATE_SET "hidden" 0.0;
          target: "elements_clip";
       }
 
       /* current page is being pushed: [previous]<----[current] */
+      // This set of programs handles the animation of the current view being
+      // pushed off-screen to the left to make way for a new view.
+      // 'elm,state,cur,pushed': Instantly sets the item to its on-screen position.
+      // This is a setup step before the animation starts.
       program { signal: "elm,state,cur,pushed"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "elements_clip";
       }
+      // 'elm,state,cur,pushed,deferred': Starts the animation. The 'base' part
+      // transitions to the 'prev' state, which moves it off-screen to the left.
+      // 'pushed3': Emits a signal when the animation is finished.
       program { signal: "elm,state,cur,pushed,deferred"; source: "elm";
          action: STATE_SET "prev" 0.0;
          transition: DECEL 0.2;
@@ -511,11 +601,17 @@ group { name: "elm/naviframe/item/basic/default";
       }
 
       /* current page is being popped: [current]---->[next] */
+      // Animation for the current view being popped off-screen to the right,
+      // revealing the previous view. This is triggered by a back action.
+      // 'elm,state,cur,popped': Setup step, places item on-screen.
       program { signal: "elm,state,cur,popped"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "elements_clip";
       }
+      // 'elm,state,cur,popped,deferred': Animates the item to the 'next' state,
+      // moving it off-screen to the right.
+      // 'popped3': Emits a signal upon completion.
       program { signal: "elm,state,cur,popped,deferred"; source: "elm";
          action: STATE_SET "next" 0.0;
          transition: DECEL 0.2;
@@ -528,11 +624,17 @@ group { name: "elm/naviframe/item/basic/default";
       }
 
       /* new page is being pushed: [current]<----[next] */
+      // Animation for a new view sliding into place from the right.
+      // 'elm,state,new,pushed': Setup step, places the new item off-screen
+      // to the right ('next' state) before it animates in.
       program { signal: "elm,state,new,pushed"; source: "elm";
          action: STATE_SET "next" 0.0;
          target: "base";
          target: "elements_clip";
       }
+      // 'elm,state,new,pushed,deferred': Animates the item from the 'next' state
+      // to the 'default' (on-screen) state.
+      // 'pushedb3': Emits a signal upon completion.
       program { signal: "elm,state,new,pushed,deferred"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
@@ -545,11 +647,18 @@ group { name: "elm/naviframe/item/basic/default";
       }
 
       /* previous page is being pushed: [previous]---->[current] */
+      // Animation for a previous view sliding back into place from the left.
+      // This happens when the current view is popped.
+      // 'elm,state,prev,popped': Setup step, places the item off-screen to the
+      // left ('prev' state) before it animates in.
       program { signal: "elm,state,prev,popped"; source: "elm";
          action: STATE_SET "prev" 0.0;
          target: "base";
          target: "elements_clip";
       }
+      // 'elm,state,prev,popped,deferred': Animates the item from the 'prev' state
+      // to the 'default' (on-screen) state.
+      // 'poppedb3': Emits a signal upon completion.
       program { signal: "elm,state,prev,popped,deferred"; source: "elm";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2;
@@ -563,6 +672,9 @@ group { name: "elm/naviframe/item/basic/default";
    }
 }
 
+// This group defines an "overlap" style for the naviframe item, where the
+// content area fills the entire item, and the title bar is overlaid on top of it.
+// This is often used for pager-like transitions.
 group { name: "elm/naviframe/item/overlap/default";
    inherit: "elm/naviframe/item/basic/default";
    alias: "elm/naviframe/item/overlap/pager";
@@ -571,12 +683,17 @@ group { name: "elm/naviframe/item/overlap/default";
       // to inherit properly with limits etc.
       BOTTOMMAX()
 
+      // The content swallow is modified to fill the entire 'base' area,
+      // ignoring the height of the top bar. This makes the content area appear
+      // underneath the title bar.
       part { name: "elm.swallow.content";
          description { state: "default" 0.0;
             rel1.to: "base";
             rel1.relative: 0.0 0.0;
          }
       }
+      // The top clip (which clips the title bar background) is given a specific
+      // color class for the overlap style, which is typically semi-transparent.
       part { name: "top_clip";
          description { state: "default" 0.0;
             color_class: "/fg/normal/naviframe/top/overlap";

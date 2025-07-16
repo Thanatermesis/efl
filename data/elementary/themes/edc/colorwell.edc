@@ -1,6 +1,13 @@
+// This group defines the visual theme for a color well widget, a UI element that
+// displays a color. It uses several layers: a background, a pattern to show
+// transparency, and a content area for the color itself.
 group { name: "e/widgets/color_well";
+   // The 'COMP' flag indicates that the image should be compressed when edje
+   // is built, which helps reduce the final file size.
    images.image: "diagonal_stripes.png" COMP;
    parts {
+      // This part is the background of the color well, a rectangle providing a
+      // border and a dark background, styled with theme color classes.
       part { name: "bg"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -8,9 +15,13 @@ group { name: "e/widgets/color_well";
             rel2.offset: -3 -3;
             color_class: "/bg-dark/normal/color";
             min: 18 18;
+            // 'offscale' ensures that the element's border/stroke does not scale
+            // with the object, maintaining a consistent border size.
             offscale;
          }
       }
+      // This part displays a tiled pattern, typically to indicate transparency in
+      // the selected color. It is placed on top of the 'bg' part.
       part { name: "pat";
          scale: 1;
          description
@@ -20,34 +31,59 @@ group { name: "e/widgets/color_well";
               rel2.offset: -3 -3;
               image.normal: "diagonal_stripes.png";
               color_class: "/bg-dark-alt/normal/color";
+              // This macro sets the image to be tiled, creating a repeating pattern.
+              // It's useful for backgrounds where the image is smaller than the area.
               TILED_PATTERN(240, 240)
               offscale;
            }
       }
+      // This part is a clipper, an invisible rectangle in its default state used to
+      // mask the 'e.swallow.content' part. It ensures that the displayed color doesn't
+      // spill outside the designated area.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "pat";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // When disabled, this part becomes a semi-transparent white layer,
+            // visually indicating the widget is not interactive.
+            // Color is white (255 255 255) with 25% alpha (64), hex: #FFFFFF40.
             color: 255 255 255 64; // no cc
          }
       }
+      // This is a SWALLOW part, a container for external Evas objects. Here, it
+      // displays the actual color set by the application. 'mouse_events: 0' lets
+      // clicks pass through to the 'pat' part below, which handles them.
       part { name: "e.swallow.content"; type: SWALLOW; mouse_events: 0;
+         // The content is clipped by the 'clipper' part, keeping the color swatch
+         // neatly contained within the widget's borders.
          clip_to: "clipper";
          description { state: "default" 0.0;
             rel.to: "pat";
          }
       }
    }
+   // The 'programs' section defines the widget's interactive behavior. These are
+   // small scripts that run in response to signals, like mouse clicks or state
+   // changes from the application.
    programs {
+      // When the 'pat' part is clicked (source: "pat"), it emits the
+      // "e,action,click" signal. The application can listen for this signal
+      // to trigger an action, like opening a color chooser dialog.
       program { signal: "mouse,clicked,1"; source: "pat";
          action: SIGNAL_EMIT "e,action,click" "";
       }
+      // This program listens for the "e,state,disabled" signal from the application
+      // (source: "e"). When received, it changes the state of the 'clipper' part
+      // to "disabled", which makes the semi-transparent overlay visible.
       program { signal: "e,state,disabled"; source: "e";
          action: STATE_SET "disabled" 0.0;
          target: "clipper";
       }
+      // This program handles the "e,state,enabled" signal. It resets the 'clipper'
+      // part to its "default" state, hiding the disabled-state overlay and
+      // restoring the widget's normal appearance.
       program { signal: "e,state,enabled"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "clipper";

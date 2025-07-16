@@ -31,6 +31,8 @@ Group: efl/view_grid (@since 1.23)
 	 Signal: efl,vertical_bar,visible,on
 
 */
+// The efl/grid group is an alias for efl/scroller, providing a standard
+// scroller for grid-like widgets.
 group { "efl/grid";
    inherit: "efl/scroller";
    data.item: "version" "123";
@@ -41,6 +43,11 @@ group { "efl/view_grid";
    data.item: "version" "123";
 }
 
+// This group defines the style for an item within a grid. It supports various
+// states like selected, disabled, and default, and can contain an icon,
+// text, and extra content.
+// The 'selectraise' and 'focusraise' data items ensure that interacting with
+// an item brings it to the forefront, which is useful in overlapping layouts.
 group { "efl/grid_item";
    data.item: "version" "124";
    data.item: "selectraise" "on";
@@ -48,6 +55,14 @@ group { "efl/grid_item";
    data.item: "texts" "elm.text";
    parts {
 //---------------------------------------------------------------------------
+// The BASEP() macro defines the fundamental visual layers for the grid item.
+// It includes a 'base' part for the default background and a 'sel_base' part
+// for the selected state, which is hidden by default. Both parts do not
+// handle mouse events as they are purely decorative. Programs within this
+// macro toggle the visibility of 'sel_base' based on "efl,state,selected"
+// and "efl,state,unselected" signals. It also includes programs that
+// enable/disable the 'event' part (from TOPP macro) based on "efl,state,enabled"
+// and "efl,state,disabled" signals.
 #define BASEP() \
    part { name: "base"; type: RECT; mouse_events: 0; \
       description { state: "default" 0.0; \
@@ -80,6 +95,13 @@ group { "efl/grid_item";
       action: STATE_SET "default" 0.0; \
       target: "event"; \
    }
+// The TOPP() macro defines the top-level interactive elements.
+// The 'event' part is an invisible rectangle that captures all mouse events,
+// allowing the item to be clickable. `repeat_events: 1` ensures that events
+// are passed to other handlers. It is hidden when the item is disabled.
+// The 'event_block' part is an invisible rectangle that becomes visible when
+// the item is disabled, effectively blocking mouse events. The programs
+// handle the visibility of 'event_block' based on the item's state.
 #define TOPP() \
    part { name: "event"; type: RECT; \
       repeat_events: 1; \
@@ -113,31 +135,46 @@ group { "efl/grid_item";
       BASEP()
 
       //##//
+      // The main text of the grid item. It is not interactive and is intended
+      // purely for display. 'scale: 1' allows the text to be scaled along with
+      // the item.
       part { name: "efl.text"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // The text part is fixed vertically but scales horizontally.
             fixed: 0 1;
+            // Positioned at the bottom of the item, with some padding.
             rel1.relative: 0.0 1.0;
             rel1.offset: 4 -5;
             rel2.offset: -5 -5;
+            // The color is determined by a theme-able color class.
             color_class: "/fg/normal/grid/item";
+            // Text is horizontally centered and vertically aligned to the bottom.
             align: 0.5 1.0;
+            // 'offscale' ensures that scaling does not bleed outside the part's boundaries.
             offscale;
             text { font: FN; size: 10;
+               // The text can shrink horizontally but has a minimum height of 1 pixel.
                min: 0 1;
                align: 0.5 1.0;
+               // A specific text class for theming, allowing more granular control over text style.
                text_class: "grid_item";
             }
          }
+         // In 'selected' state, the text color changes.
          description { state: "selected" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/selected/grid/item";
          }
+         // In 'disabled' state, the text color changes to indicate it's inactive.
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
             color_class: "/fg/disabled/grid/item";
          }
       }
+      // These programs switch the state of the 'efl.text' part and 'icon_area'
+      // in response to signals from the 'efl' source, which changes their
+      // appearance according to the item's state (e.g., selected, disabled).
       program { signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected" 0.0;
          target: "efl.text";
@@ -157,34 +194,51 @@ group { "efl/grid_item";
          target: "icon_area";
       }
       //##//
+      // This RECT defines the area for the icon, placed above the text.
       part { name: "icon_area"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
             rel1.offset: 4 4;
+            // The bottom of the icon area is aligned with the top of the text part.
             rel2.to_y: "efl.text";
             rel2.relative: 1.0 0.0;
             rel2.offset: -5 -5;
+            // The color is solid white (#FFFFFFFF), acting as a backdrop for the icon.
             color: 255 255 255 255; // no cc
             offscale;
          }
+         // When disabled, the icon area becomes semi-transparent.
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
+            // Color is white with 25% opacity (#FFFFFF40).
             color: 255 255 255 64; // no cc
          }
       }
+      // A swallow part for the main icon, clipped within the 'icon_area'.
+      // This allows external content to be placed here.
       part { name: "efl.icon"; type: SWALLOW;
          clip_to: "icon_area";
          description { state: "default" 0.0;
+            // Fills the 'icon_area' completely.
             rel.to: "icon_area";
          }
       }
+      // A swallow part for extra content, like a badge or overlay, on the icon.
       part { name: "efl.extra"; type: SWALLOW;
          scale: 1;
          clip_to: "icon_area";
          description { state: "default" 0.0;
+            // Sets a minimum size. If the part's calculated size is smaller, it
+            // will expand to this size. 'ICMIN' is likely a predefined macro.
             min: ICMIN ICMIN;
+            // Aligned to the top-right. This influences how it expands if its
+            // size is forced by the 'min' property.
             align: 1.0 0.0;
+            // Positioned relative to 'icon_area'.
             rel.to: "icon_area";
+            // Both relative points are set to the top-right corner of 'icon_area'.
+            // Combined with offsets, this defines a point. The final size is
+            // determined by 'min' and 'align'.
             rel1.relative: 1.0 0.0;
             rel1.offset: -5 4;
             rel2.relative: 1.0 0.0;
@@ -197,6 +251,8 @@ group { "efl/grid_item";
       TOPP()
    }
    programs {
+      // Binds click events on the "event" part to standard EFL click signals
+      // (e.g., "efl,clicked"). This macro simplifies handling user interaction.
       EFL_UI_CLICKABLE_PART_BIND("event")
    }
 }

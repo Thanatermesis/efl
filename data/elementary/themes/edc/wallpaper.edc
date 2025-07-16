@@ -1,28 +1,40 @@
 /////////////////////////////////////////////////////////////////////////////
 /*** WALLPAPER MAIN DIALOG ***/
 
+// This group defines the main window for the wallpaper configuration dialog.
+// It includes areas for a wallpaper preview, a list of wallpapers, and controls.
+// An "extras" panel can be shown or hidden with an animation.
    group { name: "e/conf/wallpaper/main/window";
       parts {
+         // The base background of the dialog window.
          part { name: "base"; type: RECT; mouse_events: 0;
             description { state: "default" 0.0;
                color_class: "/bg/normal/conf/wallpaper/base";
             }
          }
+         // A swallow part to hold the wallpaper preview widget.
          part { name: "e.swallow.preview"; type: SWALLOW;
             description { state: "default" 0.0;
             }
          }
+         // A swallow part to hold the list of wallpapers. It is positioned
+         // above the bottom panel ("bot1").
          part { name: "e.swallow.list"; type: SWALLOW;
             description { state: "default" 0.0;
                rel2.relative: 1.0 0.0;
                rel2.to_y: "bot1";
             }
          }
+         // A transparent rectangle covering the whole area to capture mouse
+         // events. `repeat_events: 1` allows events to pass through to
+         // other parts below it.
          part { name: "events"; type: RECT; repeat_events: 1;
             description { state: "default" 0.0;
-               color: 0 0 0 0; // no cc
+               color: 0 0 0 0; // no cc - Transparent (#00000000)
             }
          }
+         // A panel at the bottom of the dialog, serving as a container for
+         // the filename text and dialog buttons.
          part { name: "bot1"; type: RECT; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -35,6 +47,7 @@
                offscale;
             }
          }
+         // Displays the filename of the selected wallpaper inside the bottom panel.
          part { name: "e.text.filename"; type: TEXT; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -56,6 +69,7 @@
                }
             }
          }
+         // A swallow part for the main dialog buttons (e.g., OK, Apply, Close).
          part { name: "e.swallow.buttons"; type: SWALLOW;
             scale: 1;
             description { state: "default" 0.0;
@@ -72,16 +86,21 @@
                offscale;
             }
          }
+         // An invisible rectangle that covers the main area when the extras
+         // panel is shown. It's used to intercept clicks to hide the panel.
          part { name: "cover"; type: RECT;
             description { state: "default" 0.0;
-               color: 0 0 0 0; // no cc
+               color: 0 0 0 0; // no cc - Transparent (#00000000)
                visible: 0;
             }
+            // When the extras panel is out, this cover becomes visible.
             description { state: "out" 0.0;
                inherit: "default" 0.0;
                visible: 1;
             }
          }
+         // The background for the "extras" panel. It's sized and positioned
+         // relative to the "e.swallow.extras" part.
          part { name: "extas_base"; type: RECT;
             scale: 1;
             description { state: "default" 0.0;
@@ -99,6 +118,8 @@
                offscale;
             }
          }
+         // A swallow part for extra wallpaper options, which slides in from
+         // the bottom of the window.
          part { name: "e.swallow.extras"; type: SWALLOW;
             scale: 1;
             description { state: "default" 0.0;
@@ -121,6 +142,7 @@
                rel2.offset: 8 -9;
             }
          }
+         // The arrow icon that acts as a handle for the extras panel.
          part { name: "aup"; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -143,32 +165,41 @@
                offscale;
             }
          }
+         // Clickable area to hide the extras panel when it is visible.
+         // It's a transparent rectangle placed over the arrow icon.
          part { name: "ain"; type: RECT;
             description { state: "default" 0.0;
                rel.to: "aup";
-               color: 0 0 0 0; // no cc
+               color: 0 0 0 0; // no cc - Transparent (#00000000)
             }
          }
+         // Clickable area to show the extras panel when it is hidden.
+         // This becomes invisible when the panel is shown to avoid conflicting
+         // with the "ain" part.
          part { name: "aout"; type: RECT;
             description { state: "default" 0.0;
                rel.to: "aup";
-               color: 0 0 0 0; // no cc
+               color: 0 0 0 0; // no cc - Transparent (#00000000)
             }
             description { state: "out" 0.0;
                inherit: "default" 0.0;
                visible: 0;
             }
          }
+         // A clipper for the busy label. This is used to create a fade-in/out
+         // effect for the busy text by animating its color's alpha channel.
          part { name: "busy_clip"; type: RECT;
             description { state: "default" 0.0;
                visible: 0;
-               color: 255 255 255 0; // no cc
+               color: 255 255 255 0; // no cc - Transparent White (#FFFFFF00)
             }
             description { state: "visible" 0.0;
                visible: 1;
-               color: 255 255 255 255; // no cc
+               color: 255 255 255 255; // no cc - Opaque White (#FFFFFFFF)
             }
          }
+         // A text label to indicate a busy state (e.g., "Loading...").
+         // It's clipped by "busy_clip" to manage its visibility and effects.
          part { name: "e.text.busy_label"; type: TEXT;
             clip_to: "busy_clip";
             mouse_events: 0;
@@ -198,49 +229,63 @@
             }
          }
       }
+      // These programs handle the dynamic behavior of the dialog, such as
+      // showing/hiding the extras panel and the busy indicator.
       programs {
+         // Emits a general click signal when the main area is clicked.
          program { signal: "mouse,up,1"; source: "events";
             action: SIGNAL_EMIT "e,action,click" "e";
          }
+         // When the "show panel" area is clicked, emit a signal to show it.
          program { signal: "mouse,down,1"; source: "aout";
             action: SIGNAL_EMIT "e,action,panel,show" "e";
          }
+         // On "e,action,panel,show", hide the "show" trigger, show the cover,
+         // and then start the panel animation.
          program { signal: "e,action,panel,show"; source: "e";
             action: STATE_SET "out" 0.0;
             target: "aout";
             target: "cover";
             after: "out2";
          }
+         // Animation program to slide the extras panel into view.
          program { name: "out2";
             action: STATE_SET "out" 0.0;
             target: "e.swallow.extras";
             transition: DECELERATE 0.2;
          }
+         // Clicking the cover (while the panel is open) hides the panel.
          program { signal: "mouse,down,1"; source: "cover";
             action: STATE_SET "default" 0.0;
             target: "aout";
             target: "cover";
             after: "in2";
          }
+         // When the "hide panel" area is clicked, emit a signal to hide it.
          program { signal: "mouse,down,1"; source: "ain";
             action: SIGNAL_EMIT "e,action,panel,hide" "e";
          }
+         // On "e,action,panel,hide", reset the state of the hide trigger,
+         // then start the panel hiding animation.
          program { signal: "e,action,panel,hide"; source: "e";
             action: STATE_SET "default" 0.0;
             target: "aout";
             after: "in2";
          }
+         // Animation program to slide the extras panel out of view.
          program { name: "in2";
             action: STATE_SET "default" 0.0;
             target: "e.swallow.extras";
             target: "cover";
             transition: DECELERATE 0.2;
          }
+         // Fade in the busy indicator when the "e,state,busy,on" signal is received.
          program { signal: "e,state,busy,on"; source: "e";
             action: STATE_SET "visible" 0.0;
             transition: LINEAR 0.2;
             target: "busy_clip";
          }
+         // Fade out the busy indicator when the "e,state,busy,off" signal is received.
          program { signal: "e,state,busy,off"; source: "e";
             action: STATE_SET "default" 0.0;
             transition: LINEAR 0.5;
@@ -249,9 +294,14 @@
       }
    }
 
+// This group defines a miniature view of a wallpaper, used as an item in a list.
+// It includes a shadow, a background, and a content area, along with
+// animations for when a thumbnail is generated.
    group { name: "e/conf/wallpaper/main/mini";
       images.image: "win_shadow.png" COMP;
       parts {
+         // A shadow effect behind the thumbnail item. The WIN_SHADOW_SMALL
+         // macro provides the necessary image and properties.
          part { name: "shadow"; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -260,6 +310,7 @@
                color_class: "/shadow/normal/frame";
             }
          }
+         // The background of the thumbnail item. It changes color when selected.
          part { name: "base"; type: RECT; mouse_events: 0;
             scale: 1;
             description { state: "default" 0.0;
@@ -280,27 +331,33 @@
                color_class: "/bg/selected/conf/wallpaper/mini";
             }
          }
+         // This is a helper part used for the "zoom" animation when a thumbnail
+         // is generated. It's an invisible rectangle that changes size.
          part { name: "icon_zoom"; type: RECT; mouse_events: 0;
             description {
                state: "default" 0.0;
                visible: 0;
             }
+            // "min" state makes the rectangle a single point at the center.
             description { state: "min" 0.0;
                inherit: "default" 0.0;
                rel1.relative: 0.5 0.5;
                rel2.relative: 0.5 0.5;
             }
+            // "max" state makes it larger than the container, creating an overshoot effect.
             description { state: "max" 0.0;
                inherit: "default" 0.0;
                rel1.relative: -0.2 -0.2;
                rel2.relative: 1.2 1.2;
             }
+            // "max2" is slightly larger for a subtle bounce.
             description { state: "max2" 0.0;
                inherit: "default" 0.0;
                rel1.relative: -0.05 -0.05;
                rel2.relative: 1.05 1.05;
             }
          }
+         // The swallow part that will contain the actual wallpaper thumbnail image.
          part { name: "e.swallow.content"; type: SWALLOW;
             scale: 1;
             description { state: "default" 0.0;
@@ -315,9 +372,10 @@
                }
             }
          }
+         // A transparent rectangle to handle mouse events for the item.
          part { name: "events"; type: RECT;
             description { state: "default" 0.0;
-               color: 0 0 0 0; // no cc
+               color: 0 0 0 0; // no cc - Transparent (#00000000)
                visible: 0;
             }
             description { state: "visible" 0.0;
@@ -327,48 +385,60 @@
          }
       }
       programs {
+         // When the item is selected, change the base's state to "selected"
+         // to apply the selection color.
          program { signal: "e,state,selected"; source: "e";
             action: STATE_SET "selected" 0.0;
             target: "base";
          }
+         // When unselected, revert the base to its normal visible state.
          program { signal: "e,state,unselected"; source: "e";
             action: STATE_SET "visible" 0.0;
             target: "base";
          }
+         // This program chain creates a "bouncy" zoom-in animation when a
+         // thumbnail is generated. It is triggered by the "e,action,thumb,gen" signal.
          program { signal: "e,action,thumb,gen"; source: "e";
             action: STATE_SET "visible" 0.0;
             target: "base";
             target: "events";
             after: "thumb_gen2";
          }
+         // Start animation: reset icon_zoom to a single point.
          program { name: "thumb_gen2";
             action: STATE_SET "min" 0.0;
             target: "icon_zoom";
             after: "thumb_gen3";
          }
+         // Step 2: zoom out to larger than final size.
          program { name: "thumb_gen3";
             action: STATE_SET "max" 0.0;
             target: "icon_zoom";
             transition: DECELERATE 0.2;
             after: "thumb_gen4";
          }
+         // Step 3: bounce back to normal size.
          program { name: "thumb_gen4";
             action: STATE_SET "default" 0.0;
             target: "icon_zoom";
             transition: SINUSOIDAL 0.1;
             after: "thumb_gen5";
          }
+         // Step 4: bounce out slightly again.
          program { name: "thumb_gen5";
             action: STATE_SET "max2" 0.0;
             target: "icon_zoom";
             transition: SINUSOIDAL 0.2;
             after: "thumb_gen6";
          }
+         // Step 5: settle to the final, default size.
          program { name: "thumb_gen6";
             action: STATE_SET "default" 0.0;
             target: "icon_zoom";
             transition: SINUSOIDAL 0.3;
          }
+         // Triggered by "e,action,thumb,ungen" to reset the thumbnail item
+         // to its initial, invisible state.
          program { signal: "e,action,thumb,ungen"; source: "e";
             action: STATE_SET "default" 0.0;
             target: "shadow";
@@ -380,9 +450,13 @@
          }
       }
    }
+// This group inherits from "e/conf/wallpaper/main/mini" and adds a "THEME"
+// label to identify wallpapers that are part of the current theme.
    group { name: "e/conf/wallpaper/main/mini-theme";
       inherit: "e/conf/wallpaper/main/mini";
       parts {
+         // A text part to display the "THEME" label in the bottom-right
+         // corner of the thumbnail.
          part { name: "theme"; type: TEXT; mouse_events: 0;
             insert_after: "e.swallow.content";
             scale: 1;
@@ -406,19 +480,25 @@
          }
       }
       programs {
+         // When the thumbnail is generated, make the "THEME" label visible.
          program { signal: "e,action,thumb,gen"; source: "e";
             action: STATE_SET "visible" 0.0;
             target: "theme";
          }
+         // When the thumbnail is "ungenerated" (removed), hide the "THEME" label.
          program { signal: "e,action,thumb,ungen"; source: "e";
             action: STATE_SET "default" 0.0;
             target: "theme";
          }
       }
    }
+// A group for remote wallpapers. It currently has the same appearance as a
+// local wallpaper thumbnail but could be customized in the future.
    group { name: "e/conf/wallpaper/main/mini-remote";
       inherit: "e/conf/wallpaper/main/mini";
    }
+// Inherits from the standard EFL scrollframe widget. This will be used to
+// create a scrollable list of wallpaper thumbnails.
    group { name: "e/conf/wallpaper/main/scrollframe";
       inherit: "e/widgets/scrollframe";
    }

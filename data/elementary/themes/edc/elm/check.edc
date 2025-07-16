@@ -1,8 +1,14 @@
+// This group defines the standard check widget, which can be toggled on or off.
+// It includes a checkbox, an optional icon, and a text label.
 group { name: "elm/check/base/default";
    script {
+      // Inherits a standard script for handling button-like behaviors and states,
+      // such as pressed, disabled, and icon/label visibility.
       BUTTONMODE_SCRIPT
    }
    parts {
+      // A spacer part that can be used to provide a shadow effect for depth.
+      // Its properties are defined in different states to create the visual effect.
       part { name: "shadow"; type: SPACER;
          description { state: "default";
          }
@@ -11,6 +17,8 @@ group { name: "elm/check/base/default";
          desc { "disabled"; inherit;
          }
       }
+      // A container for a custom background object. It is initially hidden and does not
+      // interact with mouse events due to the 'nomouse' property.
       swallow { "elm.swallow.background"; nomouse;
          desc { "default";
             visible: 0;
@@ -19,15 +27,17 @@ group { name: "elm/check/base/default";
             visible: 1;
          }
       }
+      // A clipping rectangle that defines the visible area for the icon. This ensures
+      // that the icon does not draw outside its designated space.
       rect { "icon_clip";
          desc { "default";
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // no cc // Solid white (#FFFFFFFF)
          }
          desc { "pressed"; inherit;
             color: 255 255 255 255; // no cc
          }
          desc { "disabled"; inherit;
-            color: 255 255 255 64; // no cc
+            color: 255 255 255 64; // no cc // Semi-transparent white (#FFFFFF40)
          }
       }
       swallow { "elm.swallow.content"; nomouse;
@@ -56,11 +66,12 @@ group { name: "elm/check/base/default";
             align: 0.5 0.5;
             rel2.relative: 1.0 1.0;
             rel2.offset: -5 -5;
-            rel2.to_x: "";
             visible: 1;
             min: ICMIN ICMIN;
          }
       }
+      // This rectangle forms the main body of the checkbox. Its appearance is determined by
+      // color classes, making it easily themeable. It maintains a fixed size of 13x13 pixels.
       part { name: "base"; type: RECT;
          scale: 1;
          description { state: "default";
@@ -81,15 +92,20 @@ group { name: "elm/check/base/default";
             color_class: "/bg/disabled/check/base";
          }
       }
+      // A rectangle that indicates the selected state of the checkbox. It's positioned relative
+      // to the "base" part and becomes semi-transparent when the widget is disabled.
       part { name: "ck_selected"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "base";
          }
          description { state: "disabled" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 153; // no cc
+            color: 255 255 255 153; // no cc // Semi-transparent white (#FFFFFF99)
          }
       }
+      // This part displays the checkmark icon ("i-check") when the box is checked. It is
+      // clipped by "ck_selected" to ensure it fits within the selection indicator. The
+      // icon's visibility and color are controlled by its state.
       part { name: "ck_check";
          clip_to: "ck_selected";
          scale: 1;
@@ -113,6 +129,9 @@ group { name: "elm/check/base/default";
             visible: 1;
          }
       }
+      // The text label for the check widget. It has multiple states to handle layout
+      // changes when an icon is present ("visible") versus when it's not ("textonly"),
+      // and also adjusts for pressed and disabled states.
       text { "elm.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -174,20 +193,27 @@ group { name: "elm/check/base/default";
             visible: 1;
          }
       }
+      // An invisible rectangle that captures all mouse events for the widget. This makes
+      // the entire check widget area, including the label, clickable.
       rect { "event";
          ignore_flags: ON_HOLD;
          desc { "default";
-            color: 0 0 0 0; // no cc
+            color: 0 0 0 0; // no cc // Fully transparent
          }
          desc { "disabled"; inherit;
             visible: 0;
          }
       }
    }
+   // The 'programs' section defines the interactive behavior of the widget.
+   // These programs respond to signals (like mouse clicks) and change the widget's state.
    programs {
+      // When clicked, this program sends a signal to toggle the check state.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,check,toggle" "elm";
       }
+      // When the mouse button is pressed down, this script checks the current state
+      // and plays a corresponding sound effect for immediate auditory feedback.
       program { signal: "mouse,down,1"; source: "event";
          script {
             new buf[32]; new Float:val;
@@ -196,20 +222,27 @@ group { name: "elm/check/base/default";
             else { run_program(PROGRAM:"snd-check-off"); }
          }
       }
+      // Changes the state of the "ck_check" part to "selected" when the widget is checked on.
       program { signal: "elm,state,check,on"; source: "elm";
          action:  STATE_SET "selected" 0.0;
          target: "ck_check";
       }
+      // Resets the "ck_check" part to its default state when the widget is unchecked.
       program { signal: "elm,state,check,off"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "ck_check";
       }
+      // Program to play a sound when the check is turned on.
       program { name: "snd-check-on";
          action: PLAY_SAMPLE "wood-tap1" 1.0 INPUT;
       }
+      // Program to play a sound when the check is turned off.
       program { name: "snd-check-off";
          action: PLAY_SAMPLE "wood-tap2" 1.0 INPUT;
       }
+      // The following programs handle the visual feedback for the pressed state.
+      // On "mouse,down,1", a "press" signal is emitted and the "ck_check" part's state
+      // is set to "pressed". The 'PRESSED' flag is also set via a script.
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
@@ -221,18 +254,24 @@ group { name: "elm/check/base/default";
       program { name: "button_click_anim";
          script { flag_set(PRESSED); }
       }
+      // On "mouse,up,1", an "unpress" signal is emitted, the "ck_check" part is reset
+      // to its default state, and the 'PRESSED' flag is unset.
       program { name: "button_unclick";
          signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
          after: "button_unclick_anim";
       }
       program { signal: "mouse,up,1"; source: "event";
+         // This ensures that after a click, the checkmark's state is reset,
+         // preparing it for the new state determined by the toggle action.
          action: STATE_SET "default" 0.0;
          target: "ck_check";
       }
       program { name: "button_unclick_anim";
          script { flag_unset(PRESSED); }
       }
+      // This set of programs allows for programmatic activation of the check widget,
+      // simulating a click with a brief "pressed" animation.
       program { name: "buttonactivate";
          signal: "elm,anim,activate"; source: "elm";
          action: STATE_SET "pressed" 0.0;
@@ -244,9 +283,12 @@ group { name: "elm/check/base/default";
          action: STATE_SET "default" 0.0;
          target: "ck_check";
       }
+      // Emits a generic "click" signal, allowing other components to react to the action.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // The following programs manage flags based on the visibility of text, icon, and background.
+      // These flags are used by the BUTTONMODE_SCRIPT to adjust the widget's layout dynamically.
       program { name: "button_text_visible";
          signal: "elm,state,text,visible"; source: "elm";
          script { flag_set(LABEL); }
@@ -271,6 +313,8 @@ group { name: "elm/check/base/default";
          signal: "elm,state,background,hidden"; source: "elm";
          script { flag_unset(BACKGROUND); }
       }
+      // These programs manage the 'DISABLE' flag and set the state of various parts
+      // to "disabled" or "enabled" accordingly, controlling the widget's interactive state.
       program { name: "button_state_disabled";
          signal: "elm,state,disabled"; source: "elm";
          script { flag_set(DISABLE); }
@@ -279,10 +323,12 @@ group { name: "elm/check/base/default";
          signal: "elm,state,enabled"; source: "elm";
          script { flag_unset(DISABLE); }
       }
+      // When the widget is disabled, this program visually updates the "ck_selected" part.
       program { signal: "elm,state,disabled"; source: "elm";
          action:  STATE_SET "disabled" 0.0;
          target: "ck_selected";
       }
+      // When enabled, it reverts "ck_selected" to its default appearance.
       program { signal: "elm,state,enabled"; source: "elm";
          action:  STATE_SET "default" 0.0;
          target: "ck_selected";
@@ -290,8 +336,13 @@ group { name: "elm/check/base/default";
    }
 }
 
+// This group defines a toggle switch widget, a variant of the check widget that
+// visually slides between "ON" and "OFF" states. It supports dragging and
+// click-to-toggle interactions.
 group { name: "elm/check/base/toggle";
    script {
+      // 'is_drag' and 'was_drag' manage the dragging state of the toggle.
+      // 'is_rtl' is used to support right-to-left layout direction.
       public is_drag;
       public was_drag;
       public is_rtl;
@@ -323,9 +374,12 @@ group { name: "elm/check/base/toggle";
             color: 255 255 255 255; // no cc
          }
          desc { "disabled"; inherit;
-            color: 255 255 255 64; // no cc
+            color: 255 255 255 64; // no cc // Semi-transparent white (#FFFFFF40)
          }
       }
+      // This part is a container for the check widget's icon, and is clipped by "icon_clip".
+      // Its layout is adaptive, changing based on whether a text label is also present,
+      // as seen in the "visible" and "icononly" states.
       swallow { "elm.swallow.content"; nomouse;
          clip_to: "icon_clip";
          scale: 1;
@@ -355,6 +409,8 @@ group { name: "elm/check/base/toggle";
             min: ICMIN ICMIN;
          }
       }
+      // This spacer defines the main area for the toggle switch mechanism, including the
+      // track and the sliding button. It has a fixed size.
       spacer { name: "tog"; scale: 1;
          description { state: "default" 0.0;
             fixed: 1 1;
@@ -367,6 +423,7 @@ group { name: "elm/check/base/toggle";
             offscale;
          }
       }
+      // The background track of the toggle switch.
       rect { name: "base";
          description { state: "default";
             fixed: 1 1;
@@ -380,6 +437,8 @@ group { name: "elm/check/base/toggle";
             color_class: "/bg/disabled/toggle/base";
          }
       }
+      // Spacers used to define the areas for the "ON" and "OFF" text labels,
+      // positioning them on either side of the sliding "button".
       spacer { name: "onrect";
          description { state: "default" 0.0;
             rel.to: "button";
@@ -394,6 +453,8 @@ group { name: "elm/check/base/toggle";
             rel2.relative: 6.0 1.0;
          }
       }
+      // The "OFF" text label. Its position is relative to the "button" and "offrect" parts.
+      // It displays the text "OFF" and has states for disabled and clicked appearances.
       text { name: "elm.offtext"; nomouse; scale: 1;
          clip_to: "tog_clip";
          description { state: "default" 0.0;
@@ -421,6 +482,8 @@ group { name: "elm/check/base/toggle";
             color_class: "/fg/pressed/toggle/text/off";
          }
       }
+      // The "ON" text label, similar in function to "elm.offtext" but for the "ON" state.
+      // It is positioned relative to "onrect" and "button".
       text { name: "elm.ontext"; nomouse; scale: 1;
          clip_to: "tog_clip";
          description { state: "default" 0.0;
@@ -448,11 +511,15 @@ group { name: "elm/check/base/toggle";
             color_class: "/fg/pressed/toggle/text/on";
          }
       }
+      // A clipping rectangle that constrains the toggle switch components, ensuring they do
+      // not draw outside the bounds of the "tog" part.
       part { name: "tog_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "tog";
          }
       }
+      // This part represents the draggable button of the toggle switch. It is confined to
+      // horizontal movement within the "tog" area.
       part { name: "button"; type: RECT; scale: 1;
          clip_to: "tog_clip";
          dragable {
@@ -468,6 +535,7 @@ group { name: "elm/check/base/toggle";
             color: 0 0 0 0; // no cc
          }
       }
+      // The visible rectangle of the sliding button. It doesn't handle mouse events directly.
       rect { name: "base_but"; nomouse;
          description { state: "default" 0.0;
             rel.to: "button";
@@ -482,12 +550,16 @@ group { name: "elm/check/base/toggle";
             color_class: "/fg/disabled/toggle/button";
          }
       }
+      // An invisible rectangle that forwards drag events to the "button" part, allowing the
+      // button to be dragged without the visual element needing to handle events.
       rect { name: "button_events";
          dragable.events: "button";
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
          }
       }
+      // The main text label for the toggle widget, positioned to the left of the switch.
+      // Similar to the checkbox, it adapts its layout based on various states.
       text { "elm.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -551,6 +623,8 @@ group { name: "elm/check/base/toggle";
             visible: 1;
          }
       }
+      // An event-blocking rectangle that becomes visible only when the widget is disabled,
+      // preventing any interaction.
       rect { "event2";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -560,6 +634,8 @@ group { name: "elm/check/base/toggle";
             visible: 1;
          }
       }
+      // The main clickable area of the widget (excluding the sliding button), used for
+      // toggling the state with a simple click instead of dragging.
       rect { "event"; repeat;
          ignore_flags: ON_HOLD;
          desc { "default";
@@ -570,7 +646,11 @@ group { name: "elm/check/base/toggle";
          }
       }
    }
+   // The programs for the toggle switch handle its complex interactive logic, including
+   // sliding animations, drag-and-drop, and state changes.
    programs {
+      // When the state changes to "on" or "off", these programs animate the sliding "button"
+      // to the correct position, taking into account the layout direction (LTR or RTL).
       program { signal: "elm,state,check,on"; source: "elm";
          script {
             new Float:drag;
@@ -587,6 +667,9 @@ group { name: "elm/check/base/toggle";
             set_drag(PART:"button", drag, 0.0);
          }
       }
+      // Handles a click on the sliding button. If it wasn't a drag action ('was_drag' is false),
+      // it toggles the switch's state by moving the button to the opposite side and
+      // emitting the appropriate "check,on" or "check,off" signal.
       program { signal: "mouse,clicked,1"; source: "button";
          script {
             new Float:dx, Float:dy;
@@ -606,17 +689,22 @@ group { name: "elm/check/base/toggle";
             }
          }
       }
+      // Sets the 'is_drag' flag to true when a drag operation begins on the button.
       program { signal: "drag"; source: "button";
          script {
             set_int(is_drag, 1);
          }
       }
+      // Initializes drag-related flags when the mouse button is pressed down on the slider.
       program { signal: "mouse,down,1"; source: "button";
          script {
             set_int(was_drag, 0);
             set_int(is_drag, 0);
          }
       }
+      // When the mouse is released after dragging, this program determines the final state.
+      // It snaps the button to the nearest end (on or off) and emits the corresponding
+      // signal. It also sets 'was_drag' to true to prevent the click handler from firing.
       program { signal: "mouse,up,1"; source: "button";
          script {
             new Float:dx, Float:dy;
@@ -638,6 +726,9 @@ group { name: "elm/check/base/toggle";
             }
          }
       }
+      // These programs provide visual feedback when the slider button is pressed and released.
+      // They change the state of the button and the "ON"/"OFF" text labels to "clicked"
+      // on mouse down and back to "default" on mouse up.
       program { signal: "mouse,down,1"; source: "button";
          action: STATE_SET "clicked" 0.0;
          target: "base_but";
@@ -650,9 +741,13 @@ group { name: "elm/check/base/toggle";
          target: "elm.ontext";
          target: "elm.offtext";
       }
+      // Toggles the state when the area next to the switch is clicked.
       program { signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,check,toggle" "elm";
       }
+      // The following programs manage button-like behaviors such as press/unpress animations,
+      // programmatic activation, and dynamic layout adjustments based on the visibility of
+      // text, icon, and background elements.
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
@@ -707,6 +802,8 @@ group { name: "elm/check/base/toggle";
       program { signal: "elm,state,background,hidden"; source: "elm";
          script { flag_unset(BACKGROUND); }
       }
+      // These programs handle the enabled and disabled states of the widget, updating the
+      // appearance and interactivity of various parts accordingly.
       program { signal: "elm,state,disabled"; source: "elm";
          script { flag_set(DISABLE); }
       }
@@ -727,6 +824,8 @@ group { name: "elm/check/base/toggle";
          target: "elm.offtext";
          target: "elm.ontext";
       }
+     // These programs listen for layout direction changes (RTL/LTR) from the Edje engine
+     // and update the 'is_rtl' flag, which is used to correctly position the toggle button.
      program { signal: "edje,state,rtl"; source: "edje";
         script {
            set_int(is_rtl, 1);

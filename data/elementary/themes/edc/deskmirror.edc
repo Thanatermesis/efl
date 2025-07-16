@@ -1,13 +1,27 @@
+// This group defines the default appearance and behavior of a deskmirror frame.
+// It includes a title bar, shadow, and animations for events like focus changes and urgency.
 group { name: "e/deskmirror/frame/default";
+   // Aliases allow this group to be used for different types of windows
+   // without duplicating the code. Dialogs, urgent windows, and sparkle-effect
+   // windows will all use this frame definition.
    alias: "e/deskmirror/frame/dialog";
    alias: "e/deskmirror/frame/urgent";
    alias: "e/deskmirror/frame/sparkle";
+   // Pre-compresses the shadow image for faster loading.
    images.image: "pager_mini_win_shadow.png" COMP;
+   // Embryo script block for handling dynamic messages from the C application code.
    script {
+      // This message handler is called when a message of type MSG_FLOAT with ID 0 is received.
+      // It's a way for the C code to pass a floating-point value to the theme.
       public message(Msg_Type:type, id, ...) {
          if ((type == MSG_FLOAT) && (id == 0)) {
+            // Get the float value from the message arguments.
             new Float:sc = getfarg(2);
 
+            // This dynamically adjusts the height of the "top_spacer" part.
+            // It sets a custom state for the part, modifying its vertical relative size (rel2.y)
+            // based on the received float value 'sc'. This is likely used to adjust
+            // the title bar height based on whether a title is present or not.
             custom_state(PART:"top_spacer", "default", 0.0);
             set_state_val(PART:"top_spacer", STATE_REL2, 1.0, sc);
             set_state(PART:"top_spacer", "custom", 0.0);
@@ -15,24 +29,32 @@ group { name: "e/deskmirror/frame/default";
       }
    }
    parts {
+      // This spacer defines the main geometry of the window content area.
+      // Its size changes during iconification to create a shrinking/growing animation.
       part { name: "spacer"; type: SPACER;
          description { state: "default";
          }
+         // In the "iconic" state, the spacer collapses to a single line at the bottom,
+         // effectively hiding the window content.
          description { state: "iconic";
             inherit: "default" 0.0;
             rel1.relative: 0.0 1.0;
             rel2.relative: 0.0 1.0;
          }
       }
+      // A spacer to manage the vertical position and height of the title bar area.
+      // Its height is dynamically controlled by the Embryo script.
       part { name: "top_spacer"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to: "spacer";
             rel2.to_x: "spacer";
+            // The bottom of this spacer is aligned with the top of the title text part.
             rel2.to_y: "e.text.title";
             rel2.offset: -1 -4;
             align: 0.5 0.0;
          }
       }
+      // A 1-pixel high spacer at the very bottom, acting as a bottom border line.
       part { name: "bottom_size"; type: SPACER;
          description { state: "default" 0.0;
             rel1.to_x: "spacer";
@@ -42,42 +64,55 @@ group { name: "e/deskmirror/frame/default";
             min: 0 1;
             fixed: 0 1;
          }
+         // When "hidden", the border has zero height.
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
             min: 0 0;
             max: 0 0;
          }
       }
+      // The shadow part, displayed around the frame.
       part { name: "shadow";
          mouse_events: 0;
          description { state: "default" 0.0;
+            // Uses a 9-patch PNG for scalable borders.
             image.normal: "pager_mini_win_shadow.png";
             image.border: 7 7 7 7;
-            image.middle: 0;
+            image.middle: 0; // The middle part of the image is not drawn.
+            // Positioned slightly outside the main frame parts.
             rel1.to: "top";
             rel1.offset: -5 -5;
             rel2.to: "bottom";
             rel2.offset: 4 4;
-            fill.smooth: 0;
+            fill.smooth: 0; // Disables anti-aliasing for sharper edges.
+            // Uses a theme-defined color class for the shadow.
             color_class: "/shadow/normal/border";
          }
+         // In the "off" state, the shadow is hidden.
          description { state: "off";
             inherit: "default" 0.0;
             visible: 0;
          }
       }
 
+      // A clipping rectangle to contain the swallowed client content.
+      // This ensures that the client content doesn't draw over the frame's title bar or borders.
       part { name: "client_clip"; type: RECT;
          description { state: "default" 0.0;
+            // Aligned vertically between the "top" and "bottom" parts.
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
             rel2.to_y: "bottom";
             rel2.relative: 1.0 0.0;
          }
       }
+      // This is the container for the actual window content.
+      // The content (e.g., a mirrored desktop) is "swallowed" into this part.
       part { name: "e.swallow.client"; type: SWALLOW;
+         // Clipped by "client_clip" to stay within the designated content area.
          clip_to: "client_clip";
          description { state: "default" 0.0;
+            // Positioned identically to the clipping rectangle.
             rel1.to_y: "top";
             rel1.relative: 0.0 1.0;
             rel2.to_y: "bottom";
@@ -85,158 +120,209 @@ group { name: "e/deskmirror/frame/default";
          }
       }
 
+      // Rectangle for the title bar background.
       part { name: "top"; type: RECT;
          description { state: "default" 0.0;
+            // Positioned relative to the "top_spacer".
             rel.to: "top_spacer";
+            // Uses a theme-defined color class for the background.
             color_class: "/bg/normal/titlebar";
-            min: 0 1;
+            min: 0 1; // Minimum height of 1 pixel.
          }
+         // State for when the window is focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // Uses a different color class for the selected/focused state.
             color_class: "/bg/selected/titlebar";
          }
       }
 
+      // The text part for displaying the window title.
       part { name: "e.text.title"; type: TEXT; mouse_events: 0;
-         scale: 1;
+         scale: 1; // Enables scaling of the text.
          description { state: "default" 0.0;
             rel.to: "spacer";
             rel1.offset: 1 3;
             rel2.relative: 1.0 0.0;
             rel2.offset: -2 3;
             align: 0.5 0.0;
+            // Uses a theme-defined color class.
             color_class: "/fg/normal/titlebar";
             text { font: FNBD; size: 10;
+               // Associates the text with a theme-defined text class for styling.
                text_class: "title_bar";
                align: 0.5 0.0;
                min: 0 1;
             }
+            // The title is initially not visible. It is likely made visible by the C code
+            // when there is a title to display.
             visible: 0;
-            fixed: 0 1;
+            fixed: 0 1; // Fixed height.
          }
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
+            // Uses a different color class when focused.
             color_class: "/fg/selected/titlebar";
          }
       }
 
+      // Rectangle for the bottom border of the frame.
       part { name: "bottom"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Positioned relative to the "bottom_size" spacer.
             rel.to: "bottom_size";
             color_class: "/bg/normal/border";
          }
+         // The "hidden" state is used when the window is shaded or maximized
+         // to remove the bottom border.
          description { state: "hidden" 0.0;
             inherit: "default" 0.0;
-            max: 0 0;
+            max: 0 0; // Zero maximum height.
             visible: 0;
          }
       }
 
+      // A proxy of the client area, used for the "urgent" animation.
+      // It's normally invisible and sits on top of the actual client content.
       part { name: "clone"; type: PROXY; mouse_events: 0;
          description { state: "default";
             source: "e.swallow.client";
             rel.to: "e.swallow.client";
             visible: 0;
-            color: 255 255 255 0; // no cc
-            proxy.source_clip: 0;
+            // Transparent white, not using a color class for a fixed effect.
+            color: 255 255 255 0; // #FFFFFF00
+            proxy.source_clip: 0; // The proxy is not clipped by its source's clipper.
          }
+         // First stage of the urgent animation: a solid white flash.
          description { state: "urgent1";
             inherit: "default" 0.0;
             visible: 1;
-            color: 255 255 255 255; // no cc
+            // Opaque white.
+            color: 255 255 255 255; // #FFFFFFFF
             proxy.source_clip: 0;
          }
+         // Second stage of the urgent animation: expand and fade out.
          description { state: "urgent2" 0.0;
             inherit: "default" 0.0;
             visible: 1;
+            // Expands to 3 times the original size.
             rel1.relative: -2.0  -2.0;
             rel2.relative: 3.0  3.0;
-            color: 255 255 255 0; // no cc
+            // Fades to transparent white.
+            color: 255 255 255 0; // #FFFFFF00
             proxy.source_clip: 0;
          }
       }
    }
    programs {
+      // When the window becomes urgent, this program is triggered.
       program { signal: "e,state,urgent"; source: "e";
+         // It stops any ongoing urgent animation...
          action: ACTION_STOP;
          target: "go_big";
          target: "go_big2";
+         // ...and starts the new animation sequence.
          after: "go_big";
       }
+      // First part of the urgent animation loop.
       program { name: "go_big";
+         // Sets the "clone" proxy to the "urgent1" state (solid white flash).
          action: STATE_SET "urgent1" 0.0;
          target: "clone";
+         // After this, triggers the second part of the animation.
          after: "go_big2";
       }
+      // Second part of the urgent animation loop.
       program { name: "go_big2";
+         // Sets the "clone" proxy to the "urgent2" state (expand and fade).
          action: STATE_SET "urgent2" 0.0;
          transition: LINEAR 0.5 USE_DURATION_FACTOR 1;
          target: "clone";
+         // After this, restarts the loop, creating a continuous pulsing effect.
          after: "go_big";
       }
+      // When the window is no longer urgent.
       program { signal: "e,state,not_urgent"; source: "e";
+         // Stops the urgent animation loop.
          action: ACTION_STOP;
          target: "go_big";
          target: "go_big2";
+         // Starts the program to hide the "clone" proxy.
          after: "go_hid";
       }
+      // Hides the "clone" proxy by transitioning it back to the default (invisible) state.
       program { name: "go_hid";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 0.5 USE_DURATION_FACTOR 1;
          target: "clone";
       }
+      // Triggered by C code to show the shadow.
       program { signal: "e,state,shadow,on"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "shadow";
       }
+      // Triggered by C code to hide the shadow.
       program { signal: "e,state,shadow,off"; source: "e";
          action: STATE_SET "off" 0.0;
          target: "shadow";
       }
+      // When the window gains focus, update the title and top bar to the "focused" state.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "e.text.title";
          target: "top";
       }
+      // When the window loses focus, revert to the "default" state.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.text.title";
          target: "top";
       }
+      // When the window is shaded (rolled up), hide the bottom border.
       program { signal: "e,state,shaded"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "bottom";
       }
+      // Also hide the bottom border when the window is maximized.
       program { signal: "e,state,maximize*"; source: "e";
          action: STATE_SET "hidden" 0.0;
          target: "bottom";
       }
+      // When un-maximizing, restore the bottom border.
       program { signal: "e,state,unmaximize*"; source: "e";
          after: "unshade";
       }
+      // When un-shading, restore the bottom border.
       program { signal: "e,state,unshaded"; source: "e";
          after: "unshade";
       }
+      // Program to restore the bottom border to its default state.
       program { name: "unshade";
          signal: "e,state,unshading"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "bottom";
       }
+      // Program for the iconify (minimize) animation.
       program { name: "iconify";
+         // Changes the "spacer" part to its "iconic" (collapsed) state.
          action: STATE_SET "iconic" 0.0;
          transition: ACCELERATE 0.2 CURRENT USE_DURATION_FACTOR 1;
          target: "spacer";
       }
+      // Program for the un-iconify (restore) animation.
       program { name: "uniconify";
+         // Changes the "spacer" part back to its "default" (expanded) state.
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2 CURRENT USE_DURATION_FACTOR 1;
          target: "spacer";
       }
+      // When an un-iconify action is requested, stop any ongoing iconify animation first.
       program { signal: "e,action,uniconify"; source: "e";
          action: ACTION_STOP;
          target: "iconify";
          after: "uniconify";
       }
+      // When an iconify action is requested, stop any ongoing un-iconify animation first.
       program { signal: "e,action,iconify"; source: "e";
          action: ACTION_STOP;
          target: "uniconify";
@@ -245,14 +331,21 @@ group { name: "e/deskmirror/frame/default";
    }
 }
 
+// This group defines a frame for non-resizable windows.
+// It inherits all properties from the "default" frame and modifies a few parts.
 group { name: "e/deskmirror/frame/noresize";
    inherit: "e/deskmirror/frame/default";
    parts {
+      // The client area is modified to have a fixed size relative to the window.
       part { name: "e.swallow.client"; type: SWALLOW;
          description { state: "default" 0.0;
+            // Fixes the bottom-right corner to the parent's bottom-right,
+            // preventing resizing from that corner.
             rel2.relative: 1.0 1.0;
          }
       }
+      // The bottom border is made invisible and zero-height, as it's not needed
+      // for a non-resizable window.
       part { name: "bottom"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/border";
@@ -268,6 +361,9 @@ group { name: "e/deskmirror/frame/noresize";
    }
 }
 
+// A frame for non-resizable dialog windows.
+// It is functionally identical to the "noresize" group but provides a separate
+// name for semantic clarity, allowing different styling if needed in the future.
 group { name: "e/deskmirror/frame/noresize_dialog";
    inherit: "e/deskmirror/frame/default";
    parts {
@@ -291,22 +387,29 @@ group { name: "e/deskmirror/frame/noresize_dialog";
    }
 }
 
+// This group defines a minimal, "pixel-perfect" frame, typically used for
+// windows where only a simple border is desired (e.g., some popups).
 group { name: "e/deskmirror/frame/pixel";
    parts {
+      // A clipper to ensure the client content stays within the frame.
       part { name: "client_clip"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.client";
          }
       }
+      // A single rectangle that acts as the entire frame.
       part { name: "frame"; type: RECT;
          description { state: "default" 0.0;
+            // Uses theme colors for the outline.
             color_class: "/bg/normal/border/outline";
          }
+         // The frame changes color when the window is focused.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
             color_class: "/bg/selected/border/outline";
          }
       }
+      // The client area is inset by one pixel on all sides to make the frame visible.
       part { name: "e.swallow.client"; type: SWALLOW;
          clip_to: "client_clip";
          description { state: "default" 0.0;
@@ -316,10 +419,12 @@ group { name: "e/deskmirror/frame/pixel";
       }
    }
    programs {
+      // Changes the frame's state to "focused" on focus.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "frame";
       }
+      // Reverts the frame's state to "default" on unfocus.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "frame";
@@ -327,6 +432,8 @@ group { name: "e/deskmirror/frame/pixel";
    }
 }
 
+// This group is designed for tiled windows, where frames are often just simple
+// indicators of focus rather than complex decorations.
 group { name: "e/deskmirror/frame/tiling";
    parts {
       part { name: "client_clip"; type: RECT;
@@ -334,17 +441,22 @@ group { name: "e/deskmirror/frame/tiling";
             rel.to: "e.swallow.client";
          }
       }
+      // The frame part is a rectangle that is only visible when focused.
       part { name: "frame"; type: RECT;
          description { state: "default" 0.0;
-            color: 0 0 0 0; // no cc
+            // By default, the frame is fully transparent.
+            color: 0 0 0 0; // #00000000
             rel1.offset: -1 -1;
             rel2.offset: 0 0;
             color_class: "/bg/selected/border/outline";
-            color: 255 255 255 0; // no cc
+            // This color is overridden by the line above but demonstrates a transparent color.
+            color: 255 255 255 0; // #FFFFFF00
          }
+         // When focused, the frame becomes opaque white, highlighting the active tiled window.
+         // This color is hardcoded and not themeable, ensuring consistent visibility.
          description { state: "focused" 0.0;
             inherit: "default" 0.0;
-            color: 255 255 255 255; // no cc
+            color: 255 255 255 255; // #FFFFFFFF
          }
       }
       part { name: "e.swallow.client"; type: SWALLOW;
@@ -354,10 +466,12 @@ group { name: "e/deskmirror/frame/tiling";
       }
    }
    programs {
+      // On focus, sets the frame to the "focused" state, making it visible.
       program { signal: "e,state,focused"; source: "e";
          action: STATE_SET "focused" 0.0;
          target: "frame";
       }
+      // On unfocus, reverts the frame to the "default" state, making it transparent.
       program { signal: "e,state,unfocused"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "frame";
@@ -365,30 +479,44 @@ group { name: "e/deskmirror/frame/tiling";
    }
 }
 
+// This group defines a borderless frame using modern, compact EDC syntax.
+// It provides core functionalities like urgent animations and iconification
+// without any visible decorations like borders or a title bar.
 group { "e/deskmirror/frame/borderless";
    parts {
+      // Shorthand for: part { name: "spacer"; type: SPACER;
+      // This spacer is used for the iconify/uniconify animation.
       spacer { "spacer";
+         // Shorthand for: description { state: "default"; }
          desc {}
+         // Shorthand for: description { state: "iconic"; }
          desc { "iconic";
             rel1.relative: 0.0 1.0;
             rel2.relative: 0.0 1.0;
          }
       }
+      // A clipping rectangle for the client content.
       rect { "client_clip";
       }
+      // The swallow part for the client content.
       swallow { "e.swallow.client";
-         clip: "client_clip";
+         clip: "client_clip"; // Shorthand for clip_to.
       }
-      proxy { "clone"; nomouse;
+      // A proxy part for the urgent animation, functionally identical to the one
+      // in the "default" group.
+      proxy { "clone"; nomouse; // nomouse is shorthand for mouse_events: 0;
          desc {
             source: "e.swallow.client";
-            hid;
+            hid; // Shorthand for visible: 0;
+            // Transparent white (#FFFFFF00).
             color: 255 255 255 0; // no cc
          }
+         // First state of urgent animation: solid white flash (#FFFFFFFF).
          desc { "urgent1"; inherit: "default";
-            vis;
+            vis; // Shorthand for visible: 1;
             color: 255 255 255 255; // no cc
          }
+         // Second state of urgent animation: expand and fade (#FFFFFF00).
          desc { "urgent2"; inherit: "default";
             vis;
             rel1.relative: -2.0  -2.0;
@@ -396,6 +524,8 @@ group { "e/deskmirror/frame/borderless";
             color: 255 255 255 0; // no cc
          }
       }
+      // The iconify/uniconify programs are identical in function to the "default" group,
+      // creating a shrink/expand animation on the "spacer" part.
       program { name: "iconify";
          action: STATE_SET "iconic" 0.0;
          transition: ACCELERATE 0.2 CURRENT USE_DURATION_FACTOR 1;
@@ -416,6 +546,8 @@ group { "e/deskmirror/frame/borderless";
          target: "uniconify";
          after: "iconify";
       }
+      // The urgent animation programs are identical in function to the "default" group,
+      // creating a pulsing effect on the "clone" proxy part.
       program { signal: "e,state,urgent"; source: "e";
          action: ACTION_STOP;
          target: "go_big";
@@ -433,12 +565,14 @@ group { "e/deskmirror/frame/borderless";
          target: "clone";
          after: "go_big";
       }
+      // Program to stop the urgent animation.
       program { signal: "e,state,not_urgent"; source: "e";
          action: ACTION_STOP;
          target: "go_big";
          target: "go_big2";
          after: "go_hid";
       }
+      // Program to hide the "clone" proxy.
       program { name: "go_hid";
          action: STATE_SET "default" 0.0;
          transition: LINEAR 0.5 USE_DURATION_FACTOR 1;

@@ -1,10 +1,18 @@
 collections {
+   // This group defines a layout for demonstrating perspective transformations.
+   // It includes a background, a text element, and a rectangle that acts as
+   // a backdrop for the text. The text can be moved to different positions
+   // within the layout via animated transitions triggered by signals.
    group {
       name: "example/group";
 
+      // Sets the minimum size of the group to 480x320 pixels.
       min: 480 320;
 
       parts {
+         // This part is a simple rectangle that serves as the background.
+         // It is set to receive mouse events, allowing it to interact with user input,
+         // even though there are no programs attached to its signals.
          part {
             name: "bg";
             type: RECT;
@@ -15,6 +23,8 @@ collections {
             }
          } // bg
 
+         // This part is a semi-transparent red rectangle that serves as a backdrop for the "title" part.
+         // It does not handle mouse events, so they pass through to the parts below it (like 'bg').
          part {
             name: "rectangle";
             type: RECT;
@@ -22,8 +32,11 @@ collections {
 
             description {
                state: "default" 0.0;
+               // Color: Red with 50% transparency (#FF000080).
                color: 255 0 0 128;
 
+               // The rectangle's position is relative to the "title" part, with an offset
+               // to create a border effect around it.
                rel1 {
                   offset: -5 -5;
                   to: "title";
@@ -33,6 +46,8 @@ collections {
                   to: "title";
                }
 
+               // Enables 3D transformation (mapping) on this part, and specifically enables perspective.
+               // A 45-degree rotation around the X-axis is applied.
                map {
                   on: 1;
                   perspective_on: 1;
@@ -43,6 +58,8 @@ collections {
             }
          } // rectangle
 
+         // This TEXT part displays the main title. It is the central element for the perspective
+         // and animation demonstrations in this group.
          part {
             name: "title";
             type: TEXT;
@@ -50,10 +67,15 @@ collections {
 
             description {
                state: "default" 0.0;
+               // Color: A light gray (#C8C8C8FF).
                color: 200 200 200 255;
 
+               // Aligns the text within its container. 0.0 is left, 0.5 is center.
+               // The text will be vertically centered and left-aligned to the point defined by rel1/rel2.
                align: 0.0 0.5;
 
+               // The initial position is set to 10% from the top and left of the parent container.
+               // Since rel1 and rel2 are the same, the part itself has no size, but serves as an anchor for the text.
                rel1.relative: 0.1 0.1;
                rel2.relative: 0.1 0.1;
 
@@ -64,6 +86,8 @@ collections {
                   min: 1 1;
                }
 
+               // The same perspective transformation as the "rectangle" part is applied,
+               // so they appear to be on the same 3D plane.
                map {
                   on: 1;
                   perspective_on: 1;
@@ -73,6 +97,10 @@ collections {
                }
             }
 
+            // The following descriptions define additional states for the "title" part.
+            // They all inherit from the "default" state, only overriding the position.
+
+            // Defines the "right" state, moving the text horizontally.
             description {
                state: "right" 0.0;
                inherit: "default" 0.0;
@@ -80,6 +108,7 @@ collections {
                rel1.relative: 0.5 0.1;
                rel2.relative: 0.5 0.1;
             }
+            // Defines the "bottom" state, moving the text vertically.
             description {
                state: "bottom" 0.0;
                inherit: "default" 0.0;
@@ -87,6 +116,7 @@ collections {
                rel1.relative: 0.1 0.9;
                rel2.relative: 0.1 0.9;
             }
+            // Defines the "bottomright" state, moving it to the bottom-right corner.
             description {
                state: "bottomright" 0.0;
                inherit: "default" 0.0;
@@ -97,7 +127,12 @@ collections {
          } // title
       }
 
+      // Programs define the dynamic behavior of the interface. They are triggered by signals
+      // and execute actions, such as changing the state of a part.
       programs {
+         // The following programs listen for "move,*,*" signals to change the state of the "title" part,
+         // triggering different animations. Each uses a 1-second sinusoidal transition for a smooth effect.
+         // After an animation completes, the "animation,end" program is called.
          program {
             name: "move,right";
             signal: "move,1,0";
@@ -131,6 +166,9 @@ collections {
             after: "animation,end";
          }
 
+         // This program can be run by other programs using the 'after' property.
+         // It emits the "animation,end" signal, which can be used by the application code
+         // to know when a transition has finished.
          program {
             name: "animation,end";
             action: SIGNAL_EMIT "animation,end" "";

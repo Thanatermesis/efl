@@ -1,15 +1,28 @@
+// This group defines the main layout of a dialog window. It consists of a
+// background, an optional icon, a content area, a button area, and a
+// separator between the content and buttons. The layout is designed to be
+// flexible, adjusting its appearance based on whether an icon or buttons
+// are present.
 group { name: "e/widgets/dialog/main";
    parts {
+      // The "base" part is a rectangle that serves as the background of the
+      // dialog. It fills the entire area of the group.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // The color_class sets the color of the rectangle. "/bg/normal/background"
+            // is a theme-defined color class, typically a light or dark gray,
+            // e.g., #F0F0F0 in a light theme.
             color_class: "/bg/normal/background";
          }
       }
+      // This part is a horizontal line that visually separates the content and
+      // button areas. It's designed to appear only when there are buttons.
       part { name: "separator"; type: RECT; mouse_events: 0;
          scale:  1;
          description { state: "default" 0.0;
             min: 16 1;
             max: 99999 1;
+            // Positioned between the content and buttons.
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 0;
             rel1.to_y: "e.swallow.content";
@@ -17,33 +30,48 @@ group { name: "e/widgets/dialog/main";
             rel2.offset: -1 -1;
             rel2.to_y: "e.swallow.buttons";
             color_class: "/fg/normal/separator/horizontal";
-            fixed: 0 1;
+            fixed: 0 1; // Flexible width, fixed height of 1px.
+            // link.base connects visibility to button state signals. The separator
+            // is visible by default in this description, which is activated by
+            // the "e,state,buttons,on" signal.
             link.base: "e,state,buttons,on" "e";
             visible: 1;
          }
+         // The "hid" description hides the separator. It is activated by the
+         // "e,state,buttons,off" signal, effectively hiding the part when
+         // no buttons are present.
          desc { "hid"; hid;
             visible: 0;
             link.base: "e,state,buttons,off" "e";
          }
       }
+      // A SWALLOW part that holds an optional icon, positioned on the left side
+      // of the dialog. It's invisible by default.
       part { name: "e.swallow.icon"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            align: 0.0 0.5;
+            align: 0.0 0.5; // Aligns to the left, centered vertically.
             rel1.relative: 0.0 0.0;
             rel1.offset: 8 8;
             rel2.relative: 0.0 1.0;
             rel2.offset: -1 0;
+            // Its bottom edge is aligned with the top of the button_spacer.
             rel2.to_y: "button_spacer";
-            fixed: 1 0;
+            fixed: 1 0; // Fixed width, flexible height.
+            // By default, the icon is not visible and scaled offscreen to avoid
+            // taking up space.
             visible: 0;
             offscale;
          }
+         // The "icon" state is activated by a program to make the icon container
+         // visible, allowing an icon to be displayed.
          description { state: "icon" 0.0;
             inherit: "default" 0.0;
             visible: 1;
          }
       }
+      // This SWALLOW part is the main content area of the dialog. It's designed
+      // to hold any widget, like text or a custom layout.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -51,50 +79,76 @@ group { name: "e/widgets/dialog/main";
             rel1.to_x: "base";
             rel2.to_x: "base";
             rel2.offset: -9 -1;
+            // The bottom of the content area is aligned with the top of the button_spacer.
             rel2.to_y: "button_spacer";
             offscale;
          }
+         // In the "icon" state, the content area is repositioned to the right of
+         // the icon, preventing overlap. This state is set by a program when an
+         // icon is enabled.
          description { state: "icon" 0.0;
             inherit: "default" 0.0;
             rel1.relative: 1.0 0.0;
             rel1.to_x: "e.swallow.icon";
          }
       }
+      // This spacer is an invisible element that creates a gap between the
+      // content and button areas. Its existence is linked to the presence of buttons.
       spacer { "button_spacer";
          scale: 1;
          desc {
+            // Positions the spacer above the buttons, creating a 17px high vertical gap.
+            // (-17 offset from the top of e.swallow.buttons).
             rel2.relative: 1.0 0.0;
             rel2.offset: -9 -17;
             rel2.to_y: "e.swallow.buttons";
+            // Linked to the 'buttons,on' state, so it exists only when buttons are visible.
             link.base: "e,state,buttons,on" "e";
             offscale;
          }
+         // When buttons are off, this description is used, which effectively
+         // collapses the spacer by setting its minimum size multiplier to zero.
          desc { "hid";
             link.base: "e,state,buttons,off" "e";
             minmul: 0 0;
          }
       }
+      // A SWALLOW part at the bottom of the dialog, intended to hold action
+      // buttons (e.g., OK, Cancel).
       part { name: "e.swallow.buttons"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
-            align: 0.5 1.0;
+            align: 0.5 1.0; // Centered horizontally, aligned to the bottom.
             rel1.relative: 0.0 1.0;
             rel1.offset: 8 -9;
             rel2.relative: 1.0 1.0;
             rel2.offset: -9 -9;
-            fixed: 0 1;
+            fixed: 0 1; // Flexible width, fixed height.
             offscale;
          }
+         // This "hid" state is used to hide the button area when no buttons are
+         // added. This is controlled externally by application logic by emitting
+         // a signal that sets this state.
          desc { "hid"; hid; }
       }
    }
+   // Programs define actions that are triggered by signals. They are used to
+   // dynamically change the state of parts in the UI.
    programs {
+      // This program is triggered by the "e,icon,enabled" signal from the "e"
+      // source (the elementary core).
       program { signal: "e,icon,enabled"; source: "e";
+         // It changes the state of the icon and content parts to "icon", making
+         // the icon visible and adjusting the content area's position to make
+         // space for it.
          action: STATE_SET "icon" 0.0;
          target: "e.swallow.icon";
          target: "e.swallow.content";
       }
+      // This program is triggered by the "e,icon,disabled" signal.
       program { signal: "e,icon,disabled"; source: "e";
+         // It reverts the icon and content parts to their "default" state,
+         // hiding the icon and expanding the content area to full width.
          action: STATE_SET "default" 0.0;
          target: "e.swallow.icon";
          target: "e.swallow.content";
@@ -102,21 +156,41 @@ group { name: "e/widgets/dialog/main";
    }
 }
 
+// This group defines a stylable text block, specifically for use within a dialog.
+// It provides a default style for dialog text and supports basic HTML-like tags
+// for formatting, like <br> for line breaks and <hilight> for bold text.
 group { name: "e/widgets/dialog/text";
    styles {
+      // Defines a reusable style for the text block.
       style { name: "dialog_style";
+         // 'base' defines the default appearance of the text:
+         // - font="FN" font_size=10: Uses a standard font (FN macro) at size 10.
+         // - text_class="tb_plain": A class for theming text color.
+         // - align=center: Centers the text.
+         // - color=cc:/fg/normal/text: Sets text color via a color class (e.g., #202020 in a dark theme).
+         // - wrap=word: Wraps text at word boundaries.
          base: "font="FN" font_size=10 text_class=tb_plain align=center color=cc:/fg/normal/text wrap=word";
+         // 'tag' defines how formatting tags in the text string are interpreted.
+         // This makes the <br> tag insert a newline character.
          tag: "br" "\n";
+         // This makes text inside <hilight> tags use a bold font (FNBD macro) and
+         // a different text class for emphasis.
          tag: "hilight" "+ font="FNBD" text_class=tb_light";
       }
    }
    parts {
+      // The main part of this group, a TEXTBLOCK that will display the message.
       part { name: "e.textblock.message"; type: TEXTBLOCK; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
             text {
+               // Applies the "dialog_style" defined above to this text block.
                style: "dialog_style";
+               // Ensures the text block has a minimum size of 1x1 pixels, so it is
+               // always rendered even if the text is empty.
                min: 1 1;
+               // ellipsis: -1 means that if the text overflows, it will be truncated
+               // at the end without adding an ellipsis (...).
                ellipsis: -1;
             }
          }

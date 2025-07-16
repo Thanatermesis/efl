@@ -1,3 +1,6 @@
+// DATETIME_FIELD: This macro generates a 'swallow' part that acts as a placeholder
+// for individual date/time components (e.g., year, month, day).
+// It's designed to be shown or hidden based on the date/time format.
 #define DATETIME_FIELD(_pos) \
    swallow { "efl.field"#_pos; \
       scale; \
@@ -32,6 +35,9 @@
          target: "efl.field"#_pos; \
       } \
    }
+// DATETIME_SEPARATOR: This macro creates a text part that serves as a separator
+// (e.g., '/', ':') between date/time fields. Its visibility is tied to the
+// preceding field. The macro also creates a disabled-state version of the text.
 #define DATETIME_SEPARATOR(_pos, _after) \
    text { "efl.separator"#_pos; \
       scale; \
@@ -100,20 +106,33 @@
       } \
    }
 
+// The main group for the uiclock widget. It defines the layout and behavior
+// of the date and time display, assembling the fields and separators defined
+// in the macros above.
 group { "efl/uiclock";
    data.item: "version" "123";
    parts {
+      // "bg": A simple rectangle that serves as the background for the entire widget.
+      // It uses a color_class, so its color is determined by the theme.
       rect { "bg";
          desc { "default";
             color_class: "/bg/normal/clock";
          }
       }
+      // "clip": This rectangle acts as a clipping mask for all the active
+      // date/time fields. Its horizontal bounds are tied to the first and last
+      // visible separators, ensuring that only the fields within this range are
+      // rendered. This is crucial for creating a clean, contained layout.
       rect { "clip";
          desc { "default";
             rel1.to: "efl.separator0";
             rel2.to: "efl.separator7";
          }
       }
+      // "disclip" and "disclip2": These are two clipping rectangles that manage the
+      // visibility of separators based on the widget's enabled/disabled state.
+      // "disclip" is visible by default and hides when disabled, taking the enabled
+      // separators with it.
       rect { "disclip";
          clip_to: "clip";
          desc { "default";
@@ -125,6 +144,9 @@ group { "efl/uiclock";
            hid;
          }
       }
+      // "disclip2" is hidden by default and becomes visible when disabled, revealing
+      // the disabled-style separators. This two-clipper approach is a common EDC
+      // technique for state-dependent visibility without complex logic.
       rect { "disclip2";;
          clip_to: "clip";
          desc { "default";
@@ -137,6 +159,9 @@ group { "efl/uiclock";
             vis;
          }
       }
+      // "efl.separator0": This is not a visible separator but a spacer that acts as
+      // the starting anchor for the layout of the fields. It provides a reference
+      // point for the 'clip' rectangle and the first field.
       spacer { "efl.separator0";;
          scale;
          desc { "default";
@@ -146,6 +171,10 @@ group { "efl/uiclock";
             rel2.relative: 0.0 1.0;
          }
       }
+      // The following lines instantiate the date/time fields and their separators
+      // using the macros defined at the start of the file. The numeric arguments
+      // create unique part names (e.g., "efl.field0", "efl.separator1") and link
+      // separators to their preceding fields.
       DATETIME_FIELD(0)
       DATETIME_SEPARATOR(1,0)
       DATETIME_FIELD(1)
@@ -162,6 +191,8 @@ group { "efl/uiclock";
       DATETIME_SEPARATOR(7,6)
       DATETIME_FIELD(7)
       DATETIME_SEPARATOR(8,7)
+      // "efl.separator9": Another spacer that defines the rightmost boundary
+      // of the content area.
       spacer { "efl.separator9";;
          desc { "default";
             rel1.to: "efl.separator7";
@@ -169,6 +200,11 @@ group { "efl/uiclock";
             min: 8 10;
          }
       }
+      // "discover": A transparent rectangle that overlays the fields area. It's
+      // hidden by default but becomes visible when the widget is disabled. Its
+      // purpose is to intercept mouse events, effectively making the underlying
+      // fields non-interactive. The color is set to fully transparent
+      // black (#00000000).
       rect { "discover";;
          desc { "default";
             rel1.to: "efl.separator0";
@@ -181,6 +217,10 @@ group { "efl/uiclock";
             vis;
          }
       }
+      // "efl.access": A part designated for accessibility features. The 'repeat'
+      // property indicates that an instance of this part will be created for each
+      // accessible child object, which is a standard way to handle accessibility
+      // in EDC. It is transparent.
       rect { "efl.access";
          repeat;
          desc { "default";
@@ -188,7 +228,11 @@ group { "efl/uiclock";
          }
       }
    }
+   // These programs handle the overall enabled/disabled state of the uiclock widget.
    programs {
+      // When the "efl,state,disabled" signal is received (typically from the C
+      // code), this program transitions the clipping and overlay parts to their
+      // "disabled" states. This visually indicates that the widget is inactive.
       program {
          signal: "efl,state,disabled";
          source: "efl";
@@ -197,6 +241,9 @@ group { "efl/uiclock";
          target: "disclip2";
          target: "discover";
       }
+      // Conversely, the "efl,state,enabled" signal reverts the parts to their
+      // "default" states, re-enabling interaction and restoring the normal
+      // appearance.
       program {
          signal: "efl,state,enabled";
          source: "efl";
@@ -210,19 +257,25 @@ group { "efl/uiclock";
 #undef DATETIME_SEPARATOR
 #undef DATETIME_FIELD
 
-// AM_PM_BUTTON
+// The "efl/uiclock/ampm" group defines the AM/PM selector button.
+// It simply inherits from the standard "efl/button" group, meaning it will
+// look and behave like a default button but can be specifically themed for
+// the uiclock context.
 group { "efl/uiclock/ampm"
    data.item: "version" "123";
    inherit: "efl/button";
 }
 
-//ENTRY
+// The following groups are for theming the text entry parts within the uiclock,
+// such as the fields for year, month, etc. They inherit from standard EFL text
+// and selection styles, allowing themers to provide uiclock-specific overrides.
 group { "efl/uiclock/text"
    data.item: "version" "123";
    inherit: "efl/text";
    alias: "efl/uiclock/text/single";
    alias: "efl/uiclock/text/single-noedit";
 }
+// This group is for styling the text selection within the uiclock fields.
 group { "efl/uiclock/text/selection"
    data.item: "version" "123";
    inherit: "efl/text/selection";

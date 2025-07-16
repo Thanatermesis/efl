@@ -1,19 +1,35 @@
+// This group defines the main look of the bluez4 gadget when it is active.
+// It will be displayed as an icon on a shelf or desktop.
 group { name: "e/modules/bluez4/main";
+   // Pre-loads the 'bz5_logo.png' image and compresses it for efficiency.
    images.image: "bz5_logo.png" COMP;
+   // Sets the maximum size for this UI component to 160x160 pixels.
    max: 160 160;
    parts {
+      // 'base' is the main visual part of the gadget.
       part { name: "base";
+         // This block describes the appearance of the 'base' part in its default state.
          description { state: "default" 0.0;
+            // The 'rel1' and 'rel2' properties define the part's geometry relative to its container.
+            // Using fractions like (25/380) allows the part to scale proportionally.
+            // It effectively creates a margin around the image.
             rel1.relative: (25/380) (25/380);
             rel2.relative: (365/380) (365/380);
+            // Enforces a 1:1 aspect ratio, ensuring the icon doesn't get stretched.
+            // 'BOTH' means it will respect the aspect ratio for both width and height.
             aspect: 1.0 1.0; aspect_preference: BOTH;
+            // Sets the image to be displayed.
             image.normal: "bz5_logo.png";
+            // Applies a color from the current theme. This color is likely a shade of blue
+            // to indicate that Bluetooth is 'on'. This is a way to tint the image.
             color_class: "/fg/normal/gadgets/bluez/on";
          }
       }
    }
 }
 
+// This group defines the appearance of the gadget when Bluetooth is inactive.
+// It's visually similar to the 'main' state but uses a different color to indicate it's 'off'.
 group { name: "e/modules/bluez4/inactive";
    images.image: "bz5_logo.png" COMP;
    max: 160 160;
@@ -24,6 +40,8 @@ group { name: "e/modules/bluez4/inactive";
             rel2.relative: (365/380) (365/380);
             aspect: 1.0 1.0; aspect_preference: BOTH;
             image.normal: "bz5_logo.png";
+            // Uses a different color class to signify the 'off' or inactive state.
+            // This color is typically a shade of grey or a less vibrant color, defined by the theme.
             color_class: "/fg/normal/gadgets/bluez/off";
          }
       }

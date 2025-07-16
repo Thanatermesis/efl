@@ -1,6 +1,9 @@
 efl_version: 1 22;
 
 collections {
+// This group defines a simple green rectangle that fills its container. It is
+// intended to be used as a 'source' part for features like text selection
+// highlighting in a TEXTBLOCK.
    group {
       name: "sel_group";
       parts {
@@ -9,6 +12,7 @@ collections {
             type: RECT;
             description {
                state: "default" 0.0;
+               // A solid green color (#00FF00).
                color: 0 255 0 255; /* green */
                rel1.relative: 0.0 0.0;
                rel2.relative: 1.0 1.0;
@@ -16,10 +20,16 @@ collections {
          }
       }
    }
+// This group demonstrates a layout with internationalization support.
+// It contains two text parts and logic to switch text styles based on the
+// current language settings of the application.
    group {
       name: "example_group";
       max: 500 500;
       min: 50 50;
+      // Defines translation files for different locales. Edje will use these
+      // to look up translated strings for text parts within this group that
+      // have a 'domain' property set.
       translation {
          file {
             locale: en_IN;
@@ -34,7 +44,11 @@ collections {
             source: domain_name.po;
          }
       }
+      // Defines named styles for text rendering. These can be applied to parts
+      // and switched dynamically. The tags 'br', 'hilight', 'b', and 'tab'
+      // enable simple markup within TEXTBLOCK parts.
       styles {
+         // Style for English text, colored red (#FF0000).
          style {
             name: "textblock_style_en";
             base: "font=Sans font_size=22 color=#f00 wrap=word";
@@ -43,6 +57,7 @@ collections {
             tag:  "b" "+ font_weight=Bold";
             tag:  "tab" "\t";
          }
+         // Style for Tamil text, colored black (#000000).
          style {
             name: "textblock_style_ta";
             base: "font=Sans font_size=22 color=#000 wrap=word";
@@ -51,6 +66,7 @@ collections {
             tag:  "b" "+ font_weight=Bold";
             tag:  "tab" "\t";
          }
+         // Style for Hindi text, colored blue (#0000FF).
          style {
             name: "textblock_style_hi";
             base: "font=Sans font_size=22 color=#00f wrap=word";
@@ -61,17 +77,23 @@ collections {
          }
       }
       parts {
+         // This is a simple TEXT part acting as a label.
+         // It is horizontally centered at the top of the group.
          part {
             name: "part_one";
             type: TEXT;
             description {
                min: 50 50;
                state: "default" 0.0;
+               // A solid blue color (#0000FF).
                color: 0 0 255 255; /* blue */
                rel1.relative: 0.5 0.0;
                rel2.relative: 0.5 0.0;
                text {
                   text : "LOADING";
+                  // The 'domain' property links this text to the translation
+                  // files. If a translation for "LOADING" exists in the
+                  // specified domain for the current locale, it will be used.
                   domain: "domain_name";
                   font: "arial";
                   size: 22;
@@ -80,9 +102,13 @@ collections {
                }
             }
          }
+         // This TEXTBLOCK part is designed to display rich, multi-style text.
          part {
             name: "part_two";
             type: TEXTBLOCK;
+            // 'EXPLICIT' selection mode combined with a 'source' part allows
+            // 'sel_group' (the green rectangle) to be used as a visual
+            // indicator for selected text.
             select_mode: EXPLICIT;
             source: "sel_group";
             entry_mode: PLAIN;
@@ -92,11 +118,15 @@ collections {
                rel1.relative: 0.0 0.25;
                rel2.relative: 0.5 0.0;
                text {
+                  // The default state uses the English style.
                   style: "textblock_style_en";
                   min: 1 1;
                   ellipsis: -1;
                }
             }
+            // This description defines the "one" state, used for Hindi.
+            // It inherits all properties from the "default" state but
+            // overrides the text style. This state is activated by a program.
             description {
                inherit: "default" 0.0;
                state: "one" 0.0;
@@ -105,6 +135,7 @@ collections {
                min: 1 1;
                }
            }
+           // This description defines the "two" state, used for Tamil.
            description {
                inherit: "default" 0.0;
                state: "two" 0.0;
@@ -115,7 +146,13 @@ collections {
             }
          }
       }
+      // The 'programs' block contains scripts that run in response to signals.
+      // This is the core logic for dynamically changing the UI based on events.
       programs {
+         // This program listens for the "edje,language,hi_IN" signal, which is
+         // emitted by EFL when the application's language is set to Hindi.
+         // When triggered, it changes 'part_two' to the "one" state, which
+         // applies the Hindi text style.
          program {
             signal: "edje,language,hi_IN";
             source: "edje";
@@ -123,6 +160,8 @@ collections {
                set_state(PART:"part_two", "one", 1.0);
             }
          }
+         // When the language changes to Tamil, this program sets 'part_two'
+         // to state "two" to apply the Tamil style.
          program {
             signal: "edje,language,ta_IN";
             source: "edje";
@@ -130,6 +169,8 @@ collections {
                set_state(PART:"part_two", "two", 1.0);
             }
          }
+         // When the language changes to English, this program resets 'part_two'
+         // to its "default" state.
          program {
             signal: "edje,language,en_IN";
             source: "edje";
@@ -139,6 +180,9 @@ collections {
          }
       }
    }
+   // This group is a variation of 'example_group', demonstrating
+   // different text and layout positioning. The core functionality for
+   // language-based style switching remains the same.
    group {
       name: "example_group1";
       max: 500 500;
@@ -262,6 +306,7 @@ collections {
          }
       }
    }
+   // Another variation of 'example_group'.
    group {
       name: "example_group2";
       max: 500 500;
@@ -346,7 +391,7 @@ collections {
             description {
                inherit: "default" 0.0;
                state: "one" 0.0;
-               text {   
+               text {
                   style: "textblock_style_hi2";
                   min: 1 1;
                }
@@ -385,6 +430,7 @@ collections {
          }
       }
    }
+   // Another variation of 'example_group'.
    group {
       name: "example_group3";
       max: 500 500;

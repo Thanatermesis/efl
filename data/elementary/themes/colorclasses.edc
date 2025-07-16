@@ -1,3 +1,8 @@
+// The color_tree defines a hierarchical structure for color classes.
+// It maps abstract color roles (like ":bg" for background) to specific color
+// class paths used by various widgets. This allows a theme to define a small
+// palette of abstract colors, which are then propagated to many different UI
+// elements, ensuring a consistent look and feel.
 color_tree {
    ":bg" {
       "/bg";
@@ -631,186 +636,193 @@ color_tree {
 }
 
 color_classes {
+// This block defines the actual RGBA color values for the color classes.
+// The primary section is the "Core Palette," which sets the fundamental colors for the theme
+// using abstract names like ":bg" or ":selected". This allows for simple theme-wide
+// color changes. Further down, there are sections for special-case colors and a
+// large commented-out reference for overriding colors on specific UI elements.
 ///////////////////////////////////////////////////////////////////////////////
-// a core palette that the cc's below map to. this basically makes
-// for example ":selected" like a variable name that is that color and
-// then a list of explicit cc's that map TO that variable color.
-//
-// the idea is that a simple GUI for a palette only shows these variables
-// for you to modify for your colors. the "extended" gui allows you to
-// specifically override specific cc's like "/fg/normal/panes/flush" for
-// example to make a custom color appear for that specific element or anything
-// sharing that specific cc.
+// Core Palette
 ///////////////////////////////////////////////////////////////////////////////
    color_class { name: ":bg";
-      color:  64  64  64 255; }
+      color:  64  64  64 255; } // #404040FF
    color_class { name: ":bg-semi";
-      color:  64  64  64 182; }
+      color:  64  64  64 182; } // #404040B6
    color_class { name: ":bg-trans";
-      color:  64  64  64 192; }
+      color:  64  64  64 192; } // #404040C0
    color_class { name: ":bg-dimmest";
-      color:  36  36  36 255; }
+      color:  36  36  36 255; } // #242424FF
    color_class { name: ":bg-dimmer";
-      color:  44  44  44 255; }
+      color:  44  44  44 255; } // #2C2C2CFF
    color_class { name: ":bg-alt-dark";
-      color:  54  54  54 255; }
+      color:  54  54  54 255; } // #363636FF
    color_class { name: ":bg-alt-light";
-      color:  58  58  58 255; }
+      color:  58  58  58 255; } // #3A3A3AFF
    color_class { name: ":bg-alt";
-      color:  56  56  56 255; }
+      color:  56  56  56 255; } // #383838FF
    color_class { name: ":bg-dim";
-      color:  48  48  48 255; }
+      color:  48  48  48 255; } // #303030FF
    color_class { name: ":bg-dark";
-      color:  32  32  32 255; }
+      color:  32  32  32 255; } // #202020FF
    color_class { name: ":bg-dark-invisible";
-      color:  32  32  32   0; }
+      color:  32  32  32   0; } // #20202000
    color_class { name: ":bg-darkest";
-      color:  16  16  16 255; }
+      color:  16  16  16 255; } // #101010FF
    color_class { name: ":bg-dark-alt";
-      color:  28  28  28 255; }
+      color:  28  28  28 255; } // #1C1C1CFF
    color_class { name: ":bg-medium";
-      color:  72  72  72 255; }
+      color:  72  72  72 255; } // #484848FF
    color_class { name: ":bg-high";
-      color:  80  80  80 255; }
+      color:  80  80  80 255; } // #505050FF
    color_class { name: ":bg-higher";
-      color:  96  96  96 255; }
+      color:  96  96  96 255; } // #606060FF
    color_class { name: ":bg-highest";
-      color: 112 112 112 255; }
+      color: 112 112 112 255; } // #707070FF
    color_class { name: ":bg-light";
-      color: 192 192 192 255; }
+      color: 192 192 192 255; } // #C0C0C0FF
    color_class { name: ":bg-light-alt";
-      color: 184 184 184 255; }
+      color: 184 184 184 255; } // #B8B8B8FF
    color_class { name: ":fg-dim";
-      color: 128 128 128 255; }
+      color: 128 128 128 255; } // #808080FF
    color_class { name: ":fg";
-      color: 160 160 160 255; }
+      color: 160 160 160 255; } // #A0A0A0FF
    color_class { name: ":fg-prehigh";
-      color: 192 192 192 255; }
+      color: 192 192 192 255; } // #C0C0C0FF
    color_class { name: ":fg-high";
-      color: 200 200 200 255; }
+      color: 200 200 200 255; } // #C8C8C8FF
    color_class { name: ":fg-higher";
-      color: 220 220 220 255; }
+      color: 220 220 220 255; } // #DCDCDCFF
    color_class { name: ":fg-light";
-      color: 255 255 255 255; }
+      color: 255 255 255 255; } // #FFFFFFFF
+   // The ":selected" family of colors is used for highlighting active or focused
+   // elements, such as items in a list, pressed buttons, or selected text.
    color_class { name: ":selected";
-      color:  51 153 255 255; }
+      color:  51 153 255 255; } // #3399FFFF
    color_class { name: ":selected-light";
-      color:  51 153 255  25; }
+      color:  51 153 255  25; } // #3399FF19
    color_class { name: ":selected-medium";
-      color:  51 153 255 128; }
+      color:  51 153 255 128; } // #3399FF80
    color_class { name: ":selected-heavy";
-      color:  51 153 255 192; }
+      color:  51 153 255 192; } // #3399FFC0
    color_class { name: ":selected-alt";
-      color: 255 153  51 255; }
+      color: 255 153  51 255; } // #FF9933FF
    color_class { name: ":selected-alt-trans";
-      color: 255 153  51  64; }
+      color: 255 153  51  64; } // #FF993340
    color_class { name: ":selected-alt-dim";
-      color: 128  76  25 255; }
+      color: 128  76  25 255; } // #804C19FF
    color_class { name: ":selected-dim";
-      color:  25  76 128 255; }
+      color:  25  76 128 255; } // #194C80FF
    color_class { name: ":selected2";
-      color: 153 255  51 255; }
+      color: 153 255  51 255; } // #99FF33FF
    color_class { name: ":selected2-dim";
-      color:  76 128  25 255; }
+      color:  76 128  25 255; } // #4C8019FF
    color_class { name: ":selected3";
-      color: 255  51 153 255; }
+      color: 255  51 153 255; } // #FF3399FF
    color_class { name: ":selected4";
-      color: 255  51  51 255; }
+      color: 255  51  51 255; } // #FF3333FF
    color_class { name: ":selected4-dim";
-      color: 153  34  34 255; }
+      color: 153  34  34 255; } // #992222FF
    color_class { name: ":selected5";
-      color: 153  51 255 255; }
+      color: 153  51 255 255; } // #9933FFFF
    color_class { name: ":selected5-dim";
-      color:  76  25 127 255; }
+      color:  76  25 127 255; } // #4C197FFF
    color_class { name: ":selected6";
-      color:  51 255 153 255; }
+      color:  51 255 153 255; } // #33FF99FF
    color_class { name: ":selected6-dim";
-      color:  56 160  96 255; }
+      color:  56 160  96 255; } // #38A060FF
+   // Window-related colors, often used for recoloring window manager decorations.
    color_class { name: ":win-normal";
-      color: 255 255 255 255; }
+      color: 255 255 255 255; } // #FFFFFFFF
    color_class { name: ":win-selected";
-      color: 255 255 255 255; }
+      color: 255 255 255 255; } // #FFFFFFFF
+   // Colors for light effects, like glows or indicators.
    color_class { name: ":light-off";
-      color: 255 255 255   0; }
+      color: 255 255 255   0; } // #FFFFFF00
    color_class { name: ":light-medium";
-      color: 255 255 255 128; }
+      color: 255 255 255 128; } // #FFFFFF80
    color_class { name: ":light-high";
-      color: 255 255 255 200; }
+      color: 255 255 255 200; } // #FFFFFFC8
    color_class { name: ":light-on";
-      color: 255 255 255 255; }
+      color: 255 255 255 255; } // #FFFFFFFF
    color_class { name: ":light-glow";
-      color: 255 220 160 255; }
+      color: 255 220 160 255; } // #FFDCA0FF
+   // Dimming/overlay colors, typically black with varying alpha levels,
+   // used to darken parts of the UI, e.g., for disabled states or popups.
    color_class { name: ":dim-invisible";
-      color:   0   0   0   0; }
+      color:   0   0   0   0; } // #00000000
    color_class { name: ":dim-lightest";
-      color:   0   0   0  32; }
+      color:   0   0   0  32; } // #00000020
    color_class { name: ":dim-lighter";
-      color:   0   0   0  64; }
+      color:   0   0   0  64; } // #00000040
    color_class { name: ":dim-light";
-      color:   0   0   0  80; }
+      color:   0   0   0  80; } // #00000050
    color_class { name: ":dim";
-      color:   0   0   0 160; }
+      color:   0   0   0 160; } // #000000A0
    color_class { name: ":dim-dark";
-      color:   0   0   0 200; }
+      color:   0   0   0 200; } // #000000C8
+   // Shadow and outline colors.
    color_class { name: ":shadow";
-      color:   0   0   0 128; }
+      color:   0   0   0 128; } // #00000080
    color_class { name: ":shadow-selected";
-      color:   0   0   0 255; }
+      color:   0   0   0 255; } // #000000FF
    color_class { name: ":shadow-disabled";
-      color:   0   0   0  64; }
+      color:   0   0   0  64; } // #00000040
    color_class { name: ":outline";
-      color:   0   0   0 255; }
+      color:   0   0   0 255; } // #000000FF
+   // Colors for validation states in entry widgets.
    color_class { name: ":validate-fail";
-      color: 255  32  16  80; }
+      color: 255  32  16  80; } // #FF201050
    color_class { name: ":validate-pass";
-      color:  32 255  16  80; }
+      color:  32 255  16  80; } // #20FF1050
+   // A set of semantic colors, primarily for text highlighting in code editors
+   // or for conveying status (success, warnings, etc.).
    color_class { name: ":success";
-      color:  51 255  51 255; }
+      color:  51 255  51 255; } // #33FF33FF
    color_class { name: ":success-dim";
-      color:  51 153  51 255; }
+      color:  51 153  51 255; } // #339933FF
    color_class { name: ":keyword";
-      color: 255 153 153 255; }
+      color: 255 153 153 255; } // #FF9999FF
    color_class { name: ":keyword-dim";
-      color: 128  80  80 255; }
+      color: 128  80  80 255; } // #805050FF
    color_class { name: ":match";
-      color: 255 187  51 255; }
+      color: 255 187  51 255; } // #FFBB33FF
    color_class { name: ":match-dim";
-      color: 128  96  25 255; }
+      color: 128  96  25 255; } // #806019FF
    color_class { name: ":comment";
-      color:  51 153 153 255; }
+      color:  51 153 153 255; } // #339999FF
    color_class { name: ":comment-dim";
-      color:  56  96  96 255; }
+      color:  56  96  96 255; } // #386060FF
    color_class { name: ":number";
-      color: 220 220  48 255; }
+      color: 220 220  48 255; } // #DCDC30FF
    color_class { name: ":number-dim";
-      color: 128 128  56 255; }
+      color: 128 128  56 255; } // #808038FF
    color_class { name: ":class";
-      color: 119 170 221 255; }
+      color: 119 170 221 255; } // #77AADDFF
    color_class { name: ":class-dim";
-      color:  59  85 110 255; }
+      color:  59  85 110 255; } // #3B556EFF
    color_class { name: ":note";
-      color: 160  80  17 255; }
+      color: 160  80  17 255; } // #A05011FF
    color_class { name: ":note-dim";
-      color:  80  40   8 255; }
+      color:  80  40   8 255; } // #502808FF
    color_class { name: ":todo";
-      color:  40  80 160 255; }
+      color:  40  80 160 255; } // #2850A0FF
    color_class { name: ":todo-dim";
-      color:  20  40  80 255; }
+      color:  20  40  80 255; } // #142850FF
 ///////////////////////////////////////////////////////////////////////////////
-// some specialty color classes wallpapers/backgrounds can optionally
-// use to match a color palette/scheme with advanced usage of these
+// Specialty color classes that can be used by wallpapers or backgrounds to
+// dynamically match the current color scheme.
    color_class { name: "/bg/normal/background/recolor";
-      color:   6  27  44 255; }
+      color:   6  27  44 255; } // #061B2CFF
    color_class { name: "/bg-alt/normal/background/recolor";
-      color:  22  48  61 255; }
+      color:  22  48  61 255; } // #16303DFF
    color_class { name: "/fg/normal/background/recolor";
-      color: 147 111  76 255; }
+      color: 147 111  76 255; } // #936F4CFF
    color_class { name: "/fg/disabled/background/recolor";
-      color:   1   4  21 255; }
+      color:   1   4  21 255; } // #010415FF
    color_class { name: "/shadow/normal/background/recolor";
-      color:   0   0   0 128; }
+      color:   0   0   0 128; } // #00000080
    color_class { name: "/dim/normal/background/recolor";
-      color:   0   0   0 192; }
+      color:   0   0   0 192; } // #000000C0
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////

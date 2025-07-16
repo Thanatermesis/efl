@@ -1,10 +1,21 @@
+// This group defines the main layout for a configuration widget. It provides a
+// standard structure with a content area for settings and a dedicated area
+// for action buttons (e.g., OK, Apply), separated by a horizontal line. This
+// modular design allows for consistent configuration dialogs across different
+// components of the application.
 group { name: "e/widgets/configure/main";
    parts {
+      // The "base" part is a simple rectangle that serves as the background for the entire widget.
+      // It uses a color class for theming, ensuring it matches the application's current look and feel.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/background";
          }
       }
+      // This part creates a horizontal separator line. `mouse_events: 0` makes it non-interactive,
+      // so it doesn't interfere with user input. It is positioned dynamically between the main
+      // content area and the button area by relating its vertical position to "e.swallow.content"
+      // and "e.swallow.button".
       part { name: "separator"; type: RECT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -20,6 +31,10 @@ group { name: "e/widgets/configure/main";
             color_class: "/fg/normal/separator/horizontal";
          }
       }
+      // A SWALLOW part acts as a container where external UI elements can be placed. This one,
+      // named "e.swallow.content", is designated for the main configuration options. The `offscale`
+      // property is an optimization that hints to the rendering engine that this part can be
+      // excluded from geometry calculations when it's not visible, improving performance.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -30,6 +45,10 @@ group { name: "e/widgets/configure/main";
             offscale;
          }
       }
+      // This SWALLOW part is intended to hold action buttons like "OK", "Cancel", or "Apply".
+      // It is aligned to the bottom-center of the widget, providing a consistent location for
+      // primary actions in configuration dialogs. The `fixed` property ensures it maintains a
+      // constant size, regardless of the widget's overall dimensions.
       part { name: "e.swallow.button"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
@@ -45,10 +64,20 @@ group { name: "e/widgets/configure/main";
    }
 }
 
+// This group defines a configuration icon, typically used for modules. It displays a spanner
+// image that provides visual feedback on mouse clicks and emits a signal to open the
+// corresponding configuration dialog. This design encapsulates the icon's appearance and
+// behavior in a reusable component.
 group { name: "e/modules/conf/main";
+   // Preloads the "spanner.png" image into memory using COMP (lossy) compression.
+   // This is an optimization to reduce memory usage and improve loading times.
    images.image: "spanner.png" COMP;
    min: 16 16;
    parts {
+      // This is a transparent rectangle that serves as the primary interactive area for the icon.
+      // Using an invisible rectangle to capture mouse events allows the visible icon ("spanner") to
+      // be non-interactive, simplifying the event handling logic. The color 0 0 0 0 is fully transparent
+      // black (#00000000).
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0; // no cc
@@ -57,6 +86,11 @@ group { name: "e/modules/conf/main";
             inherit: "default" 0.0;
          }
       }
+      // This part displays the "spanner.png" image. It is not interactive (`mouse_events: 0`) as the
+      // parent "base" part handles all mouse input. Its aspect ratio is fixed to 1:1, ensuring the
+      // icon does not get distorted. It has two states: "default" and "clicked". The "clicked"
+      // state uses a different color class to provide visual feedback to the user when the icon
+      // is pressed. The `offscale` property is a performance optimization.
       part { name: "spanner"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -75,16 +109,25 @@ group { name: "e/modules/conf/main";
       }
    }
    programs {
+      // When the left mouse button is pressed down on the "base" part, this program triggers.
+      // It sets the state of both "base" and "spanner" parts to "clicked", which can change their appearance
+      // (e.g., color) to give immediate visual feedback.
       program { signal: "mouse,down,1"; source: "base";
          action: STATE_SET "clicked" 0.0;
          target: "base";
          target: "spanner";
       }
+      // When the left mouse button is released, this program reverts the state of "base" and "spanner"
+      // back to "default", restoring their original appearance.
       program { signal: "mouse,up,1"; source: "base";
          action: STATE_SET "default" 0.0;
          target: "base";
          target: "spanner";
       }
+      // On a full mouse click (press and release), this program emits the signal "e,action,conf".
+      // This is the primary action of the icon. Application code listens for this signal to trigger
+      // the opening of the configuration dialog. The "*" in "mouse,clicked,1*" means it responds
+      // to single, double, or triple clicks.
       program { signal: "mouse,clicked,1*"; source: "base";
          action: SIGNAL_EMIT "e,action,conf" "";
       }

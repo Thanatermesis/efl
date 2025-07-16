@@ -11,19 +11,27 @@ group { name: "elm/border/base/default";
    images.image: "win_shad_flat.png" COMP;
    data.item: "shadow" "1";
    data.item: "version" "119";
+// These macros define bitmasks for different window modes, which are used in scripts to manage the window state.
 #define BORDERLESS  1
 #define MAXIMIZED   2
 #define UNRESIZABLE 4
+// These macros simplify updating the 'border_mode' integer and calling 'eval_mode' to apply the new state.
+// This is a common pattern in EDC to avoid repetitive script code.
 #define SET_MODE(a) script { new m = get_int(border_mode); m |= (a); set_int(border_mode, m); eval_mode(m); }
 #define UNSET_MODE(a) script { new m = get_int(border_mode); m &= ~(a); set_int(border_mode, m); eval_mode(m); }
 
+// Defines states for the indicator, used to control its appearance and behavior.
 #define INDICATOR_TYPE_UNKNOWN 0
 #define INDICATOR_TYPE_BG_OPAQUE 1
 #define INDICATOR_TYPE_BG_TRANSPARENT 2
 #define INDICATOR_TYPE_HIDDEN 3
    script {
-      public hide_shadow;
-      public show_menu;
+      // Public variables accessible from C code, used to control window features.
+      public hide_shadow; // Controls shadow visibility.
+      public show_menu;   // Controls menu visibility.
+      // This script evaluates whether to show or hide the shadow and menu.
+      // It checks 'hide_shadow' and 'show_menu' integer variables, which are
+      // controlled by programs. This centralization simplifies state management.
       public eval_shadow_menu() {
          new m_show = get_int(show_menu);
          new s_hide = get_int(hide_shadow);
@@ -42,9 +50,12 @@ group { name: "elm/border/base/default";
          }
       }
 
-      public border_mode;
-      public indicator_type = 0;
-      public indicator_enabled = 0;
+      public border_mode; // Stores the current window mode (borderless, maximized, etc.).
+      public indicator_type = 0; // Defines the type of indicator to display.
+      public indicator_enabled = 0; // Toggles the indicator on or off.
+      // Evaluates the border mode to adjust UI elements.
+      // When the window is borderless, maximized, or unresizable, the resize handles are hidden
+      // for a cleaner look and to prevent unwanted user interactions.
       public eval_mode(m) {
          if (m & (BORDERLESS | MAXIMIZED | UNRESIZABLE)) {
             set_state(PART:"bottom_clip", "hidden", 0.0);
@@ -56,15 +67,18 @@ group { name: "elm/border/base/default";
       }
    }
    parts {
-      /* opaque region of the window, to inform the compositor */
+      // This spacer defines the opaque region of the window, an optimization hint for the compositor.
+      // It spans from the top_clip to the bottom_clip, covering the main content area.
       spacer { "elm.spacer.opaque";
          desc {
             rel1.to: "top_clip";
             rel2.to: "bottom_clip";
          }
+         // In maximized state, it inherits the default geometry.
          desc { "max"; inherit: "default"; }
       }
-      /* covers the entire client contents, excluding the main menu */
+      // Defines the main content area of the window, positioned between the menu and the keyboard.
+      // This spacer ensures that the application's content does not overlap with these elements.
       spacer { "elm.spacer.content";
          required; // since 1.19
          desc {
@@ -74,6 +88,8 @@ group { name: "elm/border/base/default";
             rel2.relative: 1.0 0.0;
          }
       }
+      // A clipper for the window shadow, itself clipped by "shadow_clip2".
+      // This double-clipping mechanism allows for complex shadow effects and animations.
       part { name: "shadow_clip"; type: RECT; mouse_events: 0;
          clip_to: "shadow_clip2";
          description { state: "default";
@@ -88,6 +104,7 @@ group { name: "elm/border/base/default";
             color_class: "/shadow/selected/border";
          }
       }
+      // The outer clipper for the shadow, controlling the visibility of "shadow_clip".
       part { name: "shadow_clip2"; type: RECT; mouse_events: 0;
          description { state: "default";
             rel.to: "shadow_clip";
@@ -96,6 +113,8 @@ group { name: "elm/border/base/default";
             visible: 0;
          }
       }
+      // A spacer that defines the geometry for the window shadow.
+      // The WIN_SHAD macro uses this spacer to draw the actual shadow images.
       part { name: "shadow_base"; type: SPACER;
          scale: 1;
          description { state: "default" 0.0;
@@ -106,8 +125,11 @@ group { name: "elm/border/base/default";
             rel2.offset: -1 -1;
          }
       }
+      // This macro generates the image parts that create the visual shadow effect,
+      // using "win_shad_flat.png". It's a convenient way to instantiate complex,
+      // multi-part elements like shadows.
       WIN_SHAD("shadow_base", "shadow_clip", "win_shad_flat.png", 21, 21, 14, 28, 0.5)
-      /* window background: solid color */
+      // A clipper for the background, ensuring it doesn't draw over the border elements.
       rect { "bg_clip"; nomouse;
          desc { "default";
             rel1.to: "top_clip";
@@ -115,6 +137,8 @@ group { name: "elm/border/base/default";
             rel2.to: "bottom_clip";
          }
       }
+      // A rectangle for a solid color background.
+      // It is clipped by "bg_clip" and is only visible when activated by a program.
       rect { "elm.rect.background";
          required; // @since 1.19
          clip: "bg_clip";
@@ -128,7 +152,7 @@ group { name: "elm/border/base/default";
             visible: 1;
          }
       }
-      /* window background: image */
+      // A swallow part for a custom background image, allowing applications to set their own backgrounds.
       swallow { "elm.swallow.background";
          required; // @since 1.19
          clip: "client_clip";
@@ -136,6 +160,8 @@ group { name: "elm/border/base/default";
             rel.to: "elm.spacer.content";
          }
       }
+      // A spacer that reserves space for the indicator, ensuring content is positioned correctly
+      // when the indicator is shown or hidden.
       spacer { "indicator_spacer";
          desc { "default";
             rel.to: "elm.swallow.indicator";
@@ -148,7 +174,7 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* main menu */
+      // The background for the main menu, displayed behind the "elm.swallow.menu" part.
       rect { "menu_bg";
          desc { "default";
             color_class: "/bg/normal/menu";
@@ -158,6 +184,8 @@ group { name: "elm/border/base/default";
             visible: 0;
          }
       }
+      // A swallow part that holds the main menu widget. It's hidden by default and becomes visible
+      // when the application requests to show the menu.
       swallow { "elm.swallow.menu";
          required: 1; // since 1.19
          desc { "default";
@@ -179,7 +207,7 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* application contents - spacer and clipper (without main menu) */
+      // A spacer that defines the main application content area, excluding the menu.
       spacer { "client_spacer";
          desc { "default";
             rel1.to: "elm.swallow.menu";
@@ -194,7 +222,7 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* application contents */
+      // The main swallow part where the application's primary content is displayed.
       swallow { "elm.swallow.client";
          clip: "client_clip";
          desc { "default";
@@ -202,7 +230,8 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* modal window blocker */
+      // A rectangle that acts as a blocker for modal windows, preventing interaction with
+      // underlying content. It is hidden by default and shown when a modal dialog is active.
       rect { "elm.rect.blocker";
          required;
          desc { "default";
@@ -219,7 +248,8 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* top title bar - spacer and clipper */
+      // A clipper for the top title bar. This part is essential for managing the title bar's
+      // visibility and layout, especially when the window is borderless.
       rect { "top_clip"; //nomouse;
          scale: 1;
          desc { "default";
@@ -245,7 +275,8 @@ group { name: "elm/border/base/default";
             hid;
          }
       }
-      /* top title bar */
+      // The background rectangle of the title bar, clipped by "top_clip".
+      // Its color changes based on whether the window is focused.
       part { name: "top"; type: RECT; mouse_events: 0;
          clip: "top_clip";
          description { state: "default" 0.0;
@@ -257,6 +288,8 @@ group { name: "elm/border/base/default";
             color_class: "/bg/selected/titlebar";
          }
       }
+      // The text part for displaying the window title. It is positioned within the title bar
+      // between the icon and the minimize button.
       part { name: "elm.text.title"; type: TEXT; mouse_events: 0;
          scale: 1;
          clip: "top_clip";
@@ -285,6 +318,8 @@ group { name: "elm/border/base/default";
             color_class: "/fg/selected/titlebar";
          }
       }
+      // A spacer for the window icon. It's used to create a bounce animation when the window
+      // is in an urgent state, providing a visual cue to the user.
       spacer {  "icon";
          desc { "default";
             rel.to: "elm.event.icon";
@@ -300,6 +335,7 @@ group { name: "elm/border/base/default";
             rel2.relative: 1.2 1.2;
          }
       }
+      // A swallow part for the window icon itself, which is separate from the animation spacer.
       swallow {  "elm.swallow.icon"; nomouse;
          clip_to: "top_clip";
          desc { "default";
@@ -310,6 +346,8 @@ group { name: "elm/border/base/default";
             rel2.offset: 0 0;
          }
       }
+      // A clipper for the window control buttons (close, max, min) in the unfocused state.
+      // It hides the buttons when the window is focused, allowing "clip2" to show them.
       rect {  "clip1"; nomouse;
          desc { "default";
             rel.to: "top_clip";
@@ -319,6 +357,8 @@ group { name: "elm/border/base/default";
             visible: 0;
          }
       }
+      // A clipper for the window control buttons in the focused state.
+      // It is hidden by default and becomes visible when the window gains focus.
       rect {  "clip2"; nomouse;
          desc { "default";
             rel.to: "top_clip";
@@ -329,6 +369,7 @@ group { name: "elm/border/base/default";
             visible: 1;
          }
       }
+      // The close button image for the unfocused state, clipped by "clip1".
       image { "close1";  nomouse;
          clip: "clip1";
          scale: 1;
@@ -344,6 +385,7 @@ group { name: "elm/border/base/default";
             color_class: "/fg/pressed/titlebar/close";
          }
       }
+      // The maximize button image for the unfocused state.
       image { "max1"; nomouse;
          clip: "clip1";
          scale: 1;
@@ -359,6 +401,7 @@ group { name: "elm/border/base/default";
             color_class: "/fg/pressed/titlebar/maximize";
          }
       }
+      // The minimize button image for the unfocused state.
       image { "min1"; nomouse;
          clip: "clip1";
          scale: 1;
@@ -374,6 +417,7 @@ group { name: "elm/border/base/default";
             color_class: "/fg/pressed/titlebar/minimize";
          }
       }
+      // The close button image for the focused state, clipped by "clip2".
       image { "close2";  nomouse;
          clip: "clip2";
          scale: 1;
@@ -389,6 +433,7 @@ group { name: "elm/border/base/default";
             color_class: "/fg/selected-pressed/titlebar/close";
          }
       }
+      // The maximize button image for the focused state.
       image { "max2"; nomouse;
          clip: "clip2";
          scale: 1;
@@ -404,6 +449,7 @@ group { name: "elm/border/base/default";
             color_class: "/fg/selected-pressed/titlebar/maximize";
          }
       }
+      // The minimize button image for the focused state.
       image { "min2"; nomouse;
          clip: "clip2";
          scale: 1;
@@ -419,6 +465,10 @@ group { name: "elm/border/base/default";
             color_class: "/fg/selected-pressed/titlebar/minimize";
          }
       }
+      // The following 'elm.event.*' parts are invisible rectangles that serve as event
+      // catchers for mouse interactions. This technique separates clickable areas from visual
+      // elements, allowing for more flexible UI design. They are made invisible by setting
+      // their color to transparent (RGBA: 0 0 0 0).
       rect {  "elm.event.icon";
          desc { "default";
             rel1.relative: 0.0 0.0;
@@ -480,6 +530,7 @@ group { name: "elm/border/base/default";
             color: 0 0 0 0; // no cc
          }
       }
+      // A clipper for the top resize handles, to show or hide them as needed.
       rect { "top_resize_clip";
          clip: "top_clip";
          desc { "default";
@@ -490,6 +541,8 @@ group { name: "elm/border/base/default";
             hid;
          }
       }
+      // The following 'elm.event.resize.*' parts are event areas for resizing the window.
+      // They are typically small, invisible or semi-visible rectangles at the window edges.
       rect {  "elm.event.resize.tl";
          clip: "top_resize_clip";
          scale: 1;
@@ -535,7 +588,7 @@ group { name: "elm/border/base/default";
          }
          desc { "hidden"; inherit: "default"; hid; }
       }
-      /* bottom border - spacer and clipper */
+      // A swallow part for a virtual keyboard, positioned at the bottom of the window.
       swallow { "elm.swallow.keyboard";
          desc { "default";
            rel.to: "bottom_clip";
@@ -544,6 +597,7 @@ group { name: "elm/border/base/default";
            fixed: 0 1;
          }
       }
+      // A clipper for the bottom border, which also contains resize handles.
       rect { "bottom_clip";
          scale: 1;
          desc { "default";
@@ -561,6 +615,7 @@ group { name: "elm/border/base/default";
             hid;
          }
       }
+      // The visual part of the bottom border. Its color changes with focus state.
       part { name: "bottom"; type: RECT; mouse_events: 0;
          clip: "bottom_clip";
          description { state: "default" 0.0;
@@ -573,6 +628,7 @@ group { name: "elm/border/base/default";
          }
       }
 
+      // Bottom resize handles (left, bottom, right). Similar to the top ones.
       rect {  "elm.event.resize.bl";
          clip: "bottom_clip";
          scale: 1;
@@ -619,17 +675,22 @@ group { name: "elm/border/base/default";
          }
          desc { "hidden"; inherit: "default"; hid; }
       }
+      // Background for the indicator, with different states for opaque and transparent.
       rect { "indicator_bg";
          clip: "bg_clip";
          desc { "default";
+            // Color is a reddish pink (R:148, G:23, B:45, A:255), hex #94172DFF.
             color: 148 23 45 255; // no cc never see this...
             rel.to: "elm.swallow.indicator";
          }
          desc { "bg_transparent";
             inherit: "default";
+            // Fully transparent color.
             color: 0 0 0 0; // no cc never see this...
          }
       }
+      // A swallow part for the indicator widget itself. It's positioned at the top of the
+      // content area and can be shown or hidden with an effect.
       swallow { "elm.swallow.indicator";
          clip: "bg_clip";
          desc { "default";
@@ -650,18 +711,23 @@ group { name: "elm/border/base/default";
    }
 
    programs {
+      // Triggered by C code to make the window borderless. It hides the top and bottom clips
+      // and then calls a script to update the internal border mode state.
       program { signal: "elm,state,borderless,on"; source: "elm";
          action: STATE_SET "hidden";
          targets: "top_clip" "bottom_clip";
          after: "borderless,on";
       }
+      // This program is chained via 'after' to call the SET_MODE macro.
       program { "borderless,on"; SET_MODE(BORDERLESS); }
+      // Triggered to restore the window borders.
       program { signal: "elm,state,borderless,off"; source: "elm";
          action: STATE_SET "default";
          targets: "top_clip" "bottom_clip";
          after: "borderless,off";
       }
       program { "borderless,off"; UNSET_MODE(BORDERLESS); }
+      // Triggered when the window becomes unresizable. It directly calls the script macro.
       program {
          signal: "elm,state,unresizable,on"; source: "elm";
          SET_MODE(UNRESIZABLE);
@@ -669,6 +735,8 @@ group { name: "elm/border/base/default";
       program { signal: "elm,state,unresizable,off"; source: "elm";
          UNSET_MODE(UNRESIZABLE);
       }
+      // Shows the window shadow by calling the 'eval_shadow_menu' script function.
+      // Using a script here instead of direct STATE_SET allows for more complex logic.
       program { signal: "elm,state,shadow,on"; source: "elm";
          script {
             set_int(hide_shadow, 0);
@@ -678,6 +746,7 @@ group { name: "elm/border/base/default";
 //         target: "shadow_clip";
 //         target: "shadow_base";
       }
+      // Hides the window shadow.
       program { signal: "elm,state,shadow,off"; source: "elm";
          script {
             set_int(hide_shadow, 1);
@@ -687,7 +756,7 @@ group { name: "elm/border/base/default";
 //         target: "shadow_clip";
 //         target: "shadow_base";
       }
-      /* application desktop menu */
+      // Shows the application menu.
       program { signal: "elm,action,show_menu"; source: "elm";
          script {
             set_int(show_menu, 1);
@@ -696,6 +765,7 @@ group { name: "elm/border/base/default";
 //         action: STATE_SET "visible";
 //         target: "elm.swallow.menu";
       }
+      // Hides the application menu.
       program { signal: "elm,action,hide"; source: "elm";
          script {
             set_int(show_menu, 0);
@@ -704,6 +774,7 @@ group { name: "elm/border/base/default";
 //         action: STATE_SET "default";
 //         target: "elm.swallow.menu";
       }
+      // Enables the solid color background.
       program { signal: "elm,state,background,solid,on"; source: "elm";
          action: STATE_SET "visible";
          target: "elm.rect.background";
@@ -722,6 +793,8 @@ group { name: "elm/border/base/default";
 //         action: STATE_SET "default";
 //         target: "background_bevel";
 //      }
+      // Triggered when the window gains focus. It sets multiple parts to the "focused" state,
+      // which typically changes their colors or other visual properties.
       program { signal: "elm,action,focus"; source: "elm";
          action: STATE_SET "focused";
          target: "top";
@@ -731,6 +804,7 @@ group { name: "elm/border/base/default";
          target: "clip2";
          target: "shadow_clip";
       }
+      // Triggered when the window loses focus, reverting parts to their "default" state.
       program { signal: "elm,action,unfocus"; source: "elm";
          action: STATE_SET "default";
          target: "top";
@@ -740,11 +814,14 @@ group { name: "elm/border/base/default";
          target: "clip2";
          target: "shadow_clip";
       }
+      // This program chain creates a bouncing animation for the window icon when the window
+      // is marked as urgent, providing a strong visual notification.
       program { signal: "elm,state,urgent"; source: "elm";
          action: STATE_SET "bounce1";
          target: "icon";
          after: "urg1";
       }
+      // The animation is a sequence of state changes on the "icon" spacer part.
       program { name: "urg1";
          action: STATE_SET "bounce2";
          transition: DECELERATE 0.4;
@@ -757,12 +834,14 @@ group { name: "elm/border/base/default";
          target: "icon";
          after: "urg1";
       }
+      // Stops the urgent animation and returns the icon to its default state.
       program { signal: "elm,state,not_urgent"; source: "elm";
          action: STATE_SET "default";
          target: "icon";
       }
 
-      /* maximize & unmaximize */
+      // Handles window maximization. The wildcard '*' in the signal matches any suffix,
+      // e.g., "elm,state,maximize,animatable".
       program { signal: "elm,state,maximize*"; source: "elm";
          action: STATE_SET "max";
          target: "elm.spacer.opaque";
@@ -779,6 +858,8 @@ group { name: "elm/border/base/default";
       }
 
       /*indicator*/
+      // The following programs manage the state of the indicator. They set script variables
+      // and then trigger the "update_indicator" program to apply the changes.
       program { signal: "elm,action,show_indicator"; source: "elm";
          script {
             set_int(indicator_enabled, 1);
@@ -819,6 +900,9 @@ group { name: "elm/border/base/default";
          transition: DECELERATE 0.2;
          target: "elm.swallow.indicator";
       }
+      // This central program updates the indicator's state based on the script variables.
+      // This approach consolidates the logic for showing, hiding, and changing the
+      // indicator's appearance into a single, manageable script.
       program { name: "update_indicator";
          script {
             if (get_int(indicator_enabled)) {
@@ -843,19 +927,22 @@ group { name: "elm/border/base/default";
          }
       }
 
-      /* modal windows */
+      // Hides the modal blocker with a fade-out transition.
       program { signal: "elm,action,hide_blocker"; source: "elm";
          action: STATE_SET "default" 0.0;
          target: "elm.rect.blocker";
          transition: DECELERATE 0.2;
       }
+      // Shows the modal blocker with a fade-in transition.
       program { signal: "elm,action,show_blocker"; source: "elm";
          action: STATE_SET "visible" 0.0;
          target: "elm.rect.blocker";
          transition: DECELERATE 0.2;
       }
 
-      /* minimize, maximize & close buttons */
+      // The following programs handle mouse events on the title bar buttons.
+      // They change the button's state to "selected" on mouse down and back to "default" on mouse up,
+      // providing visual feedback to the user.
       program { signal: "mouse,down,*"; source: "elm.event.close";
          action: STATE_SET "selected";
          target: "close1";
@@ -892,6 +979,8 @@ group { name: "elm/border/base/default";
       program { signal: "mouse,up,1"; source: "elm.event.titlebar";
          action: SIGNAL_EMIT "elm,action,move,stop" "elm";
       }
+      // When the minimize event area is clicked, it emits a signal back to the C code
+      // to perform the minimize action. This decouples the UI from the application logic.
       program { signal: "mouse,clicked,1"; source: "elm.event.minimize";
          action: SIGNAL_EMIT "elm,action,minimize" "elm";
       }
@@ -901,12 +990,15 @@ group { name: "elm/border/base/default";
       program { signal: "mouse,clicked,1"; source: "elm.event.close";
          action: SIGNAL_EMIT "elm,action,close" "elm";
       }
+      // These programs handle mouse-in and mouse-out events on the resize handles,
+      // emitting signals that can be used to show a resize cursor.
       program { signal: "mouse,in"; source: "elm.event.resize.t";
          action: SIGNAL_EMIT "elm,action,resize,show" "elm.event.resize.t";
       }
       program { signal: "mouse,out"; source: "elm.event.resize.t";
          action: SIGNAL_EMIT "elm,action,resize,hide" "elm.event.resize.t";
       }
+      // A mouse down on a resize handle starts the resize operation by emitting a signal.
       program { signal: "mouse,down,1"; source: "elm.event.resize.t";
          action: SIGNAL_EMIT "elm,action,resize,start" "elm.event.resize.t";
       }
@@ -961,9 +1053,13 @@ group { name: "elm/border/base/default";
    }
 }
 
+// This group defines the appearance of a dialog window border. It inherits from the base
+// border but customizes certain parts to be more suitable for dialogs, such as removing
+// the maximize and minimize buttons.
 group { name: "elm/border/dialog/default";
    inherit:   "elm/border/base/default";
    parts {
+      // Overrides the base title to adjust its position since there are fewer buttons.
       text {  "elm.text.title";
          clip: "top_clip";
          desc { "default";
@@ -983,6 +1079,7 @@ group { name: "elm/border/dialog/default";
             visible: 1;
          }
       }
+      // Hides the maximize and minimize buttons by setting them to be invisible.
       image { "max1";
          desc { "default";
             visible: 0;
@@ -1028,9 +1125,13 @@ group { name: "elm/border/dialog/default";
    }
 }
 
+// A border style for naviframes, which are typically used for navigation-based UIs.
+// It inherits from the dialog style but changes the close button to a back arrow,
+// which is more intuitive in a navigation context.
 group { name: "elm/border/naviframe/default";
    inherit:   "elm/border/dialog/default";
    parts {
+      // Replaces the close icon with a left arrow, signifying "back".
       image { "close1";
          desc { "default";
             image.normal: "i-arrow-l";

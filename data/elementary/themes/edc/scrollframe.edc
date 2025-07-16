@@ -1,7 +1,15 @@
+// This group defines the scrollframe widget, which provides a scrollable view for its content.
+// It includes both vertical and horizontal scrollbars that can be shown or hidden as needed.
 group { name: "e/widgets/scrollframe";
+   // The script block contains Embryo script functions used for dynamic interactions.
+   // These functions are used to show or hide the scrollbar arrows based on the position of the dragger.
    script {
       public loop_x, loop_y;
 
+      // This function checks the vertical scrollbar's position.
+      // It's designed to hide the up/down arrows when the scrollbar dragger reaches the top or bottom of the track.
+      // This provides a visual cue that the end of the scrollable area has been reached.
+      // A timer is used to repeatedly check the position for a short duration.
       public action_on_pos_vbar(val) {
          new x, y , w, h, x1, y1 , w1, h1;
 
@@ -31,6 +39,8 @@ group { name: "e/widgets/scrollframe";
             timer(0.1,"action_on_pos_vbar", val+1);
       }
 
+      // Similar to action_on_pos_vbar, this function handles the horizontal scrollbar.
+      // It hides the left/right arrows when the scrollbar dragger reaches the start or end of its track.
       public action_on_pos_hbar(val) {
          new x, y , w, h, x1, y1 , w1, h1;
 
@@ -63,17 +73,23 @@ group { name: "e/widgets/scrollframe";
 
    parts {
       //////////////////////////////////////////////////////////////////////
+      // The 'bg' part is a rectangle that serves as the background for the scrollable content area.
+      // Its color is determined by the color_class, which allows for themeable styling.
       part { name: "bg"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
             color_class: "/bg/normal/scroller/base";
          }
       }
+      // The 'clipper' part is a rectangle used to clip the content.
+      // Anything outside of this part's boundaries will not be visible.
       part { name: "clipper"; type: RECT;
          description { state: "default" 0.0;
             rel.to: "e.swallow.content";
          }
       }
+      // The 'e.swallow.content' part is a SWALLOW type part, which is a container for external objects.
+      // This is where the actual scrollable content will be placed. It is clipped by the 'clipper' part.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clipper";
          description { state: "default" 0.0;
@@ -83,6 +99,8 @@ group { name: "e/widgets/scrollframe";
       //////////////////////////////////////////////////////////////////////
 
 // vert bar ////////////////////////////////////////////////////////////////
+      // The 'sb_vbar_show' part controls the visibility of the vertical scrollbar.
+      // It is a simple rectangle that is either visible or not, effectively showing or hiding the entire scrollbar.
       part { name: "sb_vbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -91,6 +109,8 @@ group { name: "e/widgets/scrollframe";
             visible: 0;
          }
       }
+      // The 'sb_vbar' part defines the track for the vertical scrollbar dragger.
+      // Its size and position are adjusted based on whether the horizontal scrollbar ('sb_hbar') is visible, to avoid overlap.
       part { name: "sb_vbar"; type: RECT;
          scale: 1;
          description { state: "default" 0.0;
@@ -108,9 +128,13 @@ group { name: "e/widgets/scrollframe";
             max: 0 999999;
          }
       }
+      // 'sb_vbar_p1' and 'sb_vbar_p2' are invisible rectangles covering the area above and below the dragger.
+      // Clicking on them allows for page-up and page-down scrolling.
+      // 'sb_vbar_p1' is the area above the dragger.
       part { name: "sb_vbar_p1"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
+            // The color is set to transparent black (RGBA: 0, 0, 0, 0). 'no cc' means no color class is used.
             color: 0 0 0 0; // no cc
             rel1.to: "sb_vbar";
             rel2.relative: 1.0 0.0;
@@ -118,6 +142,7 @@ group { name: "e/widgets/scrollframe";
             fixed: 1 1;
          }
       }
+      // 'sb_vbar_p2' is the area below the dragger.
       part { name: "sb_vbar_p2"; type: RECT;
          clip_to: "sb_vbar";
          description { state: "default" 0.0;
@@ -128,6 +153,8 @@ group { name: "e/widgets/scrollframe";
             fixed: 1 1;
          }
       }
+      // This is the draggable part of the vertical scrollbar, also known as the "thumb" or "dragger".
+      // It is confined to move only within the 'sb_vbar' track.
       part { name: "e.dragable.vbar"; type: RECT;
          clip_to: "sb_vbar";
          scale: 1;
@@ -151,6 +178,9 @@ group { name: "e/widgets/scrollframe";
             inherit: "default" 0.0;
          }
       }
+      // 'sb_vbar_over' is an invisible, larger area around the scrollbar used to detect mouse-over events.
+      // This makes it easier for the user to trigger the hover effect on the scrollbar.
+      // 'repeat_events: 1' allows events to pass through to parts below it.
       part { name: "sb_vbar_over"; type: RECT;
          repeat_events: 1;
          scale: 1;
@@ -163,16 +193,21 @@ group { name: "e/widgets/scrollframe";
             offscale;
          }
       }
+      // When the mouse enters the 'sb_vbar_over' area, it sets the state of 'base_vbar' to "over",
+      // which typically makes the scrollbar wider for easier interaction.
       program { signal: "mouse,in"; source: "sb_vbar_over";
          action: STATE_SET "over" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
          target: "base_vbar";
       }
+      // When the mouse leaves 'sb_vbar_over', 'base_vbar' returns to its "default" state.
       program { signal: "mouse,out"; source: "sb_vbar_over";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
          target: "base_vbar";
       }
+      // 'y_vbar_up_mapper' and 'y_vbar_up' are SPACER parts used by the script to determine if the dragger is at the top.
+      // 'y_vbar_up_mapper' is positioned at the top of the scrollbar track ('sb_vbar').
       part { name: "y_vbar_up_mapper"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -190,6 +225,8 @@ group { name: "e/widgets/scrollframe";
             max: 0 0;
          }
       }
+      // 'y_vbar_up' is positioned at the top of the dragger ('e.dragable.vbar').
+      // The script compares their y-coordinates to see if they overlap, which means the dragger is at the top.
       part { name: "y_vbar_up"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -207,6 +244,7 @@ group { name: "e/widgets/scrollframe";
             max: 0 0;
          }
       }
+      // Similar to the 'up' parts, 'y_vbar_down_mapper' is a spacer at the bottom of the scrollbar track.
       part { name: "y_vbar_down_mapper"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -224,6 +262,7 @@ group { name: "e/widgets/scrollframe";
             max: 0 0;
          }
       }
+      // 'y_vbar_down' is a spacer at the bottom of the dragger. The script uses it to detect if the dragger is at the bottom.
       part { name: "y_vbar_down"; type: SPACER;
          scale: 1;
          repeat_events: 1;
@@ -241,6 +280,8 @@ group { name: "e/widgets/scrollframe";
             max: 0 0;
          }
       }
+      // This program is triggered by the 'e,action,show,vbar' signal, making the vertical scrollbar and related parts visible.
+      // It also calls the 'check_pos_vbar' program to update the arrow states.
       program {
          signal: "e,action,show,vbar"; source: "e";
          action: STATE_SET "default" 0.0;
@@ -253,6 +294,7 @@ group { name: "e/widgets/scrollframe";
          target: "y_vbar_down";
          after: "check_pos_vbar";
       }
+      // This program is triggered by 'e,action,hide,vbar' to hide the vertical scrollbar and its components.
       program {
          signal: "e,action,hide,vbar"; source: "e";
          action: STATE_SET "hidden" 0.0;
@@ -264,16 +306,19 @@ group { name: "e/widgets/scrollframe";
          target: "y_vbar_down_mapper";
          target: "y_vbar_down";
       }
+      // When the area above the dragger ('sb_vbar_p1') is clicked, this program scrolls the content up by one page.
       program {
          signal: "mouse,down,1*"; source: "sb_vbar_p1";
          action: DRAG_VAL_PAGE 0.0 -1.0;
          target: "e.dragable.vbar";
       }
+      // When the area below the dragger ('sb_vbar_p2') is clicked, this program scrolls the content down by one page.
       program {
          signal: "mouse,down,1*"; source: "sb_vbar_p2";
          action: DRAG_VAL_PAGE  0.0 1.0;
          target: "e.dragable.vbar";
       }
+      // This program simply calls the script function to check the dragger's position.
       program { name: "check_pos_vbar";
          script {
             action_on_pos_vbar(10);
@@ -281,6 +326,8 @@ group { name: "e/widgets/scrollframe";
       }
 
 // horiz bar /////////////////////////////////////////////////////////////
+      // The following parts define the horizontal scrollbar. Their structure and behavior
+      // are analogous to the vertical scrollbar parts.
       part { name: "sb_hbar_show"; type: RECT;
          description { state: "default" 0.0;
          }
@@ -481,6 +528,8 @@ group { name: "e/widgets/scrollframe";
       }
 
       //////////////////////////////////////////////////////////////////////
+      // This part defines the visible appearance of the vertical scrollbar's track.
+      // It uses color classes for theming and changes color based on its state (e.g., 'disabled', 'clicked').
       part { name: "color_vbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_vbar_show";
          description { state: "default" 0.0;
@@ -497,6 +546,8 @@ group { name: "e/widgets/scrollframe";
          }
       }
 
+      // 'base_vbar' is the visible part of the dragger itself.
+      // It is a rectangle that changes size when the mouse is over the scrollbar area ('over' state) for better usability.
       part { name: "base_vbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_vbar";
@@ -515,6 +566,7 @@ group { name: "e/widgets/scrollframe";
       }
 
       //////////////////////////////////////////////////////////////////////
+      // This part defines the visible appearance of the horizontal scrollbar's track, similar to 'color_vbar'.
       part { name: "color_hbar"; type: RECT; mouse_events: 0;
          clip_to: "sb_hbar_show";
          description { state: "default" 0.0;
@@ -531,6 +583,7 @@ group { name: "e/widgets/scrollframe";
          }
       }
 
+      // 'base_hbar' is the visible part of the horizontal dragger, similar to 'base_vbar'.
       part { name: "base_hbar"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "color_hbar";
@@ -549,36 +602,47 @@ group { name: "e/widgets/scrollframe";
       }
    }
    programs {
+      // This program is triggered when the left mouse button is pressed on the vertical dragger.
+      // It sets the state of the dragger and its color part to "clicked".
       program { signal: "mouse,down,1*"; source: "e.dragable.vbar";
          action: STATE_SET "clicked" 0.0;
          target: "e.dragable.vbar";
          target: "color_vbar";
       }
+      // This program emits a signal 'e,vbar,press' when any mouse button is pressed on the vertical dragger.
+      // This allows other parts of the application to react to this event.
       program { signal: "mouse,down,*"; source: "e.dragable.vbar";
          action: SIGNAL_EMIT "e,vbar,press" "e";
       }
+      // When the left mouse button is released over the vertical dragger, this program reverts
+      // the dragger and its color part to the "default" state.
       program { signal: "mouse,up,1"; source: "e.dragable.vbar";
          action: STATE_SET "default" 0.0;
          target: "e.dragable.vbar";
          target: "color_vbar";
       }
+      // Emits 'e,vbar,unpress' when any mouse button is released, signaling the end of the press action.
       program { signal: "mouse,up,*"; source: "e.dragable.vbar";
          action: SIGNAL_EMIT "e,vbar,unpress" "e";
       }
 
+      // Sets the horizontal dragger to the "clicked" state on left mouse button press.
       program { signal: "mouse,down,1*"; source: "e.dragable.hbar";
          action: STATE_SET "clicked" 0.0;
          target: "e.dragable.hbar";
          target: "color_hbar";
       }
+      // Emits 'e,hbar,press' when any mouse button is pressed on the horizontal dragger.
       program { signal: "mouse,down,*"; source: "e.dragable.hbar";
          action: SIGNAL_EMIT "e,hbar,press" "e";
       }
+      // Reverts the horizontal dragger to the "default" state on left mouse button release.
       program { signal: "mouse,up,1"; source: "e.dragable.hbar";
          action: STATE_SET "default" 0.0;
          target: "e.dragable.hbar";
          target: "color_hbar";
       }
+      // Emits 'e,hbar,unpress' when any mouse button is released from the horizontal dragger.
       program { signal: "mouse,up,*"; source: "e.dragable.hbar";
          action: SIGNAL_EMIT "e,hbar,unpress" "e";
       }

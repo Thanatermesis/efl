@@ -1,11 +1,19 @@
+// This is the base theme for a standard button.
+// It defines the look and feel for a default button, including its behavior when pressed, disabled, or when showing an icon or text.
+// It is aliased for use in specific contexts like naviframe back buttons.
 group { name: "elm/button/base/default";
    alias: "elm/button/base/naviframe/back_btn/default";
    alias: "elm/button/base/naviframe/back_btn/pager";
+   // The BUTTONMODE_SCRIPT is a macro that contains the core logic for managing the button's visual state.
+   // It defines how the button appears based on a combination of flags like PRESSED, DISABLE, ICON, and LABEL.
+   // This allows for a consistent state management across different button types.
    script {
       BUTTONMODE_SCRIPT
    }
    images.image: "win_shadow.png" COMP;
    parts {
+      // The "shadow" part provides a drop shadow effect, positioned relative to the "base" part.
+      // It changes its appearance when the button is pressed or disabled to give a sense of depth.
       part { name: "shadow"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -13,6 +21,7 @@ group { name: "elm/button/base/default";
             WIN_SHADOW_SMALL;
             color_class: "/shadow/normal/button";
          }
+         // When pressed, the shadow scales and shifts slightly to give a sense of depth.
          description { state: "pressed" 0.0; inherit;
             image.border_scale_by: 0.1;
             rel1.offset: -2 -1;
@@ -26,6 +35,8 @@ group { name: "elm/button/base/default";
             color_class: "/shadow/disabled/button";
          }
       }
+      // The "base" part is the main background of the button.
+      // It changes color based on its state (normal, pressed, disabled) and is initially hidden via 'offscale' for animations.
       rect { "base";
          scale: 1;
          desc { "default";
@@ -34,6 +45,7 @@ group { name: "elm/button/base/default";
             rel2.offset: -3 -3;
             offscale;
          }
+         // The 'pressed' state adjusts offsets to create a visual feedback of the button being pushed.
          desc { "pressed"; inherit;
             color_class: "/bg/pressed/button";
             rel1.offset: 3 3;
@@ -47,6 +59,8 @@ group { name: "elm/button/base/default";
             visible: 0;
          }
       }
+      // "elm.swallow.background" is a container for an optional, user-provided background object.
+      // It's transparent to mouse events ('nomouse') and hidden by default.
       swallow { "elm.swallow.background"; nomouse;
          desc { "default";
             rel.to: "base";
@@ -56,17 +70,24 @@ group { name: "elm/button/base/default";
             visible: 1;
          }
       }
+      // "icon_clip" is a rectangle used to clip the button's icon, ensuring it doesn't draw outside its designated area.
+      // The color values suggest it may also be used as a layer to modulate the icon's color, especially in the disabled state.
       rect { "icon_clip";
          desc { "default";
+            // color: #FFFFFFFF
             color: 255 255 255 255; // no cc
          }
          desc { "pressed"; inherit;
+            // color: #FFFFFFFF
             color: 255 255 255 255; // no cc
          }
          desc { "disabled"; inherit;
+            // color: #FFFFFF40
             color: 255 255 255 64; // no cc
          }
       }
+      // "elm.swallow.content" is the container for the button's icon.
+      // It's clipped by "icon_clip" and handles positioning for different content states (e.g., 'visible' with text vs. 'icononly').
       swallow { "elm.swallow.content"; nomouse;
          clip_to: "icon_clip";
          scale: 1;
@@ -94,6 +115,9 @@ group { name: "elm/button/base/default";
             min: ICMIN ICMIN;
          }
       }
+      // "elm.text" displays the button's label.
+      // It is positioned relative to the icon container ("elm.swallow.content") and has various states
+      // to handle visibility, pressed, and disabled appearances, often in combination with an icon.
       text { "elm.text"; nomouse;
          scale: 1;
          desc { "default";
@@ -154,9 +178,13 @@ group { name: "elm/button/base/default";
             visible: 1;
          }
       }
+      // The "event" part is an invisible rectangle that captures all mouse events for the button.
+      // This simplifies event handling by providing a single, reliable source for user interaction.
+      // 'ignore_flags: ON_HOLD' prevents it from generating 'mouse,hold' events.
       rect { "event";
          ignore_flags: ON_HOLD;
          desc { "default";
+            // color: #00000000 (transparent)
             color: 0 0 0 0; // no cc
          }
          desc { "disabled"; inherit;
@@ -165,22 +193,30 @@ group { name: "elm/button/base/default";
       }
    }
    programs {
+      // This program triggers when the left mouse button is pressed on the 'event' rectangle.
+      // It emits a "elm,action,press" signal for application code and then runs "button_click_anim".
       program {
          signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
       }
+      // This program is run after a mouse down event. It sets the PRESSED flag in the script,
+      // which the BUTTONMODE_SCRIPT uses to update the button's visual state to "pressed".
       program { name: "button_click_anim";
          script { flag_set(PRESSED); }
       }
+      // This handles the mouse up event, signaling unpress to the application and running the unclick animation.
       program { name: "button_unclick";
          signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
          after: "button_unclick_anim";
       }
+      // This program unsets the PRESSED flag, returning the button to its default state.
       program { name: "button_unclick_anim";
          script { flag_unset(PRESSED); }
       }
+      // This program creates a visual "blink" effect when the button is activated (e.g., via keyboard).
+      // It momentarily sets the state to "pressed" and then transitions back to "default".
       program { name: "buttonactivate";
          signal: "elm,anim,activate"; source: "elm";
          action: STATE_SET "pressed" 0.0;
@@ -194,10 +230,14 @@ group { name: "elm/button/base/default";
          target: "shadow";
          target: "base";
       }
+      // Emits the primary "click" signal for application logic to handle.
       program {
          signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // The following programs manage the button's content state (text, icon, background, enabled/disabled).
+      // They are triggered by signals from the application (e.g., elm_object_text_set(), elm_object_disabled_set())
+      // and update the script flags, which in turn drives the visual changes via BUTTONMODE_SCRIPT.
       program { name: "button_text_visible";
          signal: "elm,state,text,visible"; source: "elm";
          script { flag_set(LABEL); }
@@ -233,7 +273,13 @@ group { name: "elm/button/base/default";
    }
 }
 
+// The "anchor" style button is designed to look like a hyperlink.
+// It is typically text-based, with an optional icon, and features an underline bar.
 group { name: "elm/button/base/anchor";
+   // This script implements the state machine for the anchor button.
+   // The `eval_mode` function is called whenever the button's state changes (e.g., pressed, disabled, content changed).
+   // It takes a bitmask 'm' representing the current state and applies the corresponding visual states to the button's parts.
+   // This centralized logic ensures all parts are updated consistently.
    script {
       public btmode;
       public eval_mode(m) {
@@ -308,6 +354,8 @@ group { name: "elm/button/base/anchor";
       }
    }
    parts {
+      // The "base" part for an anchor button is transparent, as the visual elements are the text and the underline bar.
+      // It exists primarily for layout and state management.
       rect { "base";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -437,6 +485,8 @@ group { name: "elm/button/base/anchor";
             visible: 1;
          }
       }
+      // The "bar" is the underline shown beneath the anchor button's text/icon.
+      // Its color changes to provide feedback when the button is pressed or disabled.
       rect { "bar"; nomouse;
          desc { "default";
             color_class: "/fg/normal/button-anchor";
@@ -464,11 +514,14 @@ group { name: "elm/button/base/anchor";
       }
    }
    programs {
+      // On mouse down, this program emits the "press" signal and then calls the "button_click_anim" program.
       program {
          signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
       }
+      // This program updates the button's state. It sets the PRESSED bit in the 'btmode' variable
+      // and calls 'eval_mode' to apply the visual changes for the pressed state.
       program { name: "button_click_anim";
          script {
             new m = get_int(btmode);
@@ -476,6 +529,7 @@ group { name: "elm/button/base/anchor";
             eval_mode(m);
          }
       }
+      // On mouse up, it clears the PRESSED bit and calls 'eval_mode' to revert to the unpressed state.
       program { name: "button_unclick";
          signal: "mouse,up,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
@@ -503,6 +557,9 @@ group { name: "elm/button/base/anchor";
          signal: "mouse,clicked,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,click" "elm";
       }
+      // The following programs handle changes to the button's content (text/icon) or enabled state.
+      // They update the 'btmode' state variable with the appropriate flags (LABEL, ICON, DISABLE)
+      // and call 'eval_mode' to refresh the button's appearance.
       program { name: "button_text_visible";
          signal: "elm,state,text,visible"; source: "elm";
          script {
@@ -564,6 +621,8 @@ group { name: "elm/button/base/anchor";
    }
 }
 
+// The "blank" style button inherits from the default button but removes the visual styling of the shadow and base.
+// This makes it completely transparent, useful for creating invisible clickable areas or custom button-like controls.
 group { name: "elm/button/base/blank";
    inherit: "elm/button/base/default";
    parts {
@@ -595,6 +654,8 @@ group { name: "elm/button/base/blank";
    }
 }
 
+// The "overlay" style button is another variant of the default button.
+// It is designed to be used on top of other content, featuring a semi-transparent background.
 group { name: "elm/button/base/overlay";
    inherit: "elm/button/base/default";
    parts {
@@ -626,6 +687,8 @@ group { name: "elm/button/base/overlay";
    }
 }
 
+// These groups define buttons used within a color selector widget.
+// They inherit the base button style and add a specific arrow icon ("ic") to indicate direction.
 group { name: "elm/button/base/colorselector/left/default";
    inherit: "elm/button/base/default";
    parts {
@@ -658,9 +721,12 @@ group { name: "elm/button/base/colorselector/right/default";
    }
 }
 
+// This group defines the base style for a media player button (e.g., play, pause).
+// It has a simple two-state behavior ("default" and "selected") instead of the more complex logic of standard buttons.
 group { name: "elm/button/base/media_player/prev/default";
    alias: "elm/button/base/media_player/prev/flush";
    parts {
+      // The base of the media button, which is transparent by default (#FFFFFF00) and becomes opaque white when selected (#FFFFFFFF).
       rect { "base";
          desc { "default";
             color_class: "/bg/pressed/button-media";
@@ -671,6 +737,7 @@ group { name: "elm/button/base/media_player/prev/default";
             color: 255 255 255 255; // no cc
          }
       }
+      // The icon for the media button. It changes color class when selected.
       image { "ic"; nomouse;
          scale: 1;
          desc { "default";
@@ -692,6 +759,7 @@ group { name: "elm/button/base/media_player/prev/default";
       }
    }
    programs {
+      // On mouse down, the button transitions to the "selected" state.
       program { signal: "mouse,down,1"; source: "event";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";
@@ -701,6 +769,7 @@ group { name: "elm/button/base/media_player/prev/default";
          target: "base";
          target: "ic";
       }
+      // On mouse up, it returns to the "default" state.
       program { signal: "mouse,up,1"; source: "event";
          action: STATE_SET "default" 0.0;
          target: "base";
@@ -712,6 +781,9 @@ group { name: "elm/button/base/media_player/prev/default";
    }
 }
 
+// This macro simplifies the creation of various media player buttons.
+// It takes a name and an icon file, inheriting the base style from "media_player/prev/default"
+// and overriding only the icon image for each specific button type.
 #define MEDIABUTTON(_name, _icon) \
 group { name: "elm/button/base/media_player/"_name"/default"; \
    alias: "elm/button/base/media_player/"_name"/flush"; \
@@ -733,8 +805,13 @@ MEDIABUTTON("eject", "i-media-eject")
 MEDIABUTTON("volume", "i-media-volume")
 MEDIABUTTON("mute", "i-media-mute")
 
+// This group defines the style for an individual item inside a vertical hoversel widget.
+// A hoversel is a button that, when clicked, shows a popup with a list of items to select.
 group { name: "elm/button/base/hoversel_vertical_entry/default";
    alias: "elm/button/base/hoversel_vertical_entry/entry";
+   // The script manages the visual state of the hoversel item.
+   // `eval_mode` updates the item's appearance based on content (icon/label) and disabled state.
+   // `is_selected` is a flag to track if the item is the currently selected one, to maintain its "clicked" state.
    script {
       public btmode;
       public is_selected;
@@ -793,6 +870,7 @@ group { name: "elm/button/base/hoversel_vertical_entry/default";
       }
    }
    parts {
+      // The background of the hoversel item, which changes color when clicked.
       image { "base"; type: RECT; nomouse;
          scale: 1;
          desc { "default";
@@ -914,6 +992,8 @@ group { name: "elm/button/base/hoversel_vertical_entry/default";
          action: SIGNAL_EMIT "elm,action,unpress" "elm";
          after: "button_unclick_anim";
       }
+      // When the mouse is released, this program checks if the item is selected.
+      // If not, it reverts to the default state. If it is selected, it remains in the "clicked" state.
       program { name: "button_unclick_anim";
          script {
             if (!get_int(is_selected)) {
@@ -989,6 +1069,8 @@ group { name: "elm/button/base/hoversel_vertical_entry/default";
             eval_mode(m);
          }
       }
+      // The "selected" and "unselected" programs are triggered by the hoversel widget logic.
+      // They set the `is_selected` flag and update the visual state to either "clicked" or "default" accordingly.
       program { "selected";
          signal: "elm,state,selected"; source: "elm";
          script {
@@ -1008,6 +1090,8 @@ group { name: "elm/button/base/hoversel_vertical_entry/default";
    }
 }
 
+// This group defines the main button for a vertical or horizontal hoversel widget.
+// It inherits the default button logic but adds a "select_line" part to visually distinguish it as a hoversel button.
 group { name: "elm/button/base/hoversel_vertical/default";
    inherit: "elm/button/base/default";
    alias: "elm/button/base/hoversel_vertical/entry";
@@ -1096,6 +1180,7 @@ group { name: "elm/button/base/hoversel_vertical/default";
             text.align: 0.0 0.5;
          }
       }
+      // A vertical line on the right side of the button, indicating that clicking it will open a selection menu.
       rect { "select_line"; nomouse;
          scale: 1;
          desc { "default";
@@ -1120,6 +1205,7 @@ group { name: "elm/button/base/hoversel_vertical/default";
       }
    }
    programs {
+      // These programs extend the default button behavior to also update the state of the "select_line" part.
       program { name: "button_click_anim";
          action: STATE_SET "pressed" 0.0;
          target: "base";
@@ -1149,6 +1235,8 @@ group { name: "elm/button/base/hoversel_vertical/default";
    }
 }
 
+// Style for an item in a horizontal hoversel. It inherits from the vertical entry
+// and makes minor tweaks to its appearance.
 group { name: "elm/button/base/hoversel_horizontal_entry/default";
    inherit: "elm/button/base/hoversel_vertical_entry/default";
    alias: "elm/button/base/hoversel_horizontal_entry/entry";
@@ -1166,6 +1254,8 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
 }
 
 /******************* SPINNER BUTTONS STYLES **********************/
+   // This group defines the "increase" (right arrow) button for a spinner widget.
+   // It uses a custom script to handle mouse events, including logic for multi-touch (`multi_down`) to prevent conflicts.
    group { name: "elm/button/base/spinner/increase/default";
       alias: "elm/button/base/spinner/increase/colorselector/default";
       alias: "elm/button/base/spin_button/increase/default";
@@ -1192,12 +1282,16 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
                color_class: "/fg/disabled/spinner/arrow";
             }
          }
+         // An invisible rectangle that captures mouse events. 'repeat_events: 1' is crucial for spinner
+         // behavior, as it allows continuous signals to be sent while the button is held down.
          part { name: "over"; type: RECT;
             repeat_events: 1;
             description { state: "default" 0.0;
                color: 0 0 0 0; // no cc
             }
          }
+         // The "disabler" part is an invisible overlay that is only shown when the widget is disabled.
+         // It effectively blocks mouse events from reaching the parts underneath.
          part { name: "disabler"; type: RECT;
             description { state: "default" 0.0;
                color: 0 0 0 0; // no cc
@@ -1210,6 +1304,8 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
          }
       }
       programs {
+         // This program ensures that a press action only occurs if it's a primary touch/click,
+         // ignoring subsequent ones while already pressed or during a multi-touch gesture.
          program { name: "button_press";
             signal: "mouse,down,1"; source: "over";
             script {
@@ -1302,6 +1398,8 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
       }
    }
 
+   // The "decrease" (left arrow) button for a spinner, inheriting from the "increase" button
+   // and simply changing the arrow icon.
    group { name: "elm/button/base/spinner/decrease/default";
       inherit: "elm/button/base/spinner/increase/default";
       alias: "elm/button/base/spinner/decrease/colorselector/default";
@@ -1323,6 +1421,8 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
       }
    }
 
+   // This group styles the central text part of a spinner widget, which displays the current value.
+   // It is not a button itself but responds to clicks to, for example, open an entry for direct input.
    group { name: "elm/button/base/spinner/default";
       alias: "elm/button/base/spinner/colorselector/default";
       alias: "elm/button/base/spinner/vertical";
@@ -1395,6 +1495,7 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
          }
       }
    }
+   // Vertical spinner variant for the "increase" button, changing the icon to an up arrow.
    group { name: "elm/button/base/spinner/increase/vertical";
       inherit: "elm/button/base/spinner/increase/default";
       alias: "elm/button/base/spin_button/increase/vertical";
@@ -1413,6 +1514,7 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
       }
    }
 
+   // Vertical spinner variant for the "decrease" button, changing the icon to a down arrow.
    group { name: "elm/button/base/spinner/decrease/vertical";
       inherit: "elm/button/base/spinner/decrease/default";
       alias: "elm/button/base/spin_button/decrease/vertical";
@@ -1431,6 +1533,8 @@ group { name: "elm/button/base/hoversel_horizontal_entry/default";
       }
    }
 /******************* SPINNER BUTTONS STYLES END **********************/
+// This group defines a combobox button. It's similar to a standard button
+// but includes up/down arrow indicators and a separator line to signify its dropdown functionality.
 group { name: "elm/button/base/combobox_vertical/default";
    alias: "elm/button/base/combobox_vertical/entry";
    images.image: "win_shadow.png" COMP;
@@ -1468,6 +1572,7 @@ group { name: "elm/button/base/combobox_vertical/default";
             color_class: "/bg/disabled/button";
          }
       }
+      // The main clickable area for the button content (icon and text).
       rect { name: "event";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -1497,6 +1602,7 @@ group { name: "elm/button/base/combobox_vertical/default";
             offscale;
          }
       }
+      // Up arrow indicator.
       image { name: "expand1";
          scale: 1;
          desc { "default";
@@ -1517,6 +1623,7 @@ group { name: "elm/button/base/combobox_vertical/default";
             color_class: "/fg/disabled/combobox/button";
          }
       }
+      // Down arrow indicator.
       image { name: "expand2";
          scale: 1;
          desc { "default";
@@ -1537,6 +1644,9 @@ group { name: "elm/button/base/combobox_vertical/default";
             color_class: "/fg/disabled/combobox/button";
          }
       }
+      // A separate clickable area specifically for the expander arrows.
+      // This allows the button to have a distinct action for the text area vs. the dropdown arrows if needed,
+      // though here both "event" and "event2" trigger the same programs via 'source: "event*"'.
       rect { name: "event2";
          desc { "default";
             color: 0 0 0 0; // no cc
@@ -1551,6 +1661,7 @@ group { name: "elm/button/base/combobox_vertical/default";
             visible: 0;
          }
       }
+      // A vertical separator line between the content and the expander arrows.
       rect { "select_line"; nomouse;
          scale: 1;
          desc { "default";
@@ -1574,6 +1685,8 @@ group { name: "elm/button/base/combobox_vertical/default";
       }
    }
    programs {
+      // This program listens for mouse down events on BOTH the main area ("event") and the arrow area ("event2"),
+      // thanks to the wildcard in 'source: "event*"'.
       program { signal: "mouse,down,1"; source: "event*";
          action: SIGNAL_EMIT "elm,action,press" "elm";
          after: "button_click_anim";

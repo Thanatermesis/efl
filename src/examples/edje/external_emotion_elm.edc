@@ -10,42 +10,57 @@
 
  */
 collections {
+   // The 'main' group defines the primary layout of the interface.
    group { name: "main";
-      min: 350 200; /* set a min window size */
+      // Sets a minimum size for the window to ensure all elements are visible.
+      min: 350 200;
 
-      externals { /* declare the modules you want to load */
-         external: "emotion"; /* video player engine */
-         external: "elm"; /* toolkit/widgets */
+      // Declares the external modules required by the interface.
+      // 'emotion' is for video playback, and 'elm' provides the UI widgets.
+      // These are necessary for parts with 'type: EXTERNAL'.
+      externals {
+         external: "emotion";
+         external: "elm";
       }
 
+      // The 'parts' block contains all the visual elements of the UI.
       parts {
-         part { name: "bg"; /* dark gray rectangle as background */
+         // A simple rectangle serving as the dark background of the window.
+         part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Color: dark gray (#404040).
                color: 64 64 64 255;
             }
          }
 
-         part { name: "video"; /* video object */
+         // The main video player object, powered by the 'emotion' external module.
+         // This part handles the video decoding and rendering.
+         part { name: "video";
             type: EXTERNAL;
             source: "emotion";
             description { state: "default" 0.0;
                params {
-                  /* explicitly select the emotion engine
-                   * ['xine', 'gstreamer' or 'vlc']
-                   * or comment the line to autoselect the engine */
+                  // This parameter allows explicitly selecting a video engine.
+                  // For example 'xine', 'gstreamer', or 'vlc'.
+                  // If commented out, Emotion will auto-select the best available engine.
                   // choice: "engine" "gstreamer";
                }
             }
          }
 
+         // Displays the video title at the top of the window.
+         // It has a soft shadow effect for better readability.
          part { name: "title";
             type: TEXT;
             effect: SOFT_SHADOW;
+            // The 'default' state is transparent, making the title initially invisible.
             description { state: "default" 0.0;
+               // Color: transparent white (#FFFFFF00). Shadow is also transparent.
                color: 255 255 255 0;
                color3: 0 0 0 0;
                align: 0.5 0.0;
+               // Positioned at the top of the window with some padding.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 10 2;
@@ -62,29 +77,40 @@ collections {
                   text: "";
                }
             }
+            // The 'visible' state makes the title opaque. A program will trigger
+            // the transition to this state.
             description { state: "visible" 0.0;
                inherit: "default" 0.0;
+               // Color: opaque white (#FFFFFFFF). Shadow is opaque black (#000000FF).
                color: 255 255 255 255;
                color3: 0 0 0 255;
             }
          }
 
-         part { name: "controls-clipper"; /* clipper to control visibility */
+         // This is a clipper part, used to control the visibility of the control elements.
+         // By changing the alpha channel of this rectangle's color, all parts clipped to it
+         // will fade in or out. It is itself invisible, only its alpha channel matters.
+         part { name: "controls-clipper";
             type: RECT;
+            // In the 'default' state, controls are barely visible.
             description { state: "default" 0.0;
-               color: 255 255 255 32;
+               color: 255 255 255 32; // Mostly transparent (#FFFFFF20)
             }
+            // In the 'visible' state, controls are fully opaque.
             description { state: "visible" 0.0;
-               color: 255 255 255 255;
+               color: 255 255 255 255; // Fully opaque (#FFFFFFFF)
             }
          }
 
-         part { name: "controls-bg"; /* controls background as
-                                        semi-transparent black at bottom edge */
+         // A semi-transparent background for the control bar at the bottom.
+         part { name: "controls-bg";
             type: RECT;
+            // Clipped by 'controls-clipper' so it fades with the other controls.
             clip_to: "controls-clipper";
             description { state: "default" 0.0;
+               // Color: semi-transparent black (#00000080).
                color: 0 0 0 128;
+               // Positions the rectangle at the bottom of the parent, with a height of 40px.
                rel1 {
                   relative: 0.0 1.0;
                   offset: 0 -40;
@@ -96,12 +122,13 @@ collections {
             }
          }
 
-         part { name: "play"; /* play button at bottom-left (relative
-                                to controls-bg) */
+         // The play/pause button, an Elementary widget.
+         part { name: "play";
             type: EXTERNAL;
             source: "elm/button";
             clip_to: "controls-clipper";
             description { state: "default" 0.0;
+               // Positioned on the left side of the 'controls-bg' part.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 0 0;
@@ -112,15 +139,18 @@ collections {
                   offset: 50 -1;
                   to: "controls-bg";
                }
+               // Sets the button's icon.
                params.string: "icon" "apps";
             }
          }
 
-         part { name: "open"; /* open file button next to play button */
+         // A button that opens a file selector to choose a video file.
+         part { name: "open";
             type: EXTERNAL;
             source: "elm/fileselector_button";
             clip_to: "controls-clipper";
             description { state: "default" 0.0;
+               // Positioned to the right of the 'play' button.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 52 0;
@@ -135,11 +165,13 @@ collections {
             }
          }
 
-         part { name: "time"; /* time/progress */
+         // A slider to display and control the video's playback position.
+         part { name: "time";
             type: EXTERNAL;
             source: "elm/slider";
             clip_to: "controls-clipper";
             description { state: "default" 0.0;
+               // Takes up the remaining space in the control bar, next to the 'open' button.
                rel1 {
                   relative: 0.0 0.0;
                   offset: 104 0;
@@ -153,83 +185,111 @@ collections {
             }
          }
 
-         part { name: "controls-eventarea"; /* event area so we catch mouse in
-                                               and out, repeat events so
-                                               buttons get them */
+         // An invisible rectangle covering the entire control bar area.
+         // Its purpose is to capture mouse-in and mouse-out events for the whole
+         // control area, to show/hide the controls.
+         part { name: "controls-eventarea";
             type: RECT;
+            // 'repeat_events' ensures that mouse events are passed through to the
+            // parts underneath (like the buttons), so they remain clickable.
             repeat_events: 1;
             description {
                state: "default" 0.0;
-               color: 255 255 255 0; /* fully transparent as we don't
-                                        need any visual feedback */
+               // Fully transparent since it's just for capturing events.
+               color: 255 255 255 0;
+               // Aligned to cover the 'controls-bg' part exactly.
                rel1.to: "controls-bg";
                rel2.to: "controls-bg";
             }
          }
 
+         // The 'programs' block defines the interactive logic of the interface.
+         // They listen for signals from parts and execute actions in response.
          programs {
-            /* animated 0.2 linear fade in/out if mouse is over controls */
+            // This program handles showing the controls and title when the mouse
+            // enters the 'controls-eventarea'.
             program { signal: "mouse,in";
                source: "controls-eventarea";
+               // It changes the state of 'controls-clipper' and 'title' to 'visible'.
                action: STATE_SET "visible" 0.0;
+               // The transition is a 0.2-second linear animation for a smooth fade-in.
                transition: LINEAR 0.2;
                target: "controls-clipper";
                target: "title";
             }
+            // This program hides the controls and title with a fade-out animation
+            // when the mouse leaves the 'controls-eventarea'.
             program { signal: "mouse,out";
                source: "controls-eventarea";
+               // It sets the state back to 'default'.
                action: STATE_SET "default" 0.0;
                transition: LINEAR 0.2;
                target: "controls-clipper";
                target: "title";
             }
 
-            /* toggle video playing state when play is clicked */
+            // Toggles the video playing state when the 'play' button is clicked.
             program { name: "toggle-play-video";
                signal: "clicked";
                source: "play";
+               // An embedded script is used for logic that can't be expressed
+               // with simple actions.
                script {
+                  // Get the current 'play' state of the 'video' part (true or false).
                   new v = external_param_get_bool(PART:"video", "play");
+                  // Set the 'play' state to its opposite value.
                   external_param_set_bool(PART:"video", "play", !v);
                }
             }
 
-            /* whenever file is chosen, set and play it */
+            // When a file is selected using the 'open' button, this program is triggered.
             program { signal: "file,chosen";
                source: "open";
+               // It copies the chosen file path from the 'open' button to the
+               // 'file' parameter of the 'video' part, loading the new video.
                action: PARAM_COPY "open" "path" "video" "file";
+               // 'after' executes other programs sequentially. This is used to
+               // start playback and set the title after the file is loaded.
                after: "play-video";
                after: "set-title";
             }
+            // This program starts the video playback.
             program { name: "play-video";
                action: PARAM_SET "video" "play" "1";
             }
+            // This program sets the window title to the path of the opened file.
             program { name: "set-title";
                action: PARAM_COPY "open" "path" "title" "text";
             }
 
-            /* if position changes, set slider (time) */
+            // This program is triggered repeatedly by the 'video' part during playback.
+            // It synchronizes the 'time' slider with the current video position.
             program { signal: "position_update";
                source: "video";
                script {
                   new Float:p, Float:len;
 
+                  // Get the current playback position and total length from the video part.
                   p = external_param_get_float(PART:"video", "position");
                   len = external_param_get_float(PART:"video", "play_length");
+                  // To avoid division by zero, check if length is valid.
                   if (len > 0.0)
+                     // Set the slider's value (0.0 to 1.0) based on progress.
                      external_param_set_float(PART:"time", "value", p / len);
                }
             }
 
-            /* if slider (time) changes, set the position (seek) */
+            // Triggered when the user manually changes the slider's position (seeking).
             program { signal: "changed";
                source: "time";
                script {
                   new Float:v, Float:len;
 
+                  // Get the new value from the slider (0.0 to 1.0).
                   v = external_param_get_float(PART:"time", "value");
                   len = external_param_get_float(PART:"video", "play_length");
                   if (len > 0.0)
+                     // Calculate and set the new playback position in the video.
                      external_param_set_float(PART:"video", "position", v * len);
                }
             }

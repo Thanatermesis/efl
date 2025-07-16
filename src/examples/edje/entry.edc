@@ -2,54 +2,60 @@ efl_version: 1 22;
 
 collections {
 
+// This block defines all the styles that can be applied to text elements within this EDC file.
    styles {
       style {
          name: "entry_style";
          // This style wraps lines at word boundaries.
-         // Check Evas textblock's documentation to see all the options
+         // The 'base' property defines the default appearance of the text, setting font, size,
+         // color (#000000), word wrapping, and margins for spacing.
+         // Check Evas textblock's documentation for all available options.
          base: "font="sans" font_size=10 color=#000 wrap="word" left_margin=2 right_margin=2";
       }
    }
 
+// This is the main group for the entry widget. It defines the layout and behavior of the text entry field.
    group {
       name: "example/main";
       min: 12 50;
 
       parts {
+         // The 'background' part is a simple rectangle that serves as the visual container for the text entry area.
          part {
             name: "background";
             type: RECT;
-            mouse_events: 0;
+            mouse_events: 0; // It does not react to mouse events, they are passed to widgets below.
             description {
                state: "default" 0.0;
-               // 3 pixels of margin on left and top
+               // Defines a 3-pixel margin on the left and top.
                rel1.offset: 3 3;
-               // 3 pixels of margin on right and bottom... -1 (default) -3 = -4
-               // Look at documentation about EDC parts positioning
+               // The 'rel2.offset' of -4 ensures a consistent 3-pixel margin on the right and bottom.
+               // The calculation is based on the container's size (which is -1 in rel2) minus the desired margin.
                rel2.offset: -4 -4;
             }
          }
 
+         // This part is the core of the entry widget: an editable text block.
          part {
             name: "example/text";
             type: TEXTBLOCK;
             scale: 1;
-            // It's mandatory to set entry_mode as editable.
+            // 'entry_mode' must be set to EDITABLE to allow user input.
             entry_mode: EDITABLE;
-            select_mode: DEFAULT;
-            cursor_mode: UNDER;
-            mouse_events: 1;
-            // It causes a textblock that is editable to allow multiple lines
-            // for editing.
+            select_mode: DEFAULT; // Allows default text selection behavior.
+            cursor_mode: UNDER; // Displays the cursor below the text.
+            mouse_events: 1; // This part will receive mouse events.
+            // 'multiline' allows the editable textblock to span multiple lines.
             multiline: 1;
-            // Set groups used to be used as selection effect and
-            // cursor.
+            // 'source' properties link this textblock to other groups for visual effects.
+            // 'source' is used for the selection rectangle ('example/selection' group).
             source: "example/selection";
+            // 'source4' is used for the cursor ('example/cursor' group).
             source4: "example/cursor";
             description {
                state: "default" 0.0;
                min: 12 50;
-               // Position text relative to background, with a small margin
+               // This positions the textblock inside the 'background' part, creating a visual border.
                rel1 {
                   to: "background";
                   offset: 2 2;
@@ -59,46 +65,52 @@ collections {
                   offset: -3 -3;
                }
                text {
+                  // The 'entry_style' defined earlier is applied here.
                   style: "entry_style";
-                  min: 0 1;
-                  align: 0.0 0.0;
+                  min: 0 1; // Minimum size for the text, allowing it to be very small.
+                  align: 0.0 0.0; // Aligns text to the top-left corner.
                }
             }
          }
       }
 
       programs {
+         // This program sets the initial focus on the text entry field when the widget is loaded.
          program {
             name: "focus";
-            signal: "load";
-            source: "";
-            action: FOCUS_SET;
-            target: "example/text";
+            signal: "load"; // Triggered automatically when the object is created.
+            source: ""; // The signal comes from the Edje object itself.
+            action: FOCUS_SET; // The action to perform is setting the focus.
+            target: "example/text"; // The focus is set on the 'example/text' part.
          }
       }
    }
 
+// This group defines the visual appearance of the text selection.
    group {
       name: "example/selection";
 
       parts {
+         // It's a simple rectangle that highlights the selected text.
          part {
             name: "selection";
             type: RECT;
             mouse_events: 0;
             description {
                state: "default" 0.0;
-               color: 180 180 180 255;
+               color: 180 180 180 255; // A semi-transparent light gray color (#B4B4B4).
             }
          }
       }
    }
 
+// This group defines the cursor's appearance and behavior.
    group {
       name: "example/cursor";
       min: 1 0;
 
       parts {
+         // The 'cursor' part is a rectangle that indicates the text insertion point.
          part {
             name: "cursor";
             type: RECT;
@@ -106,21 +118,20 @@ collections {
             description {
                state: "default" 0.0;
                min: 2 12;
-               color: 0 0 0 255;
+               color: 0 0 0 255; // Solid black color (#000000).
             }
             description {
                state: "hidden" 0.0;
                inherit: "default" 0.0;
-               color: 0 0 0 0;
+               color: 0 0 0 0; // Fully transparent, making the cursor invisible.
             }
          }
       }
 
-      // These programs are used to blink the cursor. They're
-      // started by the "load" signal, emitted when the EDJ file is loaded.
-      // It's a infinite loop between "default" and "hidden" states of
-      // the "cursor" part.
+      // These programs create the blinking cursor effect. They are started by the "load" signal
+      // and form an infinite loop, alternating the cursor part between "default" and "hidden" states.
       programs {
+         // This program starts the animation by smoothly hiding the cursor.
          program {
             name: "cursor_hide";
             signal: "load";
@@ -130,17 +141,20 @@ collections {
             transition: SINUSOIDAL 0.2;
             after: "cursor_hide_timer";
          }
+         // This program acts as a timer to keep the cursor hidden for 0.2 seconds.
          program {
             name: "cursor_hide_timer";
             in: 0.2 0.0;
             after: "cursor_show";
          }
+         // This program makes the cursor visible again.
          program {
             name: "cursor_show";
             action: STATE_SET "default" 0.0;
             target: "cursor";
             after: "cursor_show_timer";
          }
+         // This program keeps the cursor visible for 0.5 seconds before repeating the cycle.
          program {
             name: "cursor_show_timer";
             in: 0.5 0.0;

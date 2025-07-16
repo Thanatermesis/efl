@@ -1,11 +1,18 @@
 collections {
-   /* those 2 groups are used as custom icons for the buttons */
+   // These groups define simple, reusable graphical objects that can be
+   // referenced by other parts. Here, they serve as custom icons for buttons.
+   // Using groups for icons allows for complex, multi-part icons that can be
+   // managed as a single entity.
    group { name: "icon_green";
       parts {
+         // A single part defines the visual representation of this group.
          part { name: "icon_green";
             type: RECT;
             description { state: "default" 0.0;
+               // A solid green color (#00FF00FF).
                color: 0 255 0 255;
+               // 'aspect' forces a 1:1 ratio, making it a square. 'aspect_preference'
+               // determines how space is filled if the container isn't square.
                aspect: 1 1;
                aspect_preference: VERTICAL;
             }
@@ -17,6 +24,7 @@ collections {
          part { name: "icon_red";
             type: RECT;
             description { state: "default" 0.0;
+               // A solid red color (#FF0000FF).
                color: 255 0 0 255;
                aspect: 1 1;
                aspect_preference: VERTICAL;
@@ -25,62 +33,82 @@ collections {
       }
    }
 
+   // This is the main group for the application's UI. It sets the minimum
+   // dimensions and declares dependencies on external EDC modules.
    group { name: "main";
-      /* set a min window size */
+      // Sets the minimum size of the Edje object. When used in a window,
+      // this effectively sets a minimum window size.
       min: 250 250;
-      
-      /* tell edje that we are going to use elementary external parts */
+
+      // The 'externals' block declares dependencies on other modules.
+      // 'elm' refers to the Elementary widget set, allowing this EDC
+      // to instantiate and control Elementary widgets.
       externals {
          external: "elm";
       }
-      
-      /* define global variables */
+
+      // Embryo script block for declaring global variables accessible
+      // throughout this Edje group. 'public' makes them accessible from C code.
+      // These variables will be used to maintain state for the buttons.
       script {
          public counter, toggle1, toggle2, toggle3, toggle4;
       }
-      
+
       parts {
+         // A background rectangle covering the entire area of the group.
          part { name: "bg";
             type: RECT;
             description { state: "default" 0.0;
+               // Solid white color (#FFFFFFFF).
                color: 255 255 255 255;
             }
          }
 
+         // The main title text at the top of the layout.
          part { name: "title";
             type: TEXT;
+            // 'effect' applies a graphical effect to the text. SOFT_SHADOW adds a gentle drop shadow.
             effect: SOFT_SHADOW;
             description { state: "default" 0.0;
+               // Main text color is white (#FFFFFFFF).
                color: 255 255 255 255;
+               // 'color3' is used by some effects. For SOFT_SHADOW, it's the shadow color.
                color3: 70 70 70 70;
                text {
                   text: "Elementary buttons";
                   font: "Sans";
                   size: 16;
+                  // Aligns the text horizontally to the center (0.5) and vertically to the top (0.0).
                   align: 0.5 0.0;
                }
             }
          }
 
-         /* bottom label used for reporting */
+         // A text label at the bottom, used to display status messages from button interactions.
          part { name: "label";
             type: TEXT;
             description { state: "default" 0.0;
+               // Solid black color (#000000FF).
                color: 0 0 0 255;
                text {
                   text: "try every buttons";
                   font: "Sans";
                   size: 12;
+                  // Aligns the text horizontally to the center (0.5) and vertically to the bottom (1.0).
                   align: 0.5 1.0;
                }
             }
          }
 
-         /* EXTERNAL elementary button with a label */
+         // This part is an external widget, an Elementary button. 'type: EXTERNAL'
+         // indicates that it's not a native Edje part. 'source' specifies what
+         // kind of external part to load, in this case, "elm/button".
          part { name: "bt1";
             type: EXTERNAL;
             source: "elm/button";
             description { state: "default" 0;
+               // 'rel1' and 'rel2' define the part's geometry. Here, it is positioned
+               // relative to the parent container, creating a full-width button near the top.
                rel1 {
                   offset: 5 35;
                }
@@ -88,17 +116,22 @@ collections {
                   relative: 1.0 0.0;
                   offset: -6 60;
                }
+               // 'params' are used to set properties of the external widget.
+               // This sets the button's label text.
                params {
                   string: "label" "Label only";
                }
             }
          }
 
-         /* EXTERNAL elementary button with label + standard icon */
+         // A second button positioned relative to the first one ('bt1').
          part { name: "bt2";
             type: EXTERNAL;
             source: "elm/button";
             description { state: "default" 0;
+               // 'to: "bt1"' makes positioning relative to the 'bt1' part.
+               // 'relative: 0.0 1.0' places the top edge of 'bt2' at the bottom edge of 'bt1'.
+               // 'offset' adds a 5-pixel vertical gap.
                rel1 {
                   to: "bt1";
                   relative: 0.0 1.0;
@@ -109,6 +142,8 @@ collections {
                   relative: 1.0 2.0;
                   offset: -1 5;
                }
+               // This button is initialized with both a label and a standard icon.
+               // Elementary knows a set of standard icon names like "home".
                params {
                   string: "label" "Label + standard icon";
                   string: "icon" "home";
@@ -116,7 +151,7 @@ collections {
             }
          }
 
-         /* EXTERNAL elementary button with a label and a custom icon */
+         // This button is positioned below 'bt2' and uses a custom icon.
          part { name: "bt3";
             type: EXTERNAL;
             source: "elm/button";
@@ -131,6 +166,8 @@ collections {
                   relative: 1.0 2.0;
                   offset: -1 5;
                }
+               // The "icon" parameter references the "icon_green" group defined at the top of the file.
+               // Edje will swallow this group and pass it to the button widget to be used as an icon.
                params {
                   string: "label" "Label + custom icon";
                   string: "icon" "icon_green";
@@ -138,7 +175,7 @@ collections {
             }
          }
 
-         /* EXTERNAL elementary button with just a standard icon */
+         // An icon-only button, positioned below 'bt3' but only half its width.
          part { name: "bt4";
             type: EXTERNAL;
             source: "elm/button";
@@ -148,6 +185,7 @@ collections {
                   relative: 0.0 1.0;
                   offset: 0 5;
                }
+               // 'relative: 0.5' makes its right edge align with the center of 'bt3'.
                rel2 {
                   to: "bt3";
                   relative: 0.5 2.0;
@@ -159,11 +197,12 @@ collections {
             }
          }
 
-         /* EXTERNAL elementary button with just a custom icon */
+         // A second icon-only button, placed next to 'bt4'.
          part { name: "bt5";
             type: EXTERNAL;
             source: "elm/button";
             description { state: "default" 0;
+               // Its top-left corner is aligned to the horizontal center of 'bt3', creating a side-by-side layout with 'bt4'.
                rel1 {
                   to: "bt3";
                   relative: 0.5 1.0;
@@ -181,29 +220,38 @@ collections {
          }
       }
 
+      // 'programs' define the logic and interactivity of the interface. They are
+      // small scripts that run in response to signals (like "clicked").
       programs {
-         /* bt1 clicked, change it's label and count the clicks */
+         // This program is triggered when 'bt1' emits the "clicked" signal.
+         // It increments a counter and updates the button's label.
          program { name: "bt1_click";
             signal: "clicked";
             source: "bt1";
+            // This is an Embryo script, a small C-like language for Edje.
             script {
+               // 'new' declares a local variable, in this case a string buffer.
                new buf[32];
-               /* increment the global counter*/
+               // 'set_int' and 'get_int' access the global variables declared in the group's script block.
                set_int(counter, get_int(counter) + 1);
-               /* set the button label */
+               // 'snprintf' formats a string, similar to its C counterpart.
                snprintf(buf, sizeof(buf), "Clicked %d times", get_int(counter));
+               // 'external_param_set_str' changes a string parameter of an external part at runtime.
+               // This is how the button's label is updated dynamically.
                external_param_set_str(PART:"bt1", "label", buf);
-               /* set the bottom label */
+               // 'set_text' updates the text of a regular Edje text part.
                set_text(PART:"label", "button 1 clicked: set label");
             }
          }
 
-         /* bt2 clicked, toggle it's standard icon */
+         // When 'bt2' is clicked, this program toggles its icon between two standard icons.
          program { name: "bt2_click";
             signal: "clicked";
             source: "bt2";
             script {
+               // The 'toggle1' global variable is used to track the current state.
                if (get_int(toggle1) == 0) {
+                  // 'external_param_set_str' is used to change the "icon" parameter.
                   external_param_set_str(PART:"bt2", "icon", "home");
                   set_int(toggle1, 1);
                }
@@ -215,7 +263,7 @@ collections {
             }
          }
 
-         /* bt3 clicked, toggle it's custom icon */
+         // This program toggles the custom icon of 'bt3' between "icon_red" and "icon_green".
          program { name: "bt3_click";
             signal: "clicked";
             source: "bt3";
@@ -232,7 +280,7 @@ collections {
             }
          }
 
-         /* bt4 clicked, toggle it's icon */
+         // Toggles the standard icon for the icon-only button 'bt4'.
          program { name: "bt4_click";
             signal: "clicked";
             source: "bt4";
@@ -249,7 +297,7 @@ collections {
             }
          }
 
-         /* bt5 clicked, toggle it's icon */
+         // Toggles the custom icon for the icon-only button 'bt5'.
          program { name: "bt5_click";
             signal: "clicked";
             source: "bt5";

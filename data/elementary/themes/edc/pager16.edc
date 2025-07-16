@@ -1,35 +1,49 @@
+// This group defines the appearance of the pager popup window, which typically
+// appears when interacting with the pager module.
 group { name: "e/modules/pager16/popup";
    parts {
+      // The 'base' part serves as the background for the popup window.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
             color_class: "/bg/normal/popup/pager";
          }
       }
+      // This 'swallow' part is a container for external UI components, which will
+      // be placed inside the popup. It is positioned below the title label.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          description { state: "default" 0.0;
+            // Position the top of this part 8 pixels below the bottom of the label.
             rel1.to_y: "e.text.label";
             rel1.relative: 0.0 1.0;
             rel1.offset: 0 8;
+            // The bottom-right corner is offset from the parent's bottom-right.
             rel2.relative: 1.0 1.0;
             rel2.offset: -1 -9;
+            // 'offscale' prevents this part from being affected by object scaling,
+            // maintaining a consistent size.
             offscale;
          }
       }
+      // The 'label' part displays the title text of the popup.
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
+            // Positioned at the top of the 'base' part with 8px padding.
             rel.to: "base";
             rel1.offset: 8 8;
             rel2.relative: 1.0 0.0;
             rel2.offset: -9 8;
             align: 0.5 0.0;
+            // The text color is defined by the theme, ensuring consistency.
             color_class: "/fg/normal/popup/pager/text/title";
             text { font: FNBD; size: 10;
+               // text_class applies a themed style to the text, like 'title_bar'.
                text_class: "title_bar";
                align: 0.5 0.0;
                min: 0 1;
             }
+            // 'offscale' ensures the text size is not affected by object scaling.
             offscale;
             fixed: 0 1;
          }
@@ -37,27 +51,40 @@ group { name: "e/modules/pager16/popup";
    }
 }
 
+// This group defines the base layout for the pager module itself, designed to
+// adapt to different orientations when placed on a shelf.
 group { name: "e/modules/pager16/base";
    parts {
+      // This 'swallow' part serves as the main content area of the pager.
+      // It adjusts its padding based on orientation.
       part { name: "e.swallow.content"; type: SWALLOW;
          scale: 1;
          desc { "default";
+            // SHELFPAD is a macro for padding, used here for horizontal layout.
             rel1.offset: 0 (0 - SHELFPAD);
             rel2.offset: -1 (SHELFPAD - 1);
             offscale;
          }
          desc { "vertical";
             inherit: "default" 0.0;
+            // Adjusts padding for vertical layout.
             rel1.offset: (0 - SHELFPAD) 0;
             rel2.offset: (SHELFPAD - 1) -1;
          }
       }
    }
+   // The 'programs' section handles dynamic changes in response to signals from
+   // Enlightenment ("e"). These programs adjust the layout based on the shelf's
+   // orientation by switching between "default" (horizontal) and "vertical" states.
    programs {
+      // When shelf orientation is horizontal, set the state to "default".
       program { signal: "e,state,orient,horiz"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "e.swallow.content";
       }
+      // When shelf orientation is vertical, set the state to "vertical".
+      // Other programs handle corner and edge cases, mapping them to
+      // either "default" or "vertical" for a consistent appearance.
       program { signal: "e,state,orient,vert"; source: "e";
          action: STATE_SET "vertical" 0.0;
          target: "e.swallow.content";
@@ -113,32 +140,49 @@ group { name: "e/modules/pager16/base";
    }
 }
 
+// This group defines the visual representation and behavior of a single desktop
+// within the pager. It includes elements for displaying content, labels, drop
+// indicators, and selection highlights.
 group { name: "e/modules/pager16/desk";
+   // Pre-loads images used for drop indicators to improve performance.
+   // 'COMP' specifies that the images are stored compressed.
    images.image: "mini_blue_glow_arrow_0.png" COMP;
    images.image: "mini_blue_glow_arrow_1.png" COMP;
    images.image: "mini_blue_glow_arrow_2.png" COMP;
    images.image: "mini_blue_glow_arrow_3.png" COMP;
    parts {
+      // The 'base' part is a transparent rectangle that acts as a container
+      // for all other parts of the desk.
       part { name: "base"; type: RECT;
          description { state: "default" 0.0;
+            // Fully transparent (RGBA: 0, 0, 0, 0 or #00000000). Not using a
+            // color class ('no cc') means it won't be themed.
             color: 0 0 0 0; // no cc
          }
       }
+      // A clipping rectangle that ensures child elements do not draw outside
+      // the desk's content area.
       part { name: "clip"; type: RECT; mouse_events: 0;
          desc { "default";
             rel.to: "e.swallow.content";
          }
       }
+      // This 'swallow' part is intended to display a preview when an object
+      // is being dragged over the desk for a drop operation.
       part { name: "e.swallow.drop"; type: SWALLOW;
          clip_to: "clip";
          description { state: "default" 0.0;
             rel.to: "base";
+            // 'link.base' is a non-standard property, likely an E-specific
+            // feature to link part visibility to an external state signal.
             link.base: "e,state,visible" "e";
          }
          desc { "hid"; inherit; hid;
             link.base: "e,state,hidden" "e";
          }
       }
+      // The main content area for the desk, where previews of windows on
+      // that desk are displayed.
       part { name: "e.swallow.content"; type: SWALLOW;
          clip_to: "clip";
          desc { "default";
@@ -149,6 +193,7 @@ group { name: "e/modules/pager16/desk";
             link.base: "e,state,hidden" "e";
          }
       }
+      // Displays the name of the desk (e.g., "Desktop 1").
       part { name: "e.text.label"; type: TEXT; mouse_events: 0;
          scale: 1;
          desc { "default";
@@ -164,6 +209,8 @@ group { name: "e/modules/pager16/desk";
             visible: 1;
          }
       }
+      // A rectangle used to indicate that the desk is currently selected.
+      // It's invisible by default and animated on selection change.
       part { name: "sel"; type: RECT; mouse_events: 0;
          scale: 1;
          clip_to: "clip";
@@ -181,6 +228,10 @@ group { name: "e/modules/pager16/desk";
             visible: 1;
          }
       }
+      // These four 'drop' parts are image-based indicators (arrows) that appear
+      // in the corners of the desk during a drag-and-drop operation to show it
+      // is a valid drop target. They are normally invisible. 'drop0' is for the
+      // top-left corner; the others are for the remaining corners.
       part { name: "drop0"; mouse_events: 0;
          scale: 1;
          description { state: "default" 0.0;
@@ -206,6 +257,7 @@ group { name: "e/modules/pager16/desk";
             rel1.offset: 11 11;
             rel2.offset: 11 11;
             min: 1 1;
+            // RGBA: 255, 255, 255, 0 (#FFFFFF00), fades the arrow to transparent.
             color: 255 255 255 0; // no cc
          }
       }
@@ -293,29 +345,41 @@ group { name: "e/modules/pager16/desk";
             color: 255 255 255 0; // no cc
          }
       }
+      // A transparent rectangle covering the whole desk area to capture mouse
+      // events. 'repeat_events' allows events to pass through to parts below.
       part { name: "e.eventarea"; type: RECT; mouse_events: 1;
          repeat_events: 1;
          description { state: "default" 0.0;
+            // RGBA: 255, 255, 255, 0 (#FFFFFF00), fully transparent.
             color: 255 255 255 0; // no cc
          }
       }
    }
+   // These programs control the dynamic behavior of the desk, such as selection
+   // highlights, drop indicators, and label visibility.
    programs {
+      // When this desk is selected, animate the 'sel' part to its "active" state.
       program { name: "sel";
          signal: "e,state,selected"; source: "e";
          action: STATE_SET "active" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
          target: "sel";
       }
+      // When the desk is unselected, first stop any ongoing "sel" animations.
       program { signal: "e,state,unselected"; source: "e";
          action: ACTION_STOP;
          target: "sel";
       }
+      // Then, transition the 'sel' part back to its default state.
+      // Using two separate programs ensures that any selection animation is
+      // cleanly stopped before the deselection animation begins.
       program { signal: "e,state,unselected"; source: "e";
          action: STATE_SET "default" 0.0;
          transition: DECELERATE 0.2 USE_DURATION_FACTOR 1;
          target: "sel";
       }
+      // This program chain creates a pulsing animation for the drop indicators.
+      // When a drag operation enters the desk area...
       program { name: "drop1";
          signal: "e,action,drag,in"; source: "e";
          action: STATE_SET "active" 0.0;
@@ -323,8 +387,11 @@ group { name: "e/modules/pager16/desk";
          target: "drop1";
          target: "drop2";
          target: "drop3";
+         // ...the arrows are made visible, and then program 'drop2' is run.
          after: "drop2";
       }
+      // 'drop2' animates the arrows to a 'hidden' state (fading them out).
+      // After fading out, it runs 'drop1' again, creating a pulsing loop.
       program { name: "drop2";
          action: STATE_SET "hidden" 0.0;
          transition: LINEAR 0.5;
@@ -334,6 +401,8 @@ group { name: "e/modules/pager16/desk";
          target: "drop3";
          after: "drop1";
       }
+      // When the drag operation leaves the area, this program stops the pulsing
+      // animation and hides the arrows.
       program { signal: "e,action,drag,out"; source: "e";
          action: STATE_SET "default" 0.0;
          target: "drop0";
@@ -341,6 +410,7 @@ group { name: "e/modules/pager16/desk";
          target: "drop2";
          target: "drop3";
       }
+      // These programs control the visibility of the desk name label.
       program { signal: "e,name,show"; source: "e";
          action: STATE_SET "active" 0.0;
          target: "e.text.label";

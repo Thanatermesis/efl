@@ -1,7 +1,14 @@
 
+// Defines the color properties for text in its default state.
+// This sets the main color to white (#FFFFFF) and a shadow color to black with 50% opacity (#00000080).
 #define FN_COL_DEFAULT 255 255 255 255; color3: 0 0 0 128
+// Defines the color for disabled text.
+// The main color is dark gray (#151515) with a very transparent white shadow.
 #define FN_COL_DISABLE 21 21 21 255; color3: 255 255 255 25;
+// Defines the color for highlighted text, typically when an item is selected.
+// It uses a bright blue (#3399FF) for the main color and for the glow/shadow effects with varying transparency.
 #define FN_COL_HIGHLIGHT 51 153 255 255; color2: 51 153 255 24; color3: 51 153 255 18
+// A macro to simplify setting a fixed size for a part.
 #define FIXED_SIZE(_WIDTH, _HEIGHT) \
    min: _WIDTH _HEIGHT; max: _WIDTH _HEIGHT; fixed: 1 1;
 
@@ -9,13 +16,21 @@
 collections {
 
 group {
+   // This group defines a custom theme for a list item.
+   // By aliasing "efl/list_item", it overrides the default list item style provided by EFL.
    name: "efl/list_item:custom";
    alias: "efl/list_item";
+   // These data items are hints to the containing widget.
+   // "selectraise" and "focusraise" tell the list to raise the item's layer when it is selected or focused,
+   // making it appear on top of other items, which is useful for overlapping effects or shadows.
    data.item: "selectraise" "on";
    data.item: "focusraise" "on";
    parts {
+      // An invisible rectangle that serves as the event-catching area for the entire item.
+      // This part is responsible for receiving mouse clicks and other pointer events.
       part { name: "event"; type: RECT;
          description { state: "default" 0.0;
+            // The color is fully transparent, making it invisible.
             color: 0 0 0 0;
          }
          description { state: "disabled" 0.0;
@@ -23,26 +38,36 @@ group {
             visible: 0;
          }
       }
+      // This part defines the item's background. It has no mouse events so that the "event" part above can receive them.
+      // It has two states to create a "zebra" or alternating color effect for items in a list.
       part { name: "base"; type: RECT; mouse_events: 0;
          description { state: "default" 0.0;
+            // Background color for 'even' items (#2E2E38).
             color: 46 46 56 255;
             color_class: "list_item_base_odd";
          }
          description { state: "odd" 0.0;
+            // Background color for 'odd' items (#383838).
             color: 56 56 56 255;
             color_class: "list_item_base_odd";
          }
       }
+      // When the list emits "efl,state,odd", this program changes the "base" part to the "odd" state.
       program {
          signal: "efl,state,odd"; source: "efl";
          action: STATE_SET "odd" 0.0;
          target: "base";
       }
+      // When the list emits "efl,state,even", this program changes the "base" part to the "default" state (for even rows).
       program {
          signal: "efl,state,even"; source: "efl";
          action: STATE_SET "default" 0.0;
          target: "base";
       }
+      // The following parts 'sel_shadow', 'sel_base', and 'sel_bevel' create the visual feedback for selection.
+      // They are invisible by default and become visible when the item is selected.
+      // This modular approach allows for complex selection effects by layering multiple parts.
+      // A part for the selection shadow effect.
       part { name: "sel_shadow"; mouse_events: 0;
          description { state: "default" 0.0;
             visible: 0;
@@ -52,10 +77,12 @@ group {
             visible: 1;
          }
       }
+      // The base layer of the selection highlight.
       part { name: "sel_base"; mouse_events: 0;
          description { state: "default" 0.0;
             fill.smooth: 0;
             visible: 0;
+            // The fill size makes this part a fixed-width highlight on the left.
             fill { size { relative: 0.0 1.0; offset: 120 0; } }
          }
          description { state: "selected" 0.0;
@@ -63,6 +90,7 @@ group {
             visible: 1;
          }
       }
+      // A part for the bevel effect on selection, adding a 3D-like edge.
       part { name: "sel_bevel"; mouse_events: 0;
          description { state: "default" 0.0;
             fill.smooth: 0;
@@ -73,6 +101,8 @@ group {
             visible: 1;
          }
       }
+      // This program listens for the "efl,state,selected" signal and applies the "selected" state
+      // to all parts that make up the selection visual, making them visible.
       program {
          signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected" 0.0;
@@ -80,6 +110,7 @@ group {
          target: "sel_base";
          target: "sel_bevel";
       }
+      // This program reverts the selection parts to their "default" state (invisible) when the item is unselected.
       program {
          signal: "efl,state,unselected"; source: "efl";
          action: STATE_SET "default" 0.0;
@@ -87,6 +118,7 @@ group {
          target: "sel_base";
          target: "sel_bevel";
       }
+      // The following programs manage the enabled/disabled state of the item's event rectangle.
       program {
          signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;
@@ -99,6 +131,13 @@ group {
       }
 
       //##//
+      // This section defines the text labels of the list item.
+      // It uses a technique where three separate text parts are used to display different states
+      // (default, selected, disabled), with only one visible at a time.
+      // This avoids complex state descriptions within a single part and can be more efficient.
+      //
+      // This is the primary text part. The 'efl.text' name is a convention used by EFL widgets
+      // to identify the main label of an object.
       part { name: "efl.text"; type: TEXT; mouse_events: 0;
          effect: SHADOW BOTTOM;
          scale: 1;
@@ -127,6 +166,8 @@ group {
             visible: 0;
          }
       }
+      // This text part is used to display the label when the item is in a disabled state.
+      // It is normally invisible and only appears when the "disabled" state is active.
       part { name: "label2"; type: TEXT; mouse_events: 0;
          effect: SHADOW BOTTOM;
          scale: 1;
@@ -136,6 +177,8 @@ group {
             color: FN_COL_DISABLE;
             color_class: "list_item_disabled";
             text { font: FN; size: 10;
+               // 'text_source' is an optimization that makes this part automatically use the text
+               // from "efl.text". This means the application code only needs to set the text on "efl.text".
                text_source: "efl.text";
                align: 0.0 0.5;
                text_class: "list_item";
@@ -151,6 +194,8 @@ group {
             visible: 1;
          }
       }
+      // This text part is for displaying the label when the item is selected.
+      // It uses a glow effect and a highlight color. Like 'label2', it is usually invisible.
       part { name: "label3"; type: TEXT; mouse_events: 0;
          effect: GLOW;
          scale: 1;
@@ -177,6 +222,9 @@ group {
             visible: 0;
          }
       }
+      // The following programs orchestrate the visibility of the three text parts
+      // based on the item's state (selected, unselected, disabled, enabled).
+      // For each state, the corresponding text part is set to its active state, while the others are reset to default (invisible).
       program {
          signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected" 0.0;
@@ -206,6 +254,8 @@ group {
          target: "label3";
       }
       //##//
+      // A SWALLOW part named 'efl.icon'. This is a standard name for a part that acts as a container
+      // for an icon widget provided by the application. It is positioned on the left side of the item.
       part { name: "efl.icon"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 0;
@@ -216,6 +266,8 @@ group {
             rel2.offset: 2 -3;
          }
       }
+      // Another SWALLOW part, 'efl.end', for content at the trailing edge of the item.
+      // This is often used for things like check boxes, badges, or accessory icons.
       part { name: "efl.end"; type: SWALLOW;
          description { state: "default" 0.0;
             fixed: 1 0;
@@ -228,6 +280,8 @@ group {
       }
       //##//
 
+      // This part adds a 'shine' or glossy highlight effect to the selected item.
+      // It's a small, fixed-size rectangle positioned relative to 'sel_base'.
       part { name: "sel_shine"; mouse_events: 0;
          description { state: "default" 0.0;
             rel1.offset: 0 -2;
@@ -243,6 +297,9 @@ group {
             visible: 1;
          }
       }
+      // An invisible rectangle that becomes visible when the item is disabled.
+      // Its purpose is to sit on top of everything else and block all mouse events,
+      // ensuring that a disabled item is truly non-interactive.
       part { name: "event_block"; type: RECT;
          description { state: "default" 0.0;
             color: 0 0 0 0;
@@ -253,6 +310,7 @@ group {
             visible: 1;
          }
       }
+      // Toggles the visibility of the 'sel_shine' effect based on selection state.
       program {
          signal: "efl,state,selected"; source: "efl";
          action: STATE_SET "selected" 0.0;
@@ -263,6 +321,7 @@ group {
          action: STATE_SET "default" 0.0;
          target: "sel_shine";
       }
+      // Toggles the visibility of the 'event_block' part to block/unblock events based on disabled state.
       program {
          signal: "efl,state,disabled"; source: "efl";
          action: STATE_SET "disabled" 0.0;

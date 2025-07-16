@@ -1,26 +1,49 @@
+// Specifies the EFL version compatibility.
 efl_version: 1 22;
 
+// Collections are the core of an Edje file, containing groups of UI elements.
 collections {
+   // Defines reusable styles for parts.
    styles {
+      // Defines a style named "entry_style" for text parts.
       style { name: "entry_style";
+         // Sets the visual properties.
+         // 'wrap=hyphenation' is key here, it automatically breaks and hyphenates
+         // words that don't fit on a single line. This is essential for clean
+         // text layout in narrow containers. The color #000 is black.
          base: "font="DejavuSans" font_size=10 color=#000 wrap=hyphenation left_margin=2 right_margin=2";
       }
    }
+   // A group is a self-contained UI layout that can be loaded into an application.
    group {
       name: "example_textblock_hyphenation";
+      // Sets the minimum size of this group to 10 pixels wide and 50 pixels high.
       min: 10 50;
 
+      // Contains all the parts that make up this group's interface.
       parts {
+         // A part is an individual element within the group.
          part {
             name: "text_part"; type: TEXTBLOCK;
+            // Describes the properties of this part for a given state.
             description {
+               // Sets minimum size, same as group, ensuring it can be this small.
                min: 10 50;
+               // "default" is the initial state of the part.
                state: "default" 0.0;
+               // These two properties make the part fill its container.
+               // rel1 sets the top-left corner to the top-left of the container.
                rel1.relative: 0.0 0.0;
+               // rel2 sets the bottom-right corner to the bottom-right of the container.
                rel2.relative: 1.0 1.0;
+               // Properties specific to the text within the TEXTBLOCK part.
                text {
+                  // Applies the style defined above, including font and hyphenation settings.
                   style: "entry_style";
+                  // min: characters (width) and lines (height). '0 1' means it
+                  // can be very narrow but must have at least one line of height.
                   min: 0 1;
+                  // Aligns the text to the top-left (0.0 0.0) corner of the part.
                   align: 0.0 0.0;
                }
             }

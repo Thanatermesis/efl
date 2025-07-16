@@ -1,3 +1,8 @@
+// This block shows how to define and use custom fonts. The 'fonts' section
+// allows embedding font files directly into the theme file. Each font is
+// given an alias that can be used throughout the EDC file. This is commented
+// out in favor of using system-wide available fonts for better consistency
+// and reduced file size.
 /*fonts {
    font: "PT_Sans-Web-Regular.ttf" "PTSans";
    font: "PT_Sans-Web-Bold.ttf" "PTSans-Bold";
@@ -10,11 +15,31 @@
 #define FNIT   "PTSans-Italic"
 #define FNBDIT "PTSans-BoldItalic"
 */
+// Defines aliases for commonly used system fonts. Using generic names like "Sans"
+// allows the system's font rendering engine (Fontconfig on Linux) to select an
+// appropriate font, improving portability across different systems.
+// Styles like "Bold" and "Oblique" are specified to select the correct font variant.
 #define FN     "Sans"
 #define FNBD   "Sans:style=Bold"
 #define FNIT   "Sans:style=Oblique"
 #define FNBDIT "Sans:style=Bold Italic"
 
+// This macro defines a set of styling tags for textblock objects when they are in
+// an 'enabled' state. These tags function like simplified HTML tags to format
+// text. They are applied within textblock parts to style text dynamically.
+//
+// The 'color=cc:/...' syntax uses color classes, which are abstract color
+// names that get resolved by the theme. This allows for consistent color usage
+// and easy theme-wide color changes. For example, 'cc:/fg/normal/text-standout'
+// refers to the standout text color for the foreground in a normal state.
+//
+// The tags cover various semantic purposes:
+// - Basic formatting: 'em' (emphasis), 'hilight', 'heading'.
+// - Interactive elements: 'link', 'preedit' (for IMEs).
+// - Font sizing: 'title', 'subtitle', 'bigger', etc.
+// - Semantic information: 'name', 'val', 'info', 'success', 'warning', 'failure'.
+// - Code syntax highlighting: 'code', 'comment', 'string', etc.
+// - Diff views: 'line_added', 'line_removed', 'line_changed'.
 #define ENABLED_TEXTBLOCK_TAGS                                             \
    tag: "em" "+ font_style=Oblique";                                       \
    tag: "hilight" "+ font_weight=Bold color=cc:/fg/normal/text-standout";  \
@@ -49,6 +74,11 @@
    tag: "line_removed" "+ color=cc:/fg/normal/text-line-removed";          \
    tag: "line_changed" "+ color=cc:/fg/normal/text-line-changed";
 
+// This macro defines the same set of textblock tags but for a 'disabled' state.
+// The main difference is the use of 'disabled' color classes (e.g.,
+// 'cc:/fg/disabled/text-standout'), which typically render the text grayed out
+// or with less contrast to indicate that the UI element is not interactive.
+// This provides visual feedback to the user about the state of the control.
 #define DISABLED_TEXTBLOCK_TAGS                                            \
    tag: "em" "+ font_style=Oblique";                                       \
    tag: "hilight" "+ font_weight=Bold color=cc:/fg/disabled/text-standout"; \
